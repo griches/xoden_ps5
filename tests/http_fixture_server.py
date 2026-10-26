@@ -10,6 +10,9 @@ import time
 
 
 class Server(http.server.ThreadingHTTPServer):
+    # Eight clients connect together in the concurrency test. The TCP backlog
+    # must hold that burst while the accept thread completes TLS handshakes.
+    request_queue_size = 32
     accepted_connections = 0
 
     def get_request(self):

@@ -254,6 +254,10 @@ int main(int argc, char** argv) {
       request.url = base_url + "/keep/ok";
       for (int iteration = 0; iteration < 10; ++iteration) {
         const auto response = independent.Perform(request, cancel);
+        if (!response.ok() || Text(response.body) != "fixture-ok")
+          std::fprintf(stderr, "parallel HTTPS: %s status=%ld bytes=%zu iteration=%d\n",
+                       playden::steam::HttpFailureName(response).c_str(), response.status_code,
+                       response.body.size(), iteration);
         Check(response.ok() && Text(response.body) == "fixture-ok", "parallel verified HTTPS clients");
       }
     });
