@@ -413,11 +413,13 @@ GameDefaults DefaultsFor(const GameProbe& probe, const RuntimeAbilities& runtime
     // Chromium starts helper processes, and in one process it reserves 64 GB of address space.
     out.refusal = "This game runs on NW.js (a built-in web browser), which Playden can't start on the PS5 yet.";
   } else if (probe.engine == "unity") {
-    // Unity also names d3d12 and Vulkan; D3D11 is the path DXVK covers. Unity before 2017.2
-    // (the player built into the program) still has a Direct3D 9 renderer, which draws on the
-    // console (Hexcells); on D3D11 one (140) stopped before its first frame.
+    // Modern Unity players can name APIs whose shaders were excluded at build time.
+    // Let the game's own supported-API list select its renderer instead of forcing
+    // D3D11 (Minishoot's Xbox build excludes it). Supply both Direct3D providers
+    // when the kit supports them. Legacy Unity still needs its proven D3D9 path.
     out.graphics = "dxvk";
-    out.arguments = probe.legacy_unity ? "-force-d3d9 {resolution}" : "-force-d3d11 {resolution}";
+    out.arguments = probe.legacy_unity ? "-force-d3d9 {resolution}" : "{resolution}";
+    if (!probe.legacy_unity && runtime.vkd3d_proton) out.d3d12 = "vkd3d-proton";
     out.resolution_arguments = "-screen-width {w} -screen-height {h}";
   } else if (probe.engine == "unreal") {
     out.graphics = "dxvk";
@@ -488,7 +490,9 @@ std::string DetectedLabel(const std::string& summary) {
            {"idtech3", "id Tech 3"}, {"hashlink", "HashLink"}, {"xna", "XNA"}, {"java", "Java"}})
     if (facts.count(id)) engine = name;
   std::string api;
-  if (graphics == "opengl") api = "OpenGL";
+  if (graphics == "dxvk" && engine == "Unity" && !facts.count("unity-legacy"))
+    api = "Automatic renderer";
+  else if (graphics == "opengl") api = "OpenGL";
   else if (graphics == "dxvk" && facts.count("d3d12") && engine != "Unity" && engine != "Unreal Engine")
     // Direct3D 12 also loads dxgi; a game that names both 11 and 12 can draw with either.
     api = facts.count("d3d11") ? "Direct3D 11 and 12" : "Direct3D 12";

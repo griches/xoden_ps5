@@ -115,7 +115,7 @@ int main() {
     CHECK(defaults.graphics == "dxvk" && defaults.arguments.empty() && defaults.refusal.empty());
     CHECK(defaults.summary == "d3d9 graphics=dxvk");
   }
-  {  // Unity loads Direct3D at run time (wide strings); D3D11 is forced.
+  {  // API strings in UnityPlayer do not prove the game includes that renderer's shaders.
     const auto root = fresh();
     WritePe(root / "Balls.exe", {true, {"UnityPlayer.dll", "KERNEL32.dll"}});
     WritePe(root / "UnityPlayer.dll", {true, {"KERNEL32.dll"}, false, false, Wide("d3d11.dll") + Wide("D3D12.dll")});
@@ -124,7 +124,12 @@ int main() {
     const auto probe = ProbeGame(root.string(), "Balls.exe");
     CHECK(probe.engine == "unity" && probe.il2cpp && probe.apis.count("d3d11") && probe.apis.count("d3d12"));
     const auto defaults = DefaultsFor(probe);
-    CHECK(defaults.graphics == "dxvk" && defaults.arguments == "-force-d3d11 {resolution}");
+    CHECK(defaults.graphics == "dxvk" && defaults.arguments == "{resolution}");
+    CHECK(defaults.d3d12.empty());
+    RuntimeAbilities modern;
+    modern.vkd3d_proton = true;
+    const auto automatic = DefaultsFor(probe, modern);
+    CHECK(automatic.arguments == "{resolution}" && automatic.d3d12 == "vkd3d-proton");
     CHECK(defaults.resolution_arguments == "-screen-width {w} -screen-height {h}");
     CHECK(defaults.summary == "unity-il2cpp,d3d11,d3d12 graphics=dxvk");
   }
@@ -547,7 +552,7 @@ int main() {
   }
 
   // The player's words for what was found.
-  CHECK(DetectedLabel("unity-il2cpp,d3d11,d3d12 graphics=dxvk") == "Unity \xC2\xB7 Direct3D 11");
+  CHECK(DetectedLabel("unity-il2cpp,d3d11,d3d12 graphics=dxvk") == "Unity \xC2\xB7 Automatic renderer");
   CHECK(DetectedLabel("d3d9 graphics=dxvk") == "Direct3D 9");
   CHECK(DetectedLabel("d3d12,d3d9,dxgi graphics=dxvk") == "Direct3D 12");
   CHECK(DetectedLabel("d3d11,d3d12,dxgi,vulkan graphics=dxvk") == "Direct3D 11 and 12");
