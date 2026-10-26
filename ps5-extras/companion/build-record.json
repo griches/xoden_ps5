@@ -1,0 +1,10 @@
+{
+  "nexusCommit": "3006f141331cf5579d12261e4ac80ba7c2ffcf74",
+  "backendLockSha256": "da7d81a24a3b5dd56d5847a06dc2bcdc2cee81ca80890f7987dde697d6856979",
+  "backendCommit": "53ea781dcd073e31d7ea68e894134e9c959bff04",
+  "patchesVerified": 52,
+  "rust": "1.99.1",
+  "protobuf": "36.2",
+  "localPreparationSourceSha256": "898f1b4798f396e004616f3d2fc2389e85568f2815fa75279205ece4069984da",
+  "backendBinarySha256": "65a61747331e2ac200bc62bc89249b10852691615cb4926fe9ff676baf76977f"
+}

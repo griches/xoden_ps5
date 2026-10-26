@@ -1,0 +1,21 @@
+{
+  "target": "x86_64-pc-windows-gnu",
+  "features": "no-default-features",
+  "sha256": "d5d79769e44eebb1d78b4f9eff444d581dd2bcf6092a2079c3b5054795c438bc",
+  "consoleTested": true,
+  "previousBuildResults": {
+    "profile": true,
+    "library": true,
+    "streaming": "checkpoint directory flush failed"
+  },
+  "consoleResults": {
+    "profile": "passed on previous build",
+    "library": "1179 entitlements; Minishoot active",
+    "streaming": {
+      "phase": "complete",
+      "completedBytes": 417684235,
+      "totalBytes": 417684235
+    },
+    "prepare": "pending"
+  }
+}

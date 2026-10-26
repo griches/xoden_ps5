@@ -1,0 +1,4 @@
+from domsvoboda/xodus-nexus release runtime-11.0-20261022-gf4adc821 (x86_64-windows Wine builtin; 127.0.0.1 TCP bridge via XODUS_BRIDGE_PORT/KEY)
+windows.web.dll: same release, Xodus Wine JSON patches (stock Wine 11.18 JsonArray lacks the interface xgameruntime needs).
+xodus-bridge.mjs: copy of the Nexus loopback bridge (node xodus-bridge.mjs <port> <64-hex key> /tmp/xodus.sock); game gets XODUS_BRIDGE_PORT/KEY.
+xodus-cli, xodus-service: Mac (arm64) builds of xodus 514dd56 + local decrypt command (branch ps5-decrypt).
