@@ -40,12 +40,26 @@ pub async fn parse_message(
 ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
     match message_type {
         XodusMessageType::Ping => Ok(buffer),
+        XodusMessageType::StorePackageUpdatesRequest => {
+            let result = crate::store_updates::handle(context, &buffer).await;
+            Ok(quick_xml::se::to_string(&result)?.into_bytes())
+        }
+        XodusMessageType::StoreLicenseTokenRequest => {
+            // Dedicated request, never silently reinterpret it as Xbox sign-in.
+            let result = crate::store_license::handle(context, &buffer).await;
+            Ok(quick_xml::se::to_string(&result)?.into_bytes())
+        }
         XodusMessageType::MsaTokenRequest => {
             tracing::debug!("Raw buffer: {buffer:?}");
             let string_buf = std::str::from_utf8(&buffer)?;
             tracing::debug!("String buffer: {string_buf:?}");
             let req = quick_xml::de::from_str::<MSATokenRequest>(string_buf)?;
-            let Token::Legacy(token) = context.tokens().get_user_sts_token()? else {
+            let identity_session = context.tokens().get_user_sts_session()?;
+            let request_token = match &identity_session {
+                Some((_, token)) => token.clone(),
+                None => context.tokens().get_user_sts_token()?,
+            };
+            let Token::Legacy(token) = request_token else {
                 return Ok(vec![]);
             };
             let scope = if req.msa_full_trust {
@@ -53,7 +67,7 @@ pub async fn parse_message(
             } else {
                 "xboxlive.signin"
             };
-            let device_token = context.device_token.as_ref().unwrap();
+            let device_token = context.device_token.as_ref().ok_or(xodus::models::secrets::InvalidTokenResponse)?;
             let device_token_resp = xodus::api::live::exchange_device_token(
                 &context.client,
                 device_token.clone(),
@@ -63,10 +77,10 @@ pub async fn parse_message(
             )
             .await;
 
-            let ms_device_rps_token = if let Some((Token::Compact(ms_device_token), Ok(lifetime))) =
+            let ms_device_rps_token = if let Some((Ok(Token::Compact(ms_device_token)), Ok(lifetime))) =
                 device_token_resp.ok().map(|t| {
                     let expiry = chrono::DateTime::parse_from_rfc3339(&t.lifetime.expires);
-                    (t.into(), expiry)
+                    (Token::try_from(t), expiry)
                 }) {
                 Some((ms_device_token, lifetime.timestamp()))
             } else {
@@ -97,7 +111,7 @@ pub async fn parse_message(
                 ) => {
                     if let Some(sts) = collection.security_tokens.pop() {
                         let address = sts.applies_to.endpoint_reference.address.clone();
-                        let sts: Token = sts.into();
+                        let sts: Token = sts.try_into()?;
                         let address = if let Token::Legacy(legacy) = &sts {
                             legacy.key_name.clone().unwrap_or(address)
                         } else {
@@ -107,16 +121,25 @@ pub async fn parse_message(
                             tracing::warn!("Failed to persist refreshed STS token: {err}");
                         }
                     }
-                    let token = collection.security_tokens.remove(0);
+                    let token = collection.security_tokens.into_iter().next().ok_or(xodus::models::secrets::InvalidTokenResponse)?;
                     let expiry = chrono::DateTime::parse_from_rfc3339(&token.lifetime.expires)?;
-                    let token: Token = token.into();
+                    let token: Token = token.try_into()?;
                     let Token::Compact(user_token) = token else {
                         return Ok(vec![]);
                     };
+                    // Store licensing uses this same session facade. Bind the
+                    // Xbox ticket's MSA principal to its current Store account,
+                    // never infer either account identifier from an Xbox XUID.
+                    let current_identity = context.tokens().get_user_sts_session().ok().flatten();
+                    let (xbox_msa_account_id, store_msa_account_id) = crate::account_metadata::bound_ids(
+                        identity_session.as_ref().map(|(user, _)| user),
+                        current_identity.as_ref().map(|(user, _)| user));
                     let payload = MSATokenResponse {
                         token: user_token,
                         expiry: expiry.timestamp(),
                         device_expiry: ms_device_rps_token.as_ref().map(|(_, r)| *r).unwrap_or(0),
+                        xbox_msa_account_id,
+                        store_msa_account_id,
                         device_rps: ms_device_rps_token
                             .map(|(t, _)| t)
                             .unwrap_or_else(String::new),
@@ -124,7 +147,7 @@ pub async fn parse_message(
                     let payload = quick_xml::se::to_string(&payload)?;
                     Ok(payload.as_bytes().to_vec())
                 }
-                _ => todo!("Error handling sill sucks"),
+                _ => Err(xodus::models::secrets::InvalidTokenResponse.into()),
             }
         }
         _ => Err("Unimplemented".into()),

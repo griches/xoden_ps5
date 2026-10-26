@@ -5,15 +5,15 @@ use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 
 use aes::cipher::KeyInit;
 use aes::{Aes128Dec, Aes128Enc};
-use futures_util::StreamExt;
 use msixvc_common::parse::{BinaryParse, BinaryTryParse};
-use reqwest::header::RANGE;
 use tokio::fs::OpenOptions;
 use tokio::io::{
     AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt, BufReader,
 };
 use tokio::task::block_in_place;
-use tokio::time::{sleep, timeout};
+use tokio::time::sleep;
+#[cfg(test)]
+use tokio::time::timeout;
 use tokio_util::io::SyncIoBridge;
 use uuid::Uuid;
 use zerocopy::IntoBytes;
@@ -28,6 +28,19 @@ use crate::models::xvd::{
     XvdUserDataPackageFileEntry, XvdUserDataPackageFilesHeader,
 };
 use crate::streaming_ntfs::collect_ntfs_stream_layouts;
+use crate::streaming_http::{Policy, RangeReader, TransferError};
+
+#[cfg(test)]
+#[path = "package_metadata_tests.rs"]
+mod package_metadata_tests;
+
+#[cfg(test)]
+#[path = "download_resume_tests.rs"]
+mod resume_tests;
+
+#[cfg(test)]
+#[path = "encrypted_image_tests.rs"]
+mod encrypted_image_tests;
 
 pub struct SyncSubstream<R> {
     inner: R,
@@ -303,9 +316,32 @@ pub struct SegmentFile {
     pub keep_encrypted: bool,
 }
 
+impl SegmentFile {
+    /// Ciphertext is retained as complete XTS data units, including the final
+    /// page beyond the logical file length. Plain files have no such padding.
+    pub fn stored_length(&self) -> io::Result<u64> {
+        if !self.keep_encrypted {
+            return Ok(self.length);
+        }
+        self.length.div_ceil(PAGE_SIZE as u64)
+            .checked_mul(PAGE_SIZE as u64)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "encrypted file length overflows"))
+    }
+}
+
 impl XvdFile {
     pub fn content_id(&self) -> uuid::Uuid {
         self.header.vduid
+    }
+
+    pub fn resume_identity(&self) -> String {
+        let mut identity = self.header.signature.to_vec();
+        identity.extend(self.header.top_hash_block_hash);
+        identity.extend(self.header.original_xvc_data_hash);
+        identity.extend(self.header.user_data_hash);
+        identity.extend(self.header.vduid.as_bytes());
+        identity.extend(self.header.pduid.as_bytes());
+        crate::streaming::resume_digest(&identity)
     }
 
     fn non_encrypted_prefix_len(&self, start: u64, len: u64) -> u64 {
@@ -448,7 +484,17 @@ impl XvdFile {
     {
         let mut files = HashMap::new();
 
-        let user_data_offset = self.layout.user_data.start.0 as u64;
+        let user_data_offset = self.layout.user_data.start.to_bytes().0;
+        let user_data_length = self.layout.user_data.len.0;
+        let invalid = |message| Error::new(ErrorKind::InvalidData, message);
+        if user_data_length == 0 {
+            return Ok(files);
+        }
+        if user_data_length < XvdUserDataHeader::SIZE as u64 {
+            return Err(invalid("Truncated XVD user-data header").into());
+        }
+        let user_data_end = user_data_offset.checked_add(user_data_length)
+            .ok_or_else(|| invalid("XVD user-data range overflow"))?;
         file.seek(SeekFrom::Start(user_data_offset)).await?;
         let user_data_header = {
             let mut buf = XvdUserDataHeader::buffer();
@@ -456,7 +502,14 @@ impl XvdFile {
             XvdUserDataHeader::from_array(&buf)
         };
         if user_data_header.t == 0 {
-            let mut off = user_data_offset + user_data_header.length as u64;
+            let header_length = user_data_header.length as u64;
+            if header_length < XvdUserDataHeader::SIZE as u64
+                || header_length > user_data_length
+                || user_data_length - header_length < XvdUserDataPackageFilesHeader::SIZE as u64
+            {
+                return Err(invalid("Invalid XVD package-file table range").into());
+            }
+            let mut off = user_data_offset + header_length;
             file.seek(SeekFrom::Start(off)).await?;
             let user_data_package_files_header = {
                 let mut buf = XvdUserDataPackageFilesHeader::buffer();
@@ -464,6 +517,10 @@ impl XvdFile {
                 XvdUserDataPackageFilesHeader::from_array(&buf)
             };
             off += XvdUserDataPackageFilesHeader::SIZE as u64;
+            let count = user_data_package_files_header.file_count as u64;
+            if count > (user_data_end - off) / XvdUserDataPackageFileEntry::SIZE as u64 {
+                return Err(invalid("XVD package-file entries exceed user data").into());
+            }
             let mut buf = XvdUserDataPackageFileEntry::buffer();
             for _ in 0..user_data_package_files_header.file_count {
                 file.seek(SeekFrom::Start(off)).await?;
@@ -477,12 +534,17 @@ impl XvdFile {
                     .iter()
                     .position(|&c| c == 0)
                     .unwrap_or(fullname.len());
-                let pfull_name: String = String::from_utf16(&fullname[..end]).unwrap();
+                let pfull_name = String::from_utf16(&fullname[..end])
+                    .map_err(|_| invalid("Invalid UTF-16 in XVD package-file name"))?;
+                let offset = user_data_offset + XvdUserDataHeader::SIZE as u64 + o as u64;
+                if offset > user_data_end || s as u64 > user_data_end - offset {
+                    return Err(invalid("XVD package-file payload exceeds user data").into());
+                }
 
                 files.insert(
                     pfull_name,
                     UserPackageFile {
-                        offset: user_data_offset + XvdUserDataHeader::SIZE as u64 + o as u64,
+                        offset,
                         length: s as u64,
                     },
                 );
@@ -731,24 +793,60 @@ impl XvdFile {
         })
     }
 
-    pub async fn download_file_http<Writer, Progress>(
+    pub async fn download_file_http<Writer, Progress, Checkpoint>(
         &self,
         client: &reqwest::Client,
         url: &str,
         out: &mut Writer,
         sfile: &SegmentFile,
         full_key: [u8; 32],
-        mut progress: Progress,
+        progress: Progress,
+        pause: Option<tokio::sync::watch::Receiver<bool>>,
+        resume_offset: u64,
+        checkpoint: Checkpoint,
     ) -> Result<(), Box<dyn std::error::Error>>
     where
         Writer: AsyncWrite + Unpin,
         Progress: FnMut(u64, u64),
+        Checkpoint: FnMut(u64) -> std::io::Result<()>,
+    {
+        Self::download_segment_http(
+            &self.encrypted_section_infos,
+            client,
+            url,
+            out,
+            sfile,
+            full_key,
+            progress,
+            pause,
+            resume_offset,
+            checkpoint,
+        )
+        .await
+    }
+
+    async fn download_segment_http<Writer, Progress, Checkpoint>(
+        sections: &[EncryptedSectionInfo],
+        client: &reqwest::Client,
+        url: &str,
+        out: &mut Writer,
+        sfile: &SegmentFile,
+        full_key: [u8; 32],
+        mut progress: Progress,
+        mut pause: Option<tokio::sync::watch::Receiver<bool>>,
+        resume_offset: u64,
+        mut checkpoint: Checkpoint,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        Writer: AsyncWrite + Unpin,
+        Progress: FnMut(u64, u64),
+        Checkpoint: FnMut(u64) -> std::io::Result<()>,
     {
         if sfile.length == 0 {
             return Ok(());
         }
 
-        let s = &self.encrypted_section_infos.iter().find(|s| {
+        let s = &sections.iter().find(|s| {
             sfile.offset >= s.section_offset && sfile.offset < s.section_offset + s.section_length
         });
 
@@ -778,72 +876,61 @@ impl XvdFile {
         let page_count = sfile.length.div_ceil(PAGE_SIZE as u64);
 
         let mut page = [0u8; PAGE_SIZE];
-        let mut remaining = sfile.length;
-        let mut page_in_section = page_start;
-        let page_length = sfile.length.div_ceil(PAGE_SIZE as u64) * PAGE_SIZE as u64;
-        let mut stream = None;
-        let mut pending = bytes::BytesMut::new();
-        let mut v: u64 = 0;
-
-        let stall_timeout = tokio::time::Duration::from_secs(5);
-        if let Ok(Ok(Ok(response))) = timeout(
-            stall_timeout,
-            client
-                .get(url)
-                .header(
-                    RANGE,
-                    format!(
-                        "bytes={}-{}",
-                        sfile.offset + v,
-                        sfile.offset + page_length - 1
-                    ),
-                )
-                .send(),
-        )
-        .await
-        .map(|o| o.map(|o| o.error_for_status()))
-            && response.status() == 206
-        {
-            stream = Some(response.bytes_stream());
+        if resume_offset > sfile.length || resume_offset % PAGE_SIZE as u64 != 0 {
+            return Err(Box::new(io::Error::other("invalid download resume offset")));
         }
+        let mut remaining = sfile.length - resume_offset;
+        let mut page_in_section = page_start + resume_offset / PAGE_SIZE as u64;
+        let page_length = sfile.length.div_ceil(PAGE_SIZE as u64) * PAGE_SIZE as u64;
+        let mut pending = bytes::BytesMut::new();
+        let mut v: u64 = resume_offset;
+        let mut last_checkpoint = resume_offset;
+        let start = sfile.offset.checked_add(v).ok_or(TransferError::new("transfer-range", 0))?;
+        let end = sfile.offset.checked_add(page_length - 1).ok_or(TransferError::new("transfer-range", 0))?;
+        let mut transfer = RangeReader::new(client, url, start, end, Policy::default());
         loop {
             if page_in_section >= page_start + page_count || remaining == 0 {
                 break;
             }
-            let next = if let Some(s) = stream.as_mut() {
-                timeout(stall_timeout, s.next()).await
-            } else {
-                Ok(None)
-            };
-            let data;
-            if let Ok(Some(Ok(b))) = next {
-                data = b;
-            } else {
-                // error
-                if let Ok(Ok(Ok(response))) = timeout(
-                    stall_timeout,
-                    client
-                        .get(url)
-                        .header(
-                            RANGE,
-                            format!(
-                                "bytes={}-{}",
-                                sfile.offset + v,
-                                sfile.offset + page_length - 1
-                            ),
-                        )
-                        .send(),
-                )
-                .await
-                .map(|o| o.map(|o| o.error_for_status()))
-                    && response.status() == 206
-                {
-                    stream = Some(response.bytes_stream());
-                    continue;
+            if let Some(control) = pause.as_mut() {
+                if *control.borrow() {
+                    // Release the HTTP connection while parked. Resuming issues
+                    // a fresh Range request at v, preserving pending partial pages.
+                    transfer.disconnect();
+                    out.flush().await?;
+                    checkpoint(sfile.length - remaining)?;
+                    control.wait_for(|paused| !*paused).await.ok();
+                    // Time spent intentionally paused is not a network stall.
+                    transfer.disconnect();
                 }
-                continue;
             }
-
+            let next = if let Some(control) = pause.as_mut() {
+                tokio::select! {
+                    biased;
+                    changed = control.changed() => {
+                        if changed.is_err() { pause = None; }
+                        continue;
+                    }
+                    next = transfer.next() => next,
+                }
+            } else {
+                transfer.next().await
+            };
+            let data = match next {
+                Ok(Some(data)) => data,
+                result => {
+                    // Only fully written pages become durable, never a pending
+                    // partial encrypted page or merely reported progress.
+                    out.flush().await?;
+                    checkpoint(sfile.length - remaining)?;
+                    return Err(Box::new(result.err().unwrap_or(TransferError::new("transfer-eof", 0))));
+                }
+            };
+            if data.len() as u64 > page_length - v {
+                return Err(Box::new(io::Error::other(
+                    "HTTP range exceeded the requested segment",
+                )));
+            }
             v += data.len() as u64;
             progress(min(v, sfile.length), sfile.length);
 
@@ -886,14 +973,16 @@ impl XvdFile {
                 } else {
                     to_write_remaining
                 };
-                while let Err(err) = out.write_all(&page[..to_write]).await {
-                    eprintln!("Error write file {} waiting 30s", err);
-                    println!("Error write file {} waiting 30s", err);
-                    sleep(tokio::time::Duration::from_secs(30)).await;
-                }
+                out.write_all(&page[..to_write]).await?;
                 remaining -= to_write_remaining as u64;
 
                 page_in_section += 1;
+            }
+            let written = sfile.length - remaining;
+            if written.saturating_sub(last_checkpoint) >= 32 * 1024 * 1024 {
+                out.flush().await?;
+                checkpoint(written)?;
+                last_checkpoint = written;
             }
         }
         if remaining > 0 {
@@ -902,6 +991,8 @@ impl XvdFile {
                 remaining, sfile.length, v
             ))));
         }
+        out.flush().await?;
+        checkpoint(sfile.length)?;
         Ok(())
     }
 
