@@ -11,8 +11,17 @@ constexpr StoreTraits kSteamTraits{Store::kSteam, "steam", "Steam", true, true, 
 constexpr StoreTraits kGogTraits{Store::kGog, "gog", "GOG", true, false, true};
 constexpr StoreTraits kEpicTraits{Store::kEpic, "epic", "Epic", true, false, true};
 constexpr StoreTraits kLocalTraits{Store::kLocal, "local", "Imported", false, false, false};
+constexpr StoreTraits kXboxTraits{Store::kXbox, "xbox", "Xbox", true, false, true};
 
 constexpr std::string_view kLocalPrefix = "local-";
+constexpr std::string_view kXboxPrefix = "xbox-";
+
+bool IsXboxValue(std::string_view text) {
+  if (text.size() != 12) return false;
+  for (const char c : text)
+    if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) return false;
+  return true;
+}
 
 std::optional<std::uint32_t> ParseSteamValue(std::string_view text) {
   if (text.empty() || text.front() == '0') return std::nullopt;
@@ -45,12 +54,14 @@ const StoreTraits& Traits(Store store) {
     case Store::kGog: return kGogTraits;
     case Store::kEpic: return kEpicTraits;
     case Store::kLocal: return kLocalTraits;
+    case Store::kXbox: return kXboxTraits;
   }
   return kSteamTraits;
 }
 
 std::optional<Store> ParseStoreKey(std::string_view key) {
   if (key == kLocalTraits.key) return Store::kLocal;
+  if (key == kXboxTraits.key) return Store::kXbox;
   return std::nullopt;
 }
 
@@ -58,6 +69,7 @@ bool GameId::valid() const {
   switch (store) {
     case Store::kSteam: return ParseSteamValue(value).has_value();
     case Store::kLocal: return IsLocalValue(value);
+    case Store::kXbox: return IsXboxValue(value);
     case Store::kGog:
     case Store::kEpic: return false;  // not implemented yet
   }
@@ -75,6 +87,7 @@ GameId GameId::Steam(std::uint32_t app) {
 }
 
 GameId GameId::Local(std::string uuid) { return {Store::kLocal, std::move(uuid)}; }
+GameId GameId::Xbox(std::string product) { return {Store::kXbox, std::move(product)}; }
 
 bool operator==(const GameId& left, const GameId& right) {
   return left.store == right.store && left.value == right.value;
@@ -92,10 +105,25 @@ bool operator<(const GameId& left, const GameId& right) {
 
 std::string ToKey(const GameId& id) {
   if (id.store == Store::kLocal) return std::string(kLocalPrefix) + id.value;
+  if (id.store == Store::kXbox) {
+    std::string value = id.value;
+    for (char& c : value) if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+    return std::string(kXboxPrefix) + value;
+  }
   return id.value;
 }
 
 std::optional<GameId> ParseKey(std::string_view key) {
+  if (key.substr(0, kXboxPrefix.size()) == kXboxPrefix) {
+    std::string value(key.substr(kXboxPrefix.size()));
+    // Persist only one spelling, compatible with the native title descriptor.
+    for (char& c : value) {
+      if (c >= 'A' && c <= 'Z') return std::nullopt;
+      if (c >= 'a' && c <= 'z') c -= 'a' - 'A';
+    }
+    if (!IsXboxValue(value)) return std::nullopt;
+    return GameId::Xbox(std::move(value));
+  }
   if (key.substr(0, kLocalPrefix.size()) == kLocalPrefix) {
     const auto value = key.substr(kLocalPrefix.size());
     if (!IsLocalValue(value)) return std::nullopt;
@@ -118,6 +146,7 @@ std::optional<GameId> ParseInstallId(std::string_view install_id) {
     return GameId::Steam(*app);
   }
   if (install_id.substr(0, kLocalPrefix.size()) == kLocalPrefix) return ParseKey(install_id);
+  if (install_id.substr(0, kXboxPrefix.size()) == kXboxPrefix) return ParseKey(install_id);
   return std::nullopt;
 }
 

@@ -354,7 +354,7 @@ int main() {
     CHECK(BuildEffectiveSettings(recipe, nullptr, {{"library_overrides", "winmm=n"}}, KitCapabilities{}, &settings, &error));
     CHECK(!settings.values.at("graphics").locked && settings.graphics == "dxvk");
     CHECK(settings.dll_overrides == std::string(kDxvkOverrides) + ";winmm=n");
-    CHECK(settings.arguments == "-force-d3d11 -screen-width 1920 -screen-height 1080");
+    CHECK(settings.arguments == "-screen-width 1920 -screen-height 1080");
     CHECK(BuildEffectiveSettings(recipe, nullptr, {{"graphics", "auto"}}, KitCapabilities{}, &settings, &error));
     CHECK(settings.graphics == "auto" && settings.dll_overrides.empty());
     // Steam features: emulation by default here, and the player may choose the game's own files.

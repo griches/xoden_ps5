@@ -72,7 +72,17 @@ int main() {
   Check(GeneratedRecipeId(local) == std::string("local-") + kUuid + "-auto", "Local generated recipe ID");
   Check(ProfileId(local) == std::string("playden-local-") + kUuid, "Local profile ID");
 
-  for (const auto& id : {max, local}) {
+  const auto xbox = GameId::Xbox("9N5PKH0KW2L1");
+  Check(xbox.valid() && !xbox.steam_app(), "Xbox product identity is independent of Steam");
+  Check(!GameId::Xbox("9n5pkh0kw2l1").valid(), "Xbox values have one canonical spelling");
+  Check(ToKey(xbox) == "xbox-9n5pkh0kw2l1" && ParseKey(ToKey(xbox)) == xbox,
+        "Xbox product round trips through a descriptor-safe key");
+  Check(ParseInstallId(ToInstallId(xbox)) == xbox && ParseStoreKey("xbox") == Store::kXbox,
+        "Xbox install and store identity persist");
+  Check(!ParseKey("xbox-9N5PKH0KW2L1") && !ParseKey("xbox-../9n5pkh0kw2l1") &&
+            !ParseKey("xbox-9n5pkh0kw2l") && !ParseKey("xbox-9n5pkh0kw2l11"),
+        "Xbox rejects noncanonical and unsafe keys");
+  for (const auto& id : {max, local, xbox}) {
     for (const auto& derived : {ToKey(id), ToInstallId(id), GeneratedRecipeId(id), ProfileId(id)}) {
       bool allowed = derived.size() <= 64;
       for (const char character : derived)
@@ -99,7 +109,8 @@ int main() {
             !Traits(Store::kEpic).cloud_saves && Traits(Store::kEpic).downloads,
         "Epic traits");
   Check(static_cast<int>(Store::kSteam) == 1 && static_cast<int>(Store::kGog) == 2 &&
-            static_cast<int>(Store::kEpic) == 3 && static_cast<int>(Store::kLocal) == 4,
+            static_cast<int>(Store::kEpic) == 3 && static_cast<int>(Store::kLocal) == 4 &&
+            static_cast<int>(Store::kXbox) == 5,
         "persisted store values");
 
   std::puts("library_store: ok");

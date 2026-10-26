@@ -9,7 +9,7 @@
 namespace playden {
 
 // Where a game comes from. The values are persisted: never renumber them.
-enum class Store : std::uint8_t { kSteam = 1, kGog = 2, kEpic = 3, kLocal = 4 };
+enum class Store : std::uint8_t { kSteam = 1, kGog = 2, kEpic = 3, kLocal = 4, kXbox = 5 };
 
 struct StoreTraits {
   Store store;
@@ -36,6 +36,8 @@ struct GameId {
 
   static GameId Steam(std::uint32_t app);
   static GameId Local(std::string uuid);
+  // Microsoft Store product IDs: exactly twelve upper-case ASCII letters/digits.
+  static GameId Xbox(std::string product);
 };
 
 bool operator==(const GameId& left, const GameId& right);
