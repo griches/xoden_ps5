@@ -1,5 +1,8 @@
 #include "homebrew/controller.hpp"
 #include "steam/local_session_repository.h"
+#include "stores/xbox/jobs.h"
+#include "stores/xbox/library_source.h"
+#include "steam/backend/json.h"
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -585,6 +588,43 @@ void SlowLicenseCheckShowsAfterAFewSeconds() {
   }
   std::filesystem::remove_all(root);
 }
+void PhoneApprovalLoadsMissingLibraryWithoutAnotherAction() {
+  char temp[]="/tmp/playden-phone-controller-XXXXXX";assert(mkdtemp(temp));
+  const auto root=std::filesystem::canonical(temp);
+  {
+    Storage storage(root.string());
+    const auto put=[&](const char* name,const std::string& value){assert(storage.WriteAtomicPrivate(name,Bytes(value.begin(),value.end())).ok());};
+    std::filesystem::create_directories(root/"games/xbox-9n5pkh0kw2l1");
+    put("prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9N5PKH0KW2L1\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\"xbox-9n5pkh0kw2l1\",\"executable\":\"Game.exe\"}]}");
+    std::atomic<int> phone{0},refresh{0};
+    stores::xbox::JobConfig config;config.root=root.string();config.games_root=(root/"games").string();
+    config.native_run=[&](const auto&,const auto&){
+      const auto data=storage.Read("job-request.json");assert(data.ok());
+      const auto request=steam::json::Parse(std::string(data.value().begin(),data.value().end()));assert(request);
+      const auto operation=request->Find("operation")->text();const auto id=request->Find("requestId")->text();
+      if(operation=="signin-test") {
+        ++phone;
+        put("job-result.json","{\"schema\":1,\"requestId\":\""+id+"\",\"operation\":\"signin-test\",\"status\":\"phone-sign-in-verified\",\"detail\":{\"pcLicenseVerified\":true,\"activeAccountReplaced\":false}}");
+      } else {
+        assert(operation=="refresh" && phone==1);++refresh;
+        put("job-result.json","{\"schema\":1,\"requestId\":\""+id+"\",\"operation\":\"refresh\",\"status\":\"complete\",\"detail\":{}}");
+      }
+      return stores::xbox::NativeResult::Complete;
+    };
+    stores::xbox::Jobs jobs(config);stores::xbox::XboxLibrarySource source(root.string());
+    Simulation model({}, {},ModelMode::Live);model.SetGamePassOnly(true);
+    Repository repository;Backend backend;Controller controller(model,backend,repository);controller.SetXboxJobs(&jobs,&source);
+    Wait(controller,[&]{return jobs.Snapshot()->phase=="idle";});
+    OpenSettings(model);Choose(model,"xbox-account");Choose(model,"xbox-phone-test");
+    Wait(controller,[&]{return jobs.Snapshot()->phase=="refreshed" && model.view().subtitle.find("Your library is ready")!=std::string::npos;});
+    for(int i=0;i<8;++i)controller.Tick();
+    assert(phone==1 && refresh==1 && !jobs.Snapshot()->active_game.valid());
+    assert(backend.calls==0 && backend.restores==0);
+    controller.Shutdown();jobs.Shutdown();source.Shutdown();
+  }
+  std::filesystem::remove_all(root);
+}
+
 void GamePassStartupDoesNotRestoreSteam() {
   Repository repo;repo.value=Session();CacheFixture cache;
   Simulation model({}, {},ModelMode::Live);model.SetGamePassOnly(true);
@@ -809,4 +849,4 @@ void StaySignedInOffKeepsTheTokenInMemory() {
   }
   std::filesystem::remove_all(root);
 }
-int main() { GamePassStartupDoesNotRestoreSteam(); StaySignedInOffKeepsTheTokenInMemory(); TitleNamesCarryTheirStore(); NoSteamSessionWithOtherGamesOpensHome(); FailedRestoreWithOtherGamesOpensHome(); OtherRestoreFailuresWithOtherGamesOpenHome(); SteamSignOutKeepsOtherGames(); PasswordSignInWithGuardCode(); PasswordFailuresAndCancel(); SlowLicenseCheckShowsAfterAFewSeconds(); CanceledStorageRetryKeepsSavedSessionIntent(); RevokedSessionCleanupRetriesAfterStorageRecovery(); StorageFailureKeepsVisibleAccount(); StorageFailureRetriesSavedSession(); ChallengeAndCancel(); AuthenticationRestoreAndSignOut(); FailedClearDoesNotSwitch(); SignInAgainKeepsTheAccount(); ExitHonorsClearWithoutStartingNewQr(); StorageFailureAndRevocation(); ConnectedLibraryAndOfflineRestart(); LicenseChangesRefreshTheLibrary(); OfflineRefreshFromTheLibraryReconnects(); ShutdownClearsLibraryBeforeSession(); RepeatedClearPreservesFirstIntent(); }
+int main() { PhoneApprovalLoadsMissingLibraryWithoutAnotherAction(); GamePassStartupDoesNotRestoreSteam(); StaySignedInOffKeepsTheTokenInMemory(); TitleNamesCarryTheirStore(); NoSteamSessionWithOtherGamesOpensHome(); FailedRestoreWithOtherGamesOpensHome(); OtherRestoreFailuresWithOtherGamesOpenHome(); SteamSignOutKeepsOtherGames(); PasswordSignInWithGuardCode(); PasswordFailuresAndCancel(); SlowLicenseCheckShowsAfterAFewSeconds(); CanceledStorageRetryKeepsSavedSessionIntent(); RevokedSessionCleanupRetriesAfterStorageRecovery(); StorageFailureKeepsVisibleAccount(); StorageFailureRetriesSavedSession(); ChallengeAndCancel(); AuthenticationRestoreAndSignOut(); FailedClearDoesNotSwitch(); SignInAgainKeepsTheAccount(); ExitHonorsClearWithoutStartingNewQr(); StorageFailureAndRevocation(); ConnectedLibraryAndOfflineRestart(); LicenseChangesRefreshTheLibrary(); OfflineRefreshFromTheLibraryReconnects(); ShutdownClearsLibraryBeforeSession(); RepeatedClearPreservesFirstIntent(); }

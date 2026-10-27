@@ -116,6 +116,7 @@ class Controller {
   std::uint64_t xbox_revision_ = ~0ull;
   std::string xbox_account_key_;
   std::string xbox_completed_request_, xbox_refreshed_request_;
+  bool xbox_phone_load_library_ = false, xbox_phone_refresh_started_ = false;
   std::vector<installs::InstalledLocation> xbox_locations_;
   std::map<GameId, std::string> xbox_programs_;
   void TickSelfUpdate();

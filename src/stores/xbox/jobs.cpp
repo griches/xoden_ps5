@@ -202,7 +202,7 @@ bool Jobs::Cancel(GameId game) {
     auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
     next->cancelling = true; next->phase = "stopping";
     next->sign_in_code.clear(); next->sign_in_url.clear();
-    next->message = next->phone_test ? "Cancelling phone sign-in…" : "Stopping download before deleting files…";
+    next->message = next->phone_test ? "Cancelling phone sign-in…" : !next->active_game.valid() ? "Cancelling account operation…" : "Stopping download before deleting files…";
     state_ = std::move(next); return true;
 }
 bool Jobs::TestPhoneSignIn(GameId game, std::string market) {
@@ -533,6 +533,11 @@ void Jobs::ExecuteNative(GameId game, const std::string& request_id) {
     if (loaded->phone_test) {
         if (discard || result==NativeResult::Cancelled) Publish("cancelled","Phone sign-in cancelled. Your current account is unchanged.");
         else if (result!=NativeResult::Complete && loaded->phase!="failed") Publish("failed","Phone sign-in did not finish. Your current account is unchanged.");
+        return;
+    }
+    if (!game.valid()) {
+        if(discard || result==NativeResult::Cancelled) Publish("cancelled","Account operation cancelled. Installed games and saves were kept.");
+        else if(result==NativeResult::Failed && loaded->phase!="failed") Publish("failed","The account operation did not finish. Try again.");
         return;
     }
     if (std::find(loaded->partials.begin(),loaded->partials.end(),game) != loaded->partials.end()) {
