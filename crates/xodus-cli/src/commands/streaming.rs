@@ -264,9 +264,10 @@ async fn run_cli_reader<Reader>(
 where
     Reader: AsyncRead + Unpin,
 {
+    let observer_reporter = observer.clone();
     let reporter = tokio::spawn(async move {
-        if progress_json || observer.is_some() {
-            progress::report(rx, observer).await;
+        if progress_json || observer_reporter.is_some() {
+            progress::report(rx, observer_reporter).await;
             return;
         }
         let multi_progress = MultiProgress::new();
@@ -325,6 +326,7 @@ where
         url,
         tx,
         pause,
+        observer,
     )
     .await;
     tx.send(ProgressEvent::Completed {
@@ -350,6 +352,7 @@ async fn run_reader<Reader>(
     url: &str,
     tx: &Sender<ProgressEvent>,
     pause: tokio::sync::watch::Receiver<bool>,
+    observer: Option<crate::job_observer::Observer>,
 ) -> ExitCode
 where
     Reader: AsyncRead + Unpin,
@@ -376,7 +379,7 @@ where
     };
     let remote_xvd = match XvdFile::parse(&mut remote_file).await {
         Ok(xvd) => xvd,
-        Err(error) => { failure::report_metadata(error.as_ref()); return ExitCode::FAILURE; }
+        Err(error) => { failure::report_metadata_observed(error.as_ref(),observer.as_deref()); return ExitCode::FAILURE; }
     };
     let mut rfiles: HashMap<String, SegmentFile> = HashMap::new();
     let mut lfiles: HashMap<String, SegmentFile> = HashMap::new();
@@ -387,7 +390,7 @@ where
     {
         Ok(files) => files,
         Err(error) => {
-            failure::report_metadata(error.as_ref());
+            failure::report_metadata_observed(error.as_ref(),observer.as_deref());
             return ExitCode::FAILURE;
         }
     };
@@ -397,7 +400,7 @@ where
                 .parse_segment_metadata(&mut remote_file, v)
                 .await {
                 Ok(files) => files,
-                Err(error) => { failure::report_metadata(error.as_ref()); return ExitCode::FAILURE; }
+                Err(error) => { failure::report_metadata_observed(error.as_ref(),observer.as_deref()); return ExitCode::FAILURE; }
             };
             rfiles = sfiles;
         }
@@ -413,7 +416,7 @@ where
             .parse_ntfs_segment_metadata(&mut remote_file, !rfiles.is_empty())
             .await {
             Ok(files) => files,
-            Err(error) => { failure::report_metadata(error.as_ref()); return ExitCode::FAILURE; }
+            Err(error) => { failure::report_metadata_observed(error.as_ref(),observer.as_deref()); return ExitCode::FAILURE; }
         };
         rfiles.extend(sfiles);
     }
@@ -427,13 +430,13 @@ where
     if let Some(mut file) = file {
         let xvd = match XvdFile::parse(&mut file).await {
             Ok(xvd) => xvd,
-            Err(error) => { failure::report_metadata(error.as_ref()); return ExitCode::FAILURE; }
+            Err(error) => { failure::report_metadata_observed(error.as_ref(),observer.as_deref()); return ExitCode::FAILURE; }
         };
 
         let files = match xvd.parse_user_package_files(&mut file).await {
             Ok(files) => files,
             Err(error) => {
-                failure::report_metadata(error.as_ref());
+                failure::report_metadata_observed(error.as_ref(),observer.as_deref());
                 return ExitCode::FAILURE;
             }
         };
@@ -441,7 +444,7 @@ where
             if k == "SegmentMetadata.bin" {
                 let sfiles = match xvd.parse_segment_metadata(&mut file, v).await {
                     Ok(files) => files,
-                    Err(error) => { failure::report_metadata(error.as_ref()); return ExitCode::FAILURE; }
+                    Err(error) => { failure::report_metadata_observed(error.as_ref(),observer.as_deref()); return ExitCode::FAILURE; }
                 };
                 lfiles = sfiles;
             }

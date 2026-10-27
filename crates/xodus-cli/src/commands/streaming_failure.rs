@@ -38,6 +38,14 @@ pub(super) fn report(error: &(dyn std::error::Error + 'static)) {
 pub(super) fn report_metadata(error: &(dyn std::error::Error + 'static)) {
     report_as(error, "metadata-invalid");
 }
+pub(super) fn report_metadata_observed(error: &(dyn std::error::Error + 'static), observer: Option<&dyn crate::job_observer::JobObserver>) {
+    let code = match error.downcast_ref::<std::io::Error>() {
+        Some(error) if error.kind() == std::io::ErrorKind::OutOfMemory => "metadata-memory",
+        _ => "metadata-invalid",
+    };
+    if let Some(observer) = observer { observer.diagnostic(code); }
+    report_metadata(error);
+}
 fn report_as(mut error: &(dyn std::error::Error + 'static), stage: &'static str) {
     let mut found = None;
     for _ in 0..8 {
@@ -66,6 +74,19 @@ mod tests {
         Arc,
         atomic::{AtomicBool, Ordering},
     };
+    #[test]
+    fn embedded_metadata_errors_expose_only_bounded_codes() {
+        struct Capture(std::sync::Mutex<Option<&'static str>>);
+        impl crate::job_observer::JobObserver for Capture {
+            fn diagnostic(&self, code: &'static str) { *self.0.lock().unwrap() = Some(code); }
+        }
+        let capture = Capture(std::sync::Mutex::new(None));
+        report_metadata_observed(&std::io::Error::new(std::io::ErrorKind::OutOfMemory,"private backend detail"),Some(&capture));
+        assert_eq!(*capture.0.lock().unwrap(),Some("metadata-memory"));
+        report_metadata_observed(&std::io::Error::other("private URL or path"),Some(&capture));
+        assert_eq!(*capture.0.lock().unwrap(),Some("metadata-invalid"));
+    }
+
     #[tokio::test]
     async fn streaming_failure_cancels_and_settles_parallel_workers_without_completing_failed_jobs()
     {

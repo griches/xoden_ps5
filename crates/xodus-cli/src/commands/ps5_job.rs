@@ -225,7 +225,7 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
     let destination = games.join(&folder);
     std::fs::create_dir_all(&destination).map_err(|_| "download-directory")?;
     state(root, req, "downloading", json!({"contentId":content}))?;
-    if super::streaming::run_observed(client,tokens,product.into(),destination.to_string_lossy().into(),false,None,Some(req.market.clone()),true,false,Some(content.clone()),req.observer.clone()).await != ExitCode::SUCCESS { return Err("download-failed"); }
+    if super::streaming::run_observed(client,tokens,product.into(),destination.to_string_lossy().into(),false,None,Some(req.market.clone()),true,false,Some(content.clone()),req.observer.clone()).await != ExitCode::SUCCESS { return Err(req.observer.as_ref().and_then(|observer| observer.failure_code()).unwrap_or("download-failed")); }
     state(root, req, "preparing", json!({"contentId":content}))?;
     if super::prepare_ps5::run(client,tokens,destination.to_string_lossy().into(),Some(req.market.clone())).await != ExitCode::SUCCESS { return Err("preparation-failed"); }
     if tokens.get_user().map_err(|_| "account-changed")?.username != account { return Err("account-changed"); }

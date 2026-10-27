@@ -13,6 +13,8 @@ pub struct DownloadProgress {
 /// promptly and must not panic. Native hosts should copy into their UI mailbox.
 pub trait JobObserver: Send + Sync {
     fn phase(&self, _phase: &str) {}
+    fn diagnostic(&self, _code: &'static str) {}
+    fn failure_code(&self) -> Option<&'static str> { None }
     fn progress(&self, _progress: DownloadProgress) {}
 }
 pub type Observer = std::sync::Arc<dyn JobObserver>;

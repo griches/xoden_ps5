@@ -28,6 +28,8 @@ impl Mailbox {
     }
 }
 impl JobObserver for Mailbox {
+    fn diagnostic(&self, code: &'static str) { self.update(|s| s.error = Some(code)); }
+    fn failure_code(&self) -> Option<&'static str> { self.0.lock().unwrap_or_else(|p| p.into_inner()).error }
     fn phase(&self, phase: &str) { self.update(|s| { s.phase = phase.into(); s.progress = None; }); }
     fn progress(&self, progress: DownloadProgress) { self.update(|s| s.progress = Some(progress)); }
 }
