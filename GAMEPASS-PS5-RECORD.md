@@ -549,3 +549,29 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   that does not require him authenticating. Actual Microsoft authentication is
   deferred until he returns. Keep current credentials intact.
 - Remote Play remains off; virtual pad was closed after download testing.
+
+### Final acceptance / handover at 12:16 UTC
+
+- Playden b495f92: green interface, no Xbox logos; automatic package picker was
+  console-tested with 1000xRESIST (8.0 GB). Cancelled the picker before download.
+- Playden 21c0f21: account panel no longer inherits unrelated download messages;
+  its instructions/status now actually render in the sheet. Settings > Xbox
+  account > Refresh Xbox library succeeded using the existing console session.
+  No interactive Microsoft login, logout or account replacement was performed.
+- Final binary SHA256:
+  `86418ba7b69fd077bd3311af949506bfa475929d476985b9e70b9db5f475b94e`.
+  Deployed using verified raw SELF transfers; backup is
+  `console-backups/20261027-account-help`. Ordinary FTP RETR decodes SELF by
+  default, so raw byte verification must call configure_raw_transfers first.
+- Validation: final host suite 152/152 passes (139.58 seconds); shared Rust CLI
+  75/75 passes; companion 14/14 passes; native archive and final PS5 package build
+  succeeded. Earlier added fixture incorrectly expected idle after refresh;
+  corrected to refreshed and the final complete suite passes.
+- Screenshots: /tmp/playden-green-package-plan.png (size before download),
+  /tmp/playden-account-refresh-result.png (successful native account refresh),
+  /tmp/playden-account-help-visible.png (final visible account sheet).
+- Virtual pad CLOSED successfully after returning to Library. Remote Play off;
+  debugger remains off. No active test downloads. Tracked changes committed.
+- Still outstanding: fresh console sign-in / safe account handoff, standalone
+  app packaging and separate identity/updater, generated icon0/pic0 for game
+  home-screen titles, Minishoot gameplay acceptance and multi-job scheduling.
