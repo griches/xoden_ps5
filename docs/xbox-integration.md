@@ -369,3 +369,16 @@ in execute-only text at aws_lc_0_45_0_curve25519_x25519base. Portable crypto is
 being built for this native target; no download acceptance is claimed yet.
 Host validation: all 152 Playden tests (130.28s), 74 shared engine tests, five
 native lifecycle tests and mocked native DNS cleanup/address-order contract pass.
+
+
+Portable crypto build b3693e6a7ba40562ecb0b8b283b1b007757a5597bb38cd5317a00b5d689410b9
+passed TLS, account/entitlement checks and package metadata. Its next console
+fault was fs2::unix::statvfs. The native platform feature now delegates available
+space to Playden's QueryVolumeSpace, preserving mount checks and console reserve.
+The standalone link-only payload probe fails this query explicitly; it is not
+an executable downloader. Native space build is f5233e2dba0c4a027438d38a0681728ed11942f2b16412718d4e212d8f494b21.
+
+On-console native-space build now transfers game bytes directly in Playden:
+A Game About Digging A Hole reached 15% at 10:56:21Z and 38% at 10:56:42Z.
+No Mac download/transfer or separate worker title is involved. Full 152 host tests
+pass again (130.74s); five native lifecycle tests pass. Preparation/launch pending.

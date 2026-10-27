@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "stores/xbox/native_engine.h"
+#include "steam/install_volumes.h"
 #include "xodus_ps5_native.h"
 #include <chrono>
 #include <cstring>
@@ -11,6 +12,17 @@
 #include <sys/socket.h>
 extern "C" int getentropy(void *, size_t);
 extern "C" int xodus_ps5_entropy_status(void);
+extern "C" int xodus_ps5_available_space(const char* path, std::uint64_t* bytes) {
+    if (!path || !bytes || path[0] != '/') return -1;
+    try {
+        const auto space = playden::steam::QueryVolumeSpace(path);
+        if (!space) return -1;
+        *bytes = space->free_bytes;
+        return 0;
+    } catch (...) {
+        return -1; // Never unwind across the Rust/C boundary.
+    }
+}
 namespace playden::stores::xbox {
 namespace {
 std::string Message(const std::string& phase) {

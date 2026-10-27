@@ -24,6 +24,6 @@ if(PLAYDEN_XBOX_NATIVE_SOURCE OR PLAYDEN_XBOX_NATIVE_LIBRARY)
         "${PLAYDEN_XBOX_NATIVE_SOURCE}/tools/ps5_entropy.c"
         "${PLAYDEN_XBOX_NATIVE_SOURCE}/tools/ps5_dns.c")
     target_include_directories(playden_library_service PRIVATE "${PLAYDEN_XBOX_NATIVE_SOURCE}/include")
-    target_compile_definitions(playden_library_service PUBLIC PLAYDEN_XBOX_NATIVE=1)
+    target_compile_definitions(playden_library_service PUBLIC PLAYDEN_XBOX_NATIVE=1 PRIVATE XODUS_NATIVE_TITLE=1)
     target_link_libraries(playden_library_service PUBLIC "${PLAYDEN_XBOX_NATIVE_LIBRARY}" unwind SceRandom)
 endif()
