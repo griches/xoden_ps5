@@ -30,6 +30,9 @@ tempfile = "3.27.0"
 rustix = "1.1.4"
 ctrlc = "3.5.2"
 nix = "0.31.3"
+tokio-rustls = { version = "0.26.4", default-features = false, features = ["aws_lc_rs", "tls12"] }
+rcgen = { version = "0.14.10", default-features = false, features = ["crypto", "aws_lc_rs"] }
+sha2 = "0.11.0"
 
 # The embedded PS5 library does not spawn processes or install signal drivers.
 [target.'cfg(not(target_os = "freebsd"))'.dependencies]

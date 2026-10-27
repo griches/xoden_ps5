@@ -3,6 +3,26 @@
 #include <pthread_np.h>
 #include <stddef.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <unistd.h>
+/* Native libc exports accept, but not the newer FreeBSD accept4 entry point.
+ * Apply both required descriptor flags before returning the accepted socket. */
+int accept4(int listener, struct sockaddr *address, socklen_t *length, int flags) {
+    if (flags & ~(SOCK_CLOEXEC | SOCK_NONBLOCK)) { errno=EINVAL;return -1; }
+    int fd=accept(listener,address,length);
+    if(fd<0)return -1;
+    if((flags & SOCK_CLOEXEC) && fcntl(fd,F_SETFD,FD_CLOEXEC)<0)goto failed;
+    if(flags & SOCK_NONBLOCK) {
+        int current=fcntl(fd,F_GETFL,0);
+        if(current<0 || fcntl(fd,F_SETFL,current|O_NONBLOCK)<0)goto failed;
+    }
+    return fd;
+failed: {
+    int error=errno;close(fd);errno=error;return -1;
+}
+}
 struct dl_phdr_info;
 /* Disable Rust backtrace module enumeration in this isolated test. */
 int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data) {

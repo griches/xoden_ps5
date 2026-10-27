@@ -9,6 +9,8 @@ const PLANS: &[&str] = &["CFQ7TTC0KGQ8", "CFQ7TTC0KHS0", "CFQ7TTC0P85B", "CFQ7TT
 const PC_PLANS: &[&str] = &["CFQ7TTC0KGQ8", "CFQ7TTC0KHS0"];
 #[path = "ps5_signin.rs"]
 mod signin;
+#[path = "ps5_browser_signin.rs"]
+mod browser_signin;
 type Result<T> = std::result::Result<T, &'static str>;
 
 struct Request { id: String, operation: String, market: String, account: Option<String>, product: Option<String>, content: Option<String>, observer: Option<crate::job_observer::Observer> }
@@ -21,7 +23,7 @@ fn parse(bytes: &[u8]) -> Result<Request> {
     if v["schema"] != 1 || obj.keys().any(|k| !["schema","requestId","operation","market","accountKey","productId","contentId"].contains(&k.as_str())) { return Err("request-schema"); }
     let id = v["requestId"].as_str().ok_or("request-id")?;
     if uuid::Uuid::parse_str(id).map(|u| u.to_string()).ok().as_deref() != Some(id) { return Err("request-id"); }
-    let operation = v["operation"].as_str().filter(|s| ["refresh","plan","install","signin-test","signout"].contains(s)).ok_or("request-operation")?;
+    let operation = v["operation"].as_str().filter(|s| ["refresh","plan","install","signin-test","signin-browser","signout"].contains(s)).ok_or("request-operation")?;
     let market = v["market"].as_str().filter(|s| s.len() == 2 && s.bytes().all(|b| b.is_ascii_uppercase())).ok_or("request-market")?;
     let optional = |key: &str| -> Result<Option<String>> { match v.get(key) { None | Some(Value::Null) => Ok(None), Some(Value::String(s)) => Ok(Some(s.clone())), _ => Err("request-field") } };
     let account = optional("accountKey")?;
@@ -33,6 +35,7 @@ fn parse(bytes: &[u8]) -> Result<Request> {
     if operation == "refresh" && (product.is_some() || content.is_some()) { return Err("request-refresh-fields"); }
     if operation == "signin-test" && (product.is_none() || account.is_some()) { return Err("request-signin-fields"); }
     if operation == "signout" && (product.is_some() || content.is_some() || account.is_some()) { return Err("request-signout-fields"); }
+    if operation == "signin-browser" && (product.is_some() || content.is_some() || account.is_some()) { return Err("request-signin-fields"); }
     Ok(Request { id: id.into(), operation: operation.into(), market: market.into(), account, product, content, observer: None })
 }
 
@@ -227,6 +230,7 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
         return state(root,req,"signed-out",json!({"accountCleared":true}));
     }
     if req.operation == "signin-test" { return signin::run(client,tokens,root,req).await; }
+    if req.operation == "signin-browser" { return browser_signin::run(client,tokens,root,req).await; }
     if req.operation == "refresh" && matches!(tokens.active_account(), Err(xodus::tokens::store::TokenStoreError::NotFound))
         && tokens.phone_candidate().map_err(|_| "phone-candidate-read")?.is_some() {
         tokens.activate_phone_candidate().map_err(|_| "phone-activation")?;

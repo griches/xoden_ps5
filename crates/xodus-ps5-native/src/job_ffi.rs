@@ -48,15 +48,23 @@ pub unsafe extern "C" fn xodus_job_start(config: *const JobConfig, config_size: 
     if registry.job.is_some() { return -3; }
     let Some(id) = registry.generation.checked_add(1) else { return -3; };
     let keyring = root.join("xodus-keyring.ron");
+    let request_path=root.join("job-request.json");
     let job = Job::start(root,games,move || {
         let mut pem = Vec::new();
         std::fs::File::open(trust).map_err(|_| "trust-open")?.take(2*1024*1024+1).read_to_end(&mut pem).map_err(|_| "trust-read")?;
         xodus_cli::configure_embedded_trust(&pem)?;
         // Storage roots and the pre-existing credential store are provisioned by
         // Playden. Refuse a missing store: never create a new anonymous session.
+        unsafe extern "C" {fn xodus_ps5_commit_keyring(bytes:*const u8,len:usize)->i32;}
+        if !keyring.exists() {
+            let mut bytes=Vec::new();
+            std::fs::File::open(request_path).map_err(|_|"request-read")?.take(4097).read_to_end(&mut bytes).map_err(|_|"request-read")?;
+            let request:serde_json::Value=serde_json::from_slice(&bytes).map_err(|_|"request-json")?;
+            if bytes.len()>4096 || request["operation"]!="signin-browser" {return Err("sign-in-required");}
+            if unsafe{xodus_ps5_commit_keyring(b"{}".as_ptr(),2)}!=0{return Err("credential-store");}
+        }
         let metadata = std::fs::symlink_metadata(&keyring).map_err(|_| "sign-in-required")?;
         if !metadata.file_type().is_file() { return Err("credential-file"); }
-        unsafe extern "C" {fn xodus_ps5_commit_keyring(bytes:*const u8,len:usize)->i32;}
         let tokens=xodus_cli::TokenManager::with_host_file(&keyring,std::sync::Arc::new(|bytes|
             unsafe {xodus_ps5_commit_keyring(bytes.as_ptr(),bytes.len())==0})).map_err(|_| "credential-store")?;
         let client = xodus_cli::http_client_builder()?.redirect(xodus_cli::RedirectPolicy::none())
