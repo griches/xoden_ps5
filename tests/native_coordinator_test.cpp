@@ -1,5 +1,6 @@
 #include "platform/ps5/native_coordinator.h"
 #include <cstdio>
+#include <cerrno>
 #include <cstdlib>
 #include <fstream>
 #include <sys/stat.h>
@@ -120,6 +121,28 @@ int main() {
   CHECK(native.Query(record).collision);
   package.value.title_source_path = source.string();
   response = "{}"; CHECK(!native.Query(record).available); CHECK(native.Availability("FAKE78002").source_path == TitleAvailability::kUnknown);
+  // A removed source's unmanaged row can be re-added for a fully owned new
+  // install. The cache entry alone cannot grant this exception.
+  response = R"({"status":0,"games":[{"title_id":"FAKE78001","installed":false,"managed":false,"mounted":false,"source_available":true,"source_type":"folder","runtime_path":"/data/homebrew/FAKE78001","path":"/data/homebrew/FAKE78001"}]})";
+  database = {TitleAvailability::kFree,{}};
+  const auto before_reclaim = mutations;
+  CHECK(registry.Register(record.title_id).code == EEXIST && mutations == before_reclaim);
+  CHECK(native.Availability(record.title_id).source_path == TitleAvailability::kOccupied);
+  status = native.QueryOwnership(record);
+  CHECK(status.available && status.source_available && status.owned_manifest_matches && !status.collision && !status.scan_pending);
+  package.value.manifest_matches = false;
+  CHECK(native.Register(record).state == RegistrationResultState::kFailed && mutations == before_reclaim);
+  package.value.manifest_matches = true;
+  database.inventory = TitleAvailability::kOccupied;
+  CHECK(native.QueryOwnership(record).collision);
+  CHECK(native.Register(record).state == RegistrationResultState::kFailed && mutations == before_reclaim);
+  database.inventory = TitleAvailability::kUnknown;
+  CHECK(!native.QueryOwnership(record).available);
+  database.inventory = TitleAvailability::kFree;
+  CHECK(chmod(source.c_str(),0777) == 0);
+  CHECK(native.QueryOwnership(record).collision);
+  CHECK(chmod(source.c_str(),0700) == 0);
+  CHECK(native.Register(record).state == RegistrationResultState::kScanQueued && mutations == before_reclaim + 2);
   std::filesystem::remove_all(source); std::filesystem::create_symlink("/", source);
   CHECK(ReadTitleSource(root, record.title_id).availability != TitleAvailability::kFree);
   CHECK(!native.Query(record).available);

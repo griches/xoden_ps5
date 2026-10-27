@@ -100,11 +100,13 @@ TitleResult TitleRegistry::Post(const std::string& route, const std::string& bod
     return {false, EPROTO, "shadowmount"};
   return {*code == 0, static_cast<std::uint32_t>(*code), "shadowmount"};
 }
-TitleResult TitleRegistry::Register(const std::string& title) {
+TitleResult TitleRegistry::Register(const std::string& title, bool owned_unmanaged_source) {
   if (!IsPlaydenGameTitle(title)) return {false, EINVAL, "title-id"};
   const auto existing = Query(title);
   if (existing.state == RegistrationState::kUnavailable) return {false, EIO, "query"};
-  if (existing.state == RegistrationState::kCollision) return {false, EEXIST, "collision"};
+  const bool reclaim = owned_unmanaged_source && existing.state == RegistrationState::kCollision &&
+      existing.reason == "source-not-managed" && existing.path == "/data/homebrew/" + title;
+  if (existing.state == RegistrationState::kCollision && !reclaim) return {false, EEXIST, "collision"};
   if (existing.state == RegistrationState::kReady) return {true, 0, "registered"};
   // Already submitted and waiting for its scan: never submit it again.
   if (existing.state == RegistrationState::kPending) return {true, 0, "pending"};

@@ -22,7 +22,9 @@ class TitleRegistry {
   std::string DescribeVersion();
   // Caller must independently check native install/source paths and establish
   // ownership before registration. ShadowMount inventory alone cannot reserve IDs.
-  TitleResult Register(const std::string& title_id);
+  // The opt-in is only for the coordinator after it proves this exact canonical
+  // source belongs to its reserved install and native inventory is free.
+  TitleResult Register(const std::string& title_id, bool owned_unmanaged_source = false);
   // Removes only the manual registration source; caller must retire/delete its owned
   // source folder before Unregister to prevent the scanner registering it again.
   TitleResult RemoveManualSource(const std::string& title_id);

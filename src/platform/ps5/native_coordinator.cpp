@@ -156,7 +156,13 @@ runtime::NativeStatus Ps5NativeCoordinator::QueryWith(const runtime::RuntimeInst
       cache.state == RegistrationState::kUnavailable) { diagnostic("inventory-unavailable"); return {}; }
   runtime::NativeStatus status; status.available = true;
   status.source_available = source.directory;
-  if (cache.state == RegistrationState::kCollision) { diagnostic("registry-collision"); status.collision = true; return status; }
+  // A removed manual source can remain as an unmanaged cache row after the
+  // title ID is reused. It is recoverable only for our owned canonical folder,
+  // while native inventory is free; the package marker is checked below.
+  const bool own_unmanaged = cache.state == RegistrationState::kCollision &&
+      cache.reason == "source-not-managed" && cache.path == "/data/homebrew/" + record.title_id &&
+      database.inventory == TitleAvailability::kFree && source.owned_directory;
+  if (cache.state == RegistrationState::kCollision && !own_unmanaged) { diagnostic("registry-collision"); status.collision = true; return status; }
   if (source.availability == TitleAvailability::kFree) {
     status.collision = database.inventory == TitleAvailability::kOccupied || cache.state != RegistrationState::kAbsent;
     return status;
@@ -202,7 +208,7 @@ runtime::RegistrationResult Ps5NativeCoordinator::Register(const runtime::Runtim
   const auto package = package_.Inspect(record);
   if (!package.known || !package.template_owned || !package.mutable_bottle_present || !package.mutable_bottle_owned)
     return {RegistrationResultState::kFailed, "native-bottle", "Registration requires the reserved owned template bottle."};
-  const auto result = registry_.Register(record.title_id);
+  const auto result = registry_.Register(record.title_id, true);
   // An unanswered submission is followed like a queued one: queries only.
   if (!result.ok && result.stage == "uncertain")
     return runtime::RegistrationResult{RegistrationResultState::kScanQueued, {}, {}};
