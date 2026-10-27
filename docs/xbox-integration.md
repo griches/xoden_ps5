@@ -352,3 +352,20 @@ No bulk cleanup was resumed. Controller is released after each reproduction;
 Remote Play remains off. Reproduction packages/backups are named native-crash-
 trace, native-align (discarded hypothesis), native-entropy, native-random-module,
 native-random-device, and native-io under console-backups/20261027-*.
+
+
+Follow-up: F_DUPFD_CLOEXEC returns ENOTSUP in this title; F_DUPFD and
+F_SETFD(FD_CLOEXEC) work. The isolated Rust std adapter uses that fallback,
+closing the duplicate if setting the flag fails. Runtime creation then succeeds.
+DevTools' captured leaf return address (not the incidental condvar register)
+identifies the next SIGSEGV at std lookup_host -> unresolved getaddrinfo.
+The native engine now opts into a reqwest resolver backed by sceNetResolver,
+with five-second lookup timeout and blocking-task drain on cancellation.
+DNS changes preserve URL hostname, TLS SNI and certificate verification.
+
+The DNS build (eboot 8b9d863bf3ac3713588c408bd644166c3a8f59ee758d70c9c417a437c5b9a317)
+reached TLS key generation on-console, then faulted reading an assembly constant
+in execute-only text at aws_lc_0_45_0_curve25519_x25519base. Portable crypto is
+being built for this native target; no download acceptance is claimed yet.
+Host validation: all 152 Playden tests (130.28s), 74 shared engine tests, five
+native lifecycle tests and mocked native DNS cleanup/address-order contract pass.

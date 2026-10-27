@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/event.h>
+#include <sys/socket.h>
 extern "C" int getentropy(void *, size_t);
 extern "C" int xodus_ps5_entropy_status(void);
 namespace playden::stores::xbox {
@@ -35,11 +36,20 @@ NativeRunner NativeEngine(std::string root, std::string games, std::string trust
         }
         if (log) log("native entropy ready");
         if (log) {
+            const int socket_flags = socket(AF_INET,SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK,0);
+            log("native io socket-flags=" + std::to_string(socket_flags) + " errno=" + std::to_string(socket_flags < 0 ? errno : 0));
+            if (socket_flags >= 0) close(socket_flags);
             const int queue = kqueue();
             log("native io queue=" + std::to_string(queue) + " errno=" + std::to_string(queue < 0 ? errno : 0));
             if (queue >= 0) {
                 const int flags = fcntl(queue,F_SETFD,FD_CLOEXEC);
                 log("native io cloexec=" + std::to_string(flags) + " errno=" + std::to_string(flags < 0 ? errno : 0));
+                const int duplicate = fcntl(queue,F_DUPFD_CLOEXEC,3);
+                log("native io dup-cloexec=" + std::to_string(duplicate) + " errno=" + std::to_string(duplicate < 0 ? errno : 0));
+                if (duplicate >= 0) close(duplicate);
+                const int plain_duplicate = fcntl(queue,F_DUPFD,3);
+                log("native io dup=" + std::to_string(plain_duplicate) + " errno=" + std::to_string(plain_duplicate < 0 ? errno : 0));
+                if (plain_duplicate >= 0) close(plain_duplicate);
                 struct kevent change{}, event{}; struct timespec timeout{};
                 EV_SET(&change,0,EVFILT_USER,EV_ADD | EV_CLEAR | EV_RECEIPT,0,0,nullptr);
                 const int receipt = kevent(queue,&change,1,&event,1,&timeout);

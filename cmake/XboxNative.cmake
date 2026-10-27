@@ -5,7 +5,8 @@ set(PLAYDEN_XBOX_NATIVE_LIBRARY "" CACHE FILEPATH "Adapted PS5 libxodus_ps5_nati
 if(PLAYDEN_XBOX_NATIVE_SOURCE OR PLAYDEN_XBOX_NATIVE_LIBRARY)
     if(NOT PLAYDEN_PLATFORM_PS5 OR NOT EXISTS "${PLAYDEN_XBOX_NATIVE_LIBRARY}" OR
        NOT EXISTS "${PLAYDEN_XBOX_NATIVE_SOURCE}/include/xodus_ps5_native.h" OR
-       NOT EXISTS "${PLAYDEN_XBOX_NATIVE_SOURCE}/tools/ps5_entropy.c")
+       NOT EXISTS "${PLAYDEN_XBOX_NATIVE_SOURCE}/tools/ps5_entropy.c" OR
+       NOT EXISTS "${PLAYDEN_XBOX_NATIVE_SOURCE}/tools/ps5_dns.c")
         message(FATAL_ERROR "Native Xbox requires a PS5 job-engine archive and matching crate source")
     endif()
     # The native packager treats unresolved weak hooks as imports. Explicit
@@ -20,7 +21,8 @@ if(PLAYDEN_XBOX_NATIVE_SOURCE OR PLAYDEN_XBOX_NATIVE_LIBRARY)
         "${CMAKE_SOURCE_DIR}/src/stores/xbox/native_engine.cpp"
         "${CMAKE_SOURCE_DIR}/src/stores/xbox/native_compat.c"
         "${PLAYDEN_XBOX_NATIVE_SOURCE}/tools/probe_compat.c"
-        "${PLAYDEN_XBOX_NATIVE_SOURCE}/tools/ps5_entropy.c")
+        "${PLAYDEN_XBOX_NATIVE_SOURCE}/tools/ps5_entropy.c"
+        "${PLAYDEN_XBOX_NATIVE_SOURCE}/tools/ps5_dns.c")
     target_include_directories(playden_library_service PRIVATE "${PLAYDEN_XBOX_NATIVE_SOURCE}/include")
     target_compile_definitions(playden_library_service PUBLIC PLAYDEN_XBOX_NATIVE=1)
     target_link_libraries(playden_library_service PUBLIC "${PLAYDEN_XBOX_NATIVE_LIBRARY}" unwind SceRandom)
