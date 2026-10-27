@@ -1640,9 +1640,10 @@ bool IsGeneratedRecipeId(std::string_view id) {
   constexpr std::string_view kSuffix = "-auto";
   if (id.size() <= kSuffix.size() || id.substr(id.size() - kSuffix.size()) != kSuffix) return false;
   const auto install_id = id.substr(0, id.size() - kSuffix.size());
-  // Steam's has always been any "steam-…-auto"; a Local one names a valid game.
+  // Steam's has always been any "steam-…-auto"; other stores name a valid game.
   if (install_id.size() > 6 && install_id.substr(0, 6) == "steam-") return true;
-  return install_id.substr(0, 6) == "local-" && ParseInstallId(install_id).has_value();
+  const auto game = ParseInstallId(install_id);
+  return game && (game->store == Store::kLocal || game->store == Store::kXbox);
 }
 
 GameId RecipeGame(const GameRecipe& recipe) {

@@ -1827,6 +1827,15 @@ int main(int argc, char** argv) {
     CHECK(BuildEffectiveSettings(generated, nullptr, {{"d3d12", "vkd3d-proton"}, {"dll_overrides", "dinput8=n,b"}}, vkd3d_kit,
                                  &settings, &error));
     CHECK(settings.dll_overrides == saved + ";" + kVkd3dProtonOverrides);
+    {
+      auto xbox = generated;
+      xbox.id = "xbox-9n5pkh0kw2l1-auto";
+      CHECK(IsGeneratedRecipeId(xbox.id));
+      CHECK(!IsGeneratedRecipeId("xbox-invalid-auto"));
+      EffectiveSettings xbox_settings;
+      CHECK(BuildEffectiveSettings(xbox, nullptr, {{"d3d12", "vkd3d-proton"}}, vkd3d_kit, &xbox_settings, &error));
+      CHECK(xbox_settings.dll_overrides == std::string(kDxvkOverrides) + ";" + kVkd3dProtonOverrides);
+    }
     const auto with_vkd3d = settings.dll_overrides;
     CHECK(BuildEffectiveSettings(generated, nullptr, {{"dll_overrides", with_vkd3d}}, vkd3d_kit, &settings, &error));
     CHECK(!settings.vkd3d_proton && settings.dll_overrides == saved);
