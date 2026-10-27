@@ -339,6 +339,19 @@ int main() {
     CHECK(recipe.launch_entries[0].arguments == "-nosplash" && recipe.arguments == "-dx11" && recipe.graphics == "dxvk");
     CHECK(recipe.detected == "unreal,anticheat graphics=dxvk");
   }
+  {  // Xbox Unreal uses WinGDK, but still needs to skip the child-process bootstrap.
+    const auto root = fresh();
+    WritePe(root / "Game.exe", {true, {"KERNEL32.dll"}});
+    fs::create_directories(root / "Engine/Binaries/Win64");
+    WritePe(root / "Game/Binaries/WinGDK/Game-WinGDK-Shipping.exe", {true, {"d3d11.dll"}});
+    GameRecipe recipe;
+    std::string reason;
+    CHECK(GenerateGameRecipe(playden::GameId::Xbox("9NGLST31DG26"), 9001, "Unreal Xbox",
+        {{"", "", "Game.exe", "", ""}}, root.string(), &recipe, &reason));
+    CHECK(recipe.launch_entries[0].executable == "Game/Binaries/WinGDK/Game-WinGDK-Shipping.exe");
+    CHECK(recipe.launch_entries[0].working_directory == "Game/Binaries/WinGDK");
+    CHECK(recipe.arguments == "-dx11" && recipe.graphics == "dxvk");
+  }
   {  // Generated recipes: DXVK through overrides that follow the graphics value; graphics is open.
     const auto root = fresh();
     WritePe(root / "Balls.exe", {true, {"UnityPlayer.dll"}});

@@ -255,13 +255,13 @@ std::optional<std::string> Find(const std::vector<std::pair<std::string, bool>>&
   return std::nullopt;
 }
 
-// The Unreal program under root: <Project>/Binaries/Win64/<Project>-Win64-Shipping.exe,
+// The Unreal program under root: <Project>/Binaries/{Win64,WinGDK}/*-Shipping.exe,
 // searched a few levels deep. Returns the path relative to root, or empty.
 std::string FindShipping(const fs::path& root, const std::string& relative, int depth) {
   if (depth > 4) return {};
   const auto entries = Entries(root / relative);
   for (const auto& [name, directory] : entries)
-    if (!directory && EndsWith(Lower(name), "-shipping.exe") && Lower(relative).find("binaries/win64") != std::string::npos)
+    if (!directory && EndsWith(Lower(name), "-shipping.exe") && (EndsWith(Lower(relative), "binaries/win64") || EndsWith(Lower(relative), "binaries/wingdk")))
       return relative.empty() ? name : relative + "/" + name;
   for (const auto& [name, directory] : entries) {
     if (!directory) continue;

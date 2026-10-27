@@ -382,3 +382,21 @@ On-console native-space build now transfers game bytes directly in Playden:
 A Game About Digging A Hole reached 15% at 10:56:21Z and 38% at 10:56:42Z.
 No Mac download/transfer or separate worker title is involved. Full 152 host tests
 pass again (130.74s); five native lifecycle tests pass. Preparation/launch pending.
+
+
+Native download completed 10:57:41Z. Preparation then exposed a C++ allocation
+failure in InstallXboxRuntime while reading complete DLLs. 16e9a63 now uses
+bounded 16 KiB streaming buffers, validates x64 headers, preserves the Wine
+builtin-marker change, verifies the managed temporary file, and atomically
+publishes it. Resume completed preparation at 11:03:32Z without redownloading.
+
+First launch reached Unreal's bootstrap but failed CreateProcess(32). The engine
+probe now recognizes Binaries/WinGDK as well as Win64 and selects *-Shipping.exe.
+Existing automatic Xbox launch entries are refreshed while stopped; an explicitly
+chosen program is preserved. Console startup automatically republished this game's
+profile from DiggingGame.exe to DiggingGame/Binaries/WinGDK/DiggingGame-WinGDK-Shipping.exe.
+At 11:10Z the game's graphical main menu appeared. Gameplay/save checks ongoing.
+Native package SHA256 4335a0e781cb73b8f2252c12852ad2633a4794bb43d5ee6b8e6100e54dc660f9;
+backup console-backups/20261027-wingdk. All 152 host tests pass (145.44s), including
+new WinGDK and bounded DLL-copy coverage. xbox_jobs, game_probe and xbox_runtime
+also each passed five consecutive runs after fixing the cleanup snapshot race.

@@ -1767,6 +1767,22 @@ std::string RuntimeHost::PublishSavedSettings(Composition& c, const rt::RuntimeI
         std::to_string(candidate.version) == record.recipe_version)
       recipe = &candidate;
   if (!recipe) return again("Playden no longer knows how to start this game; prepare it again.");
+  // Older generated Xbox recipes may name the Unreal bootstrap. Refresh only
+  // automatic entries; an explicitly chosen program remains the player's choice.
+  std::optional<rt::GameRecipe> refreshed_xbox;
+  if (refresh_xbox && rt::RecipeChoicesFrom(saved).program.empty()) {
+    refreshed_xbox = *recipe;
+    for (auto& launch : refreshed_xbox->launch_entries) {
+      const auto probe = rt::ProbeGame(HostPath(record.install_path).string(), launch.executable);
+      if (probe.unreal_program.empty()) continue;
+      launch.executable = probe.unreal_program;
+      const auto slash = launch.executable.rfind('/');
+      launch.working_directory = slash == std::string::npos ? std::string() : launch.executable.substr(0, slash);
+      launch.in_install_root = false;
+    }
+    recipe = &*refreshed_xbox;
+  }
+
   const rt::SettingsPreset* preset = nullptr;
   for (const auto& candidate : c.presets)
     if (candidate.id == saved.preset_id) preset = &candidate;
