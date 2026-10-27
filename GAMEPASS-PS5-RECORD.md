@@ -373,3 +373,12 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Controller closed after test; console idle. Remote Play remained off.
 - Build scripts explicitly target FAKE77031 even though upstream CMake defaults changed; current build can preserve installed title identity.
 - Remaining: UI job submission, visible worker progress/return, automatic native install publication and Xbox DLL setup, fresh-settings renderer acceptance, sign-in UX. Do not call the integrated store complete.
+
+### Native installation checkpoint
+
+- Playden Xbox rail deployed and observed with 669 games; whole-cache search has host coverage. Native DevLoop grab works without Remote Play.
+- Backend df80b73 publishes validated prepared-game manifests and displays job progress. Latest Windows worker deployed with complete readback verification.
+- Playden 036d03a submits account-bound jobs, uses a packaged helper to return after worker exit, automatically prepares Xbox manifests, installs Xbox DLLs and loads Microsoft cover art. Full 151/151 host tests pass; PS5 package builds (eboot SHA256 520e8faf2f492f8ab957c87b3fd11d1485ed6d91f63cf4efa6956511e4eefc65).
+- Test caught runtime reads exceeding Storage's 32 MiB maximum; corrected before deployment. Private worker.json and the three shared runtime DLLs provisioned and verified on PS5.
+- Helper return was proven with a console refresh job; integrated UI Install/fresh bottle launch still pending. Deployment backup 20261027-xbox-installer underway. Console idle, virtual pad closed, Remote Play off.
+- On-console account sign-in remains unfinished; current tests reuse the existing authenticated console account. Do not call the project complete.
