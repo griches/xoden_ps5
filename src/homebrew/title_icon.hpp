@@ -14,5 +14,8 @@ inline constexpr std::uint32_t kTitleIconSize = 512;
 // The centred square of the cover, scaled to 512x512 by area averaging and
 // encoded as an opaque RGB PNG. Nothing for an empty or malformed image.
 std::optional<std::string> MakeTitleIcon(const ArtworkImage& cover);
+// PS5 Home background: 1920x1080 opaque BC1 DDS, using the whole cover
+// over a dark background from the same artwork, with bounded working memory.
+std::optional<std::string> MakeTitlePicture(const ArtworkImage& cover);
 
 }  // namespace playden::homebrew

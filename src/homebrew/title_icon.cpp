@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <vector>
+#include <array>
 
 // A private copy of the PNG writer: the app's renderer has its own.
 #define STB_IMAGE_WRITE_STATIC
@@ -47,6 +48,62 @@ std::optional<std::string> MakeTitleIcon(const ArtworkImage& cover) {
                               static_cast<int>(kTitleIconSize * 3)) || png.empty())
     return std::nullopt;
   return png;
+}
+
+std::optional<std::string> MakeTitlePicture(const ArtworkImage& cover) {
+  if (!cover.width || !cover.height ||
+      cover.rgba.size() != static_cast<std::size_t>(cover.width) * cover.height * 4) return {};
+  constexpr std::uint32_t width = 1920, height = 1080;
+  std::string dds(128 + width * height / 2, '\0');
+  const auto word = [&](std::size_t offset, std::uint32_t value) {
+    for (unsigned b=0;b<4;++b) dds[offset+b] = static_cast<char>(value >> (b*8));
+  };
+  dds.replace(0,4,"DDS "); word(4,124); word(8,0x81007); word(12,height); word(16,width);
+  word(20,width*height/2); word(76,32); word(80,4); word(84,0x31545844); word(108,0x1000);
+  const double fill = std::max(double(width)/cover.width,double(height)/cover.height);
+  const double fit = std::min(960.0/cover.width,972.0/cover.height);
+  const double left = (width-cover.width*fit)/2, top = (height-cover.height*fit)/2;
+  const auto sample = [&](unsigned x,unsigned y) -> std::array<unsigned,3> {
+    const bool poster = x>=left && x<width-left && y>=top && y<height-top;
+    const double sx = poster ? (x-left)/fit : (x-width/2.0)/fill+cover.width/2.0;
+    const double sy = poster ? (y-top)/fit : (y-height/2.0)/fill+cover.height/2.0;
+    const auto ix = std::clamp(static_cast<int>(sx),0,static_cast<int>(cover.width)-1);
+    const auto iy = std::clamp(static_cast<int>(sy),0,static_cast<int>(cover.height)-1);
+    const auto* p = &cover.rgba[(static_cast<std::size_t>(iy)*cover.width+ix)*4];
+    std::array<unsigned,3> color{};
+    for (int c=0;c<3;++c) color[c] = unsigned(p[c])*p[3]/255 * (poster ? 100 : 30)/100;
+    return color;
+  };
+  const auto pack = [](const std::array<unsigned,3>& c) -> std::uint16_t {
+    return static_cast<std::uint16_t>((c[0]>>3)<<11 | (c[1]>>2)<<5 | (c[2]>>3));
+  };
+  const auto unpack = [](std::uint16_t c) -> std::array<unsigned,3> {
+    return {unsigned((c>>11)&31)*255/31,unsigned((c>>5)&63)*255/63,unsigned(c&31)*255/31};
+  };
+  std::size_t offset = 128;
+  for (unsigned y=0;y<height;y+=4) for (unsigned x=0;x<width;x+=4) {
+    std::array<std::array<unsigned,3>,16> pixels{};
+    std::array<unsigned,3> lo{255,255,255}, hi{};
+    for (unsigned i=0;i<16;++i) {
+      pixels[i]=sample(x+i%4,y+i/4);
+      for (int c=0;c<3;++c) {lo[c]=std::min(lo[c],pixels[i][c]);hi[c]=std::max(hi[c],pixels[i][c]);}
+    }
+    const auto a=pack(hi), b=pack(lo);
+    std::array<std::array<unsigned,3>,4> palette{unpack(a),unpack(b),{}, {}};
+    for (int c=0;c<3;++c) {palette[2][c]=(2*palette[0][c]+palette[1][c])/3;palette[3][c]=(palette[0][c]+2*palette[1][c])/3;}
+    std::uint32_t indices=0;
+    for (unsigned i=0;i<16;++i) {
+      unsigned chosen=0, best=~0U;
+      for (unsigned p=0;p<(a==b ? 1U : 4U);++p) {
+        unsigned distance=0;
+        for (int c=0;c<3;++c) {int d=int(pixels[i][c])-int(palette[p][c]);distance+=d*d;}
+        if (distance<best) {best=distance;chosen=p;}
+      }
+      indices |= chosen<<(i*2);
+    }
+    word(offset,std::uint32_t(a)|(std::uint32_t(b)<<16));word(offset+4,indices);offset+=8;
+  }
+  return dds;
 }
 
 }  // namespace playden::homebrew

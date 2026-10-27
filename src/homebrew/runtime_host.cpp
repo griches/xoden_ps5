@@ -2498,13 +2498,14 @@ rt::PackageActionResult RuntimeHost::WriteTitleMetadata(Composition& c, const rt
       !(replace_value("titleId", record.title_id) && replace_value("conceptId", record.title_id.substr(4)) &&
         replace_value("contentId", "UP9000-" + record.title_id + "_00-PROSPEROWIN00001")))
     return failed("The kit's title parameters have an unexpected layout.");
-  const std::string name = title_name.empty() ? "Steam game " + std::to_string(record.runtime_number) : title_name;
+  const std::string name = title_name.empty() ? "Game " + std::to_string(record.runtime_number) : title_name;
   if (!replace_value("titleName", JsonEscaped(name)))
     Log("title metadata app=" + std::to_string(record.runtime_number) + " keeps the kit's name: unexpected layout");
   const auto icon = config_.title_icon ? config_.title_icon(GameOf(record)) : std::nullopt;
+  const auto picture = config_.title_picture ? config_.title_picture(GameOf(record)) : std::nullopt;
   Log("title metadata app=" + std::to_string(record.runtime_number) + " name=" + name + " icon=" +
       (icon ? std::to_string(icon->size()) + "B" : std::string("kit")));
-  return c.installer->WriteTitleMetadata(record, param, icon);
+  return c.installer->WriteTitleArtwork(record, param, icon, picture);
 }
 
 namespace {

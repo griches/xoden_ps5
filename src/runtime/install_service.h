@@ -101,6 +101,10 @@ public:
     return {PackageActionState::kFailed, "unsupported", "title metadata is unsupported"};
   }
   virtual bool TitleMetadataCurrent(const RuntimeInstall &) { return true; }
+  virtual PackageActionResult WriteTitleArtwork(const RuntimeInstall& record, const std::string& param,
+      const std::optional<std::string>& icon, const std::optional<std::string>&) {
+    return WriteTitleMetadata(record,param,icon);
+  }
   // Updates an installed title's immutable files to the admitted kit when only
   // the kit's file inventory changed (same kit id, variant, runtime, recipe).
   virtual PackageActionResult RefreshTitle(const RuntimeInstall &) {

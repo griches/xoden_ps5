@@ -558,19 +558,31 @@ int main() {
                 std::fclose(file);
                 if (!bytes.empty()) generic_icon = std::move(bytes);
             }
-            config.title_icon = [trust = paths.trust_store, generic_icon](const playden::GameId& game) -> std::optional<std::string> {
-                // A store with no cover for the game (an imported one) gets the generic icon.
-                const auto source = playden::homebrew::CoverUrl(game);
-                std::optional<playden::homebrew::ArtworkImage> cover;
-                if (!source.empty()) {
-                    playden::homebrew::HttpArtworkBackend backend(trust);
-                    const std::atomic<bool> cancel{false};
-                    cover = backend.Load({1, game, source}, cancel);
+            const auto title_cover = [trust = paths.trust_store](const playden::GameId& id)
+                -> std::optional<playden::homebrew::ArtworkImage> {
+                playden::homebrew::Game game; game.id = id;
+                if (id.store == playden::Store::kXbox) {
+                    playden::Storage storage("/data/playden/xbox");
+                    const auto bytes = storage.Read("catalog.json",16*1024*1024);
+                    const auto catalog = bytes.ok() ? playden::stores::xbox::ParseCatalog(
+                        std::string_view(reinterpret_cast<const char*>(bytes.value().data()),bytes.value().size())) : std::nullopt;
+                    if (catalog) for (const auto& item : catalog->games)
+                        if (item.id == id) { game.artwork_source = item.artwork_source; break; }
                 }
+                const auto source = playden::homebrew::CoverUrl(game);
+                if (source.empty()) return std::nullopt;
+                playden::homebrew::HttpArtworkBackend backend(trust,"/data/playden/user/artwork-cache");
+                const std::atomic<bool> cancel{false};
+                return backend.Load({1,id,source},cancel);
+            };
+            config.title_icon = [title_cover,generic_icon](const playden::GameId& game) -> std::optional<std::string> {
+                const auto cover = title_cover(game);
                 if (auto icon = cover ? playden::homebrew::MakeTitleIcon(*cover) : std::nullopt) return icon;
-                playden::app::AppendLogLine(log_root, "runtime.log", "title icon app=" + playden::ToKey(game) +
-                                            (generic_icon ? " uses the generic icon: no cover" : " has no cover or generic icon"));
                 return generic_icon;
+            };
+            config.title_picture = [title_cover](const playden::GameId& game) -> std::optional<std::string> {
+                const auto cover = title_cover(game);
+                return cover ? playden::homebrew::MakeTitlePicture(*cover) : std::nullopt;
             };
             // What Playden downloads for a game's bottle (Microsoft's Visual C++ redistributable, for games that need
             // MFC): ranged HTTPS GETs on the worker, with its own client made on first use. Redirects are followed by

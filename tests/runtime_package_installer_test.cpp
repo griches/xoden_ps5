@@ -988,6 +988,8 @@ void AnyTitleVariantServesEveryTitle() {
 
   auto record = Record();
   record.title_id = "FAKE78012";
+  for (const auto& artifact : fixture.view.artifacts)
+    record.artifacts.push_back({artifact.artifact_id,artifact.identity,artifact.sha256});
   std::filesystem::create_directories(fixture.host_data);
   auto installer = fixture.Installer();
   // Without the game's own parameters the template's would name the wrong title.
@@ -1001,6 +1003,14 @@ void AnyTitleVariantServesEveryTitle() {
   CHECK(Read(fixture.host_data / "homebrew/FAKE78012/sce_sys/param.json") == own);
   CHECK(Read(fixture.host_data / "homebrew/FAKE78012/eboot.bin") == "native");
   CHECK(installer.TitleMetadataCurrent(record) && installer.Inspect(record).manifest_matches);
+  // The kit has no background, but generated owned artwork stages and verifies
+  // through the normal title mapping, and a changed picture requires refresh.
+  CHECK(installer.CopyTemplate(record).state == PackageActionState::kComplete);
+  CHECK(installer.WriteTitleArtwork(record,own,std::nullopt,std::string("DDS synthetic background")).state == PackageActionState::kComplete);
+  CHECK(!installer.TitleMetadataCurrent(record));
+  CHECK(installer.RefreshTitle(record).state == PackageActionState::kComplete);
+  CHECK(Read(fixture.host_data / "homebrew/FAKE78012/sce_sys/pic0.dds") == "DDS synthetic background");
+  CHECK(installer.TitleMetadataCurrent(record));
 }
 
 // A game prepared on a fixed kit title moves to the any-title shell when its kit is respun:

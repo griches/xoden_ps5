@@ -1741,7 +1741,7 @@ class Render::Impl
         // Fixture posters belong to the fixture's Steam games; an imported game has none (its title shows).
         const std::uint32_t texture = simulated
             ? (game.art_failed || game.art_pending || !game.id.steam_app() ? 0 : art_[texture_index])
-            : (live_artwork_ && current_state_ && !current_state_->account().id.empty()
+            : (live_artwork_ && current_state_ && (game.id.store == Store::kXbox || !current_state_->account().id.empty())
                 ? store_texture(game.id, CoverUrl(game)) : 0);
         const TileStatus status = tile_status(game.id);
         // Glow first: it is a filled soft shape, and the art must cover its middle so only the
@@ -2501,8 +2501,9 @@ class Render::Impl
                 return;
             }
         }
-        if (live_artwork_ && !state.account().id.empty())
-            if (const std::uint32_t cover = store_texture(id, CoverUrl(id)))
+        if (live_artwork_ && (id.store == Store::kXbox || !state.account().id.empty()))
+            if (const auto* game = game_by_id(state,id); game)
+            if (const std::uint32_t cover = store_texture(id, CoverUrl(*game)))
             {
                 scene_.image(cover, rect, gfx::kFullUv, kText, 6.0F);
                 return;
@@ -2810,9 +2811,10 @@ class Render::Impl
         const GameId id = state.navigation.detail_id.value_or(state.navigation.selected_game_id);
         const Game *game = game_by_id(state, id);
         const gfx::Rect hero{0.0F, 0.0F, kWidth, 620.0F};
-        const bool live_art = !state.simulation_mode && live_artwork_ && !state.account().id.empty() && id.valid();
+        const bool live_art = !state.simulation_mode && live_artwork_ &&
+            (id.store == Store::kXbox || !state.account().id.empty()) && id.valid();
         const std::uint32_t hero_texture = state.simulation_mode ? hero_ :
-            live_art ? store_texture(id, HeroUrl(id)) : 0;
+            live_art && game ? store_texture(id, HeroUrl(*game)) : 0;
         if (hero_texture != 0)
             scene_.image(hero_texture, hero, gfx::kFullUv, kText);
         else
@@ -2831,7 +2833,7 @@ class Render::Impl
         std::uint32_t logo_width = 0;
         std::uint32_t logo_height = 0;
         const std::uint32_t logo = live_art ?
-            store_texture(id, LogoUrl(id), &logo_width, &logo_height) : 0;
+            store_texture(id, game ? LogoUrl(*game) : LogoUrl(id), &logo_width, &logo_height) : 0;
         if (logo != 0 && logo_width > 0 && logo_height > 0)
         {
             const float fit_scale = std::min(460.0F / static_cast<float>(logo_width),

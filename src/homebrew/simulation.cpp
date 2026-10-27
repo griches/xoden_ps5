@@ -4076,7 +4076,10 @@ void Simulation::rebuild_view() {
                 const bool focused_row = modal.focused_action >= 0 &&
                     static_cast<std::size_t>(modal.focused_action) < modal.action_keys.size() &&
                     modal.action_keys[static_cast<std::size_t>(modal.focused_action)] == action_key;
-                if (focused_row && !definition->also_called.empty() && modal.id != "button-mapping")
+                if (state_.gamepass_only && id == "program_arguments")
+                    item.subtitle = "Extra arguments passed to the game.";
+                if (focused_row && !definition->also_called.empty() && modal.id != "button-mapping" &&
+                    (!state_.gamepass_only || definition->also_called.find("Steam") == std::string::npos))
                     item.subtitle += " · Also called " + definition->also_called;
             } else if (settings_ready && action_key == "steam-app-id") {
                 // Saved in the game's settings record; the game's own steam_appid.txt wins over it.
@@ -4208,7 +4211,7 @@ void Simulation::rebuild_view() {
                 item.enabled = false;
             } else if (settings_ready && !modal.setting_id.empty() && action_key == "value-reset") {
                 const auto& current = settings_values.values.at(modal.setting_id);
-                item.subtitle = modal.setting_id == "launch_option" ? "Starts the program the recipe or Steam names."
+                item.subtitle = modal.setting_id == "launch_option" ? "Starts the selected game program."
                                                                     : "Uses the value from the game's recipe.";
                 item.enabled = current.source == rt::ValueSource::kUser || current.unlocked;
                 if (!item.enabled) item.subtitle = "Already the recipe's value.";
@@ -5226,7 +5229,7 @@ void Simulation::rebuild_view() {
         view_.legends = {"Cross Select", "Circle Back"};
     } else if (state_.navigation.route == Route::Settings) {
         view_.title = "Settings";
-        if (live()) view_.subtitle = state_.account().error;
+        if (live() && !state_.gamepass_only) view_.subtitle = state_.account().error;
         // Rows come grouped by the macOS sections; the rail shows the focused row's section.
         std::string section = "Account";
         const auto add = [&](std::string key, RowKind kind, std::string title, std::string action) -> ViewRow& {
@@ -5237,6 +5240,7 @@ void Simulation::rebuild_view() {
         auto& xbox = add("settings-xbox-account",RowKind::Action,"Xbox account","xbox-account");
         xbox.value = xbox_account_name_.empty() ? "Not connected" : xbox_account_name_;
         xbox.subtitle = xbox_account_message_.empty() ? "Check Xbox access and refresh your library" : xbox_account_message_;
+        if (!state_.gamepass_only) {
         auto& account = add("settings-account", RowKind::Action, "Account", "account");
         account.value = state_.account().display_name;
         account.subtitle = state_.account().authentication == AuthState::Offline ? "Cached library · Offline"
@@ -5245,8 +5249,9 @@ void Simulation::rebuild_view() {
                 : "Connect Steam";
         if (state_.account().authentication != AuthState::SignedOut)
             add("settings-signout", RowKind::Action, "Sign out", "signout-confirm").dangerous = true;
+        }
         section = "Library";
-        {
+        if (!state_.gamepass_only) {
             // Windows games in a drive's playden/import or the console drop folder: the Import sheet.
             auto& entry = add("settings-import", RowKind::Action, "Import games", "import-manage");
             entry.subtitle = "Add Windows games from a drive or the console drop folder";
@@ -5254,7 +5259,7 @@ void Simulation::rebuild_view() {
                                              [](const LiveImportCandidate& candidate) { return !candidate.imported.valid(); });
             if (found > 0) entry.value = std::to_string(found) + " found";
         }
-        if (live()) {
+        if (live() && !state_.gamepass_only) {
             auto& suffix = add("settings-title-store", RowKind::Toggle, "Store name in PS5 titles", "toggle-title-store");
             suffix.selected = state_.title_store_suffix;
             suffix.subtitle = "Name game titles like \"Half-Life 2 (Steam)\". Prepared games change with their next Update.";
@@ -5310,7 +5315,7 @@ void Simulation::rebuild_view() {
             runtime.subtitle = state_.runtime_problem.empty() ? "Games run through prospero-win" : state_.runtime_problem;
             runtime.kind = RowKind::Status; runtime.action.clear(); runtime.enabled = false;
         }
-        if (live()) {
+        if (live() && !state_.gamepass_only) {
             auto& slow = add("settings-downloads-slow", RowKind::Toggle, "Downloads for slow networks", "toggle-downloads-slow");
             slow.selected = state_.downloads_slow_network;
             slow.subtitle = state_.downloads_slow_network
@@ -6160,7 +6165,9 @@ std::vector<GameId> Simulation::save_games(bool filtered) const {
     for (const auto& kept : state_.kept_bottles) ids.insert(kept.game_id);
     if (!live()) for (const auto& [id, cloud] : state_.cloud) ids.insert(id);
     // Saves lists Cloud saves: games of a store without them are not there.
-    std::erase_if(ids, [](const GameId& id) { return !Traits(id.store).cloud_saves; });
+    std::erase_if(ids, [this](const GameId& id) {
+        return !in_app_catalog(state_,id) || !Traits(id.store).cloud_saves;
+    });
     std::vector<std::pair<std::string, GameId>> named;
     for (const auto id : ids) {
         const auto* game = find_game(state_, id);
@@ -8588,7 +8595,7 @@ std::vector<std::string> Simulation::game_settings_actions() const {
     actions.push_back("heading-game");
     rows(G::kGame);
     // Another store's game may use Steamworks: the Steam app ID its emulator is given.
-    if (game.store == Store::kLocal) {
+    if (!state_.gamepass_only && game.store == Store::kLocal) {
         const auto program = std::find(actions.begin(), actions.end(), "setting-launch_option");
         actions.insert(program == actions.end() ? actions.end() : program + 1, "steam-app-id");
     }
@@ -8621,6 +8628,7 @@ std::vector<std::string> Simulation::game_settings_actions() const {
 
 // Whether the sheet lists a setting's row: Known problems only for a game that has one.
 bool Simulation::game_settings_row_shown(const rt::SettingDefinition& definition, GameId game) const {
+    if (state_.gamepass_only && definition.id == "steam_features") return false;
     return rt::SettingShown(definition, kit_) && (definition.id != "start_check" || known_problem(game));
 }
 
