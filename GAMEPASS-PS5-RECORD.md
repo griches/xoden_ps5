@@ -575,3 +575,35 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Still outstanding: fresh console sign-in / safe account handoff, standalone
   app packaging and separate identity/updater, generated icon0/pic0 for game
   home-screen titles, Minishoot gameplay acceptance and multi-job scheduling.
+
+## 2026-10-27 — Game Pass-only Home and Library
+
+- Gary spotted Steam titles in Continue playing and the combined 1015-game All
+  category. This was real combined Playden history/catalogue data, not fixture
+  data or an Xbox catalogue error.
+- Playden ea7b68c adds explicit Game Pass-only presentation for the PS5 build.
+  Home shelves, Library search/scopes, favourites, hidden and collection counts
+  now filter to Xbox identities. The separate Xbox and Imported rail categories
+  are removed; a saved Xbox category becomes All. Standard Playden host mode
+  keeps its combined catalogue behavior. Existing Steam data is preserved.
+- Console proof: /tmp/playden-gamepass-only-library.png shows All 669, with
+  Installed/Favorites/Hidden and no Xbox category. Home no longer shows Steam
+  history. At this point there are no installed Game Pass titles or recorded
+  Game Pass play sessions to form a Continue playing shelf.
+- Playden 949cdc3 adds a Browse Game Pass shelf when Home has no activity yet.
+  This follow-up is being deployed for the next app launch without restarting
+  the app under Gary's controller. Library filtering was console-tested; the
+  fallback Home shelf is covered by the host regression and PS5 build.
+- Compatibility note audit includes original Playden 0.1.0 commit 536c7dc:
+  ratings/notes save to local organization state. Export as recipe writes a
+  local file and tells the user to submit a GitHub pull request manually. No
+  automatic compatibility note upload was found in that path or its history.
+- Gary asked whether the test controller remained connected. It did during the
+  screenshot checks; it was then CLOSED successfully. Do not reopen it merely
+  to retest this final Home fallback. Continue code/tests while he has control.
+- Final validation: 152/152 host tests passed (135.64 seconds); PS5 build passed.
+  Final deployed binary SHA256:
+  `bcf008735c5f7a83e3b6cf913a32bac3b61fb0488245cf66e0311cdf051cd2e2`.
+  Raw deployment verification passed; backup is
+  `console-backups/20261027-gamepass-home`. Current app was left running so Gary
+  retains control; next launch loads the final Browse Game Pass fallback.
