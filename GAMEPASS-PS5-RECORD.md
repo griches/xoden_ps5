@@ -1151,3 +1151,81 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   managed installer can copy it into a stopped game's bottle safely; no UID
   transfer payloads and no direct private-bottle FTP writes. Game acceptance
   remains pending.
+
+### First game launch with active phone bridge (19:57Z)
+
+- Backend c8f6541 selects a real active phone session without a test flag;
+  opt-in candidate-only testing still exists. Both phone paths load a memory-only
+  store, never save or implicitly rewrite the console account on Drop, and
+  never fabricate PUIDs. Host 4/4 tests and Windows DLL build passed.
+- Frontend 4f711b7 optionally bundles the locally built bridge via
+  PLAYDEN_XBOX_WRAPPER_DLL. Native preparation copies only that validated DLL
+  into the private stopped bottle; base runtime DLLs remain separately
+  provisioned. Invalid bridge regression preserves the existing bottle file.
+  Full suite 153/153 passed (143.86 s); PS5 build passed. Deployed app SHA256
+  0d4942f6b809adba14c3197d8d0e44bc1f30582382e1d180048164e67b081e99,
+  wrapper 70ff52139fdc prefix, backup console-backups/20261027-phone-runtime-bridge.
+- MIO details artwork and Play/Ready visible. Launch at 19:57:53Z via Playden,
+  durable session 7d58b874-040e-49c6-956f-b059a1b090f8. Stayed BLACK. Native title
+  was alive, no save loaded or game started. Closed only this agent-launched
+  test title at 20:00:19Z and returned to Playden, no console restart.
+- Latest session-2.log showed Vulkan presentation stopped at vk_shown=19 and
+  vk_busy=1; no direct phone bridge evidence published yet. The apparent earlier
+  wgl internal context error belonged to PREVIOUS session-1.log, not this run.
+  Do not claim in-game authentication succeeded or that auth caused the stall.
+- Building filtered bridge diagnostics from the game's private profile via the
+  native app, never raw tokens/errors. Also bounded wrapper HTTP to 15 seconds
+  with redirects disabled. Frontend diagnostic bridge evidence is prefixed
+  before large session logs so it survives the public log size cap.
+- MIO resolution TEMPORARILY changed 3840x2160 -> 1920x1080 for graphics
+  isolation, revision 1->2 applied successfully 20:04:13Z. MUST RESTORE 4K
+  after this check as promised to Gary. No other settings/saves changed.
+- Virtual pad CLOSED. Remote Play remains OFF.
+
+- Further inspection of latest session-2.log found native xgameruntime.dll and
+  builtin xgameruntime_impl.dll loaded from system32, followed by repeated
+  gdkc:get_rps_tickets xodus-service request failures (0x8000ffff). This narrows
+  the unfinished in-game check to the bridge exchange; graphics stall alone
+  was not sufficient to diagnose it.
+- Frontend 09d2384 filters bridge startup/request/result markers from the
+  private wrapper log and prefixes them to the existing published title log.
+  No raw credential error/path/tokens exported; regression verifies filtering.
+  Full suite 153/153 passed 133.81 s and PS5 build passed. Backend 04d81b4
+  bounds runtime HTTP to 15 seconds, redirects disabled; 4 wrapper tests and
+  Windows build passed. Prepared app SHA256
+  1af33a784ff6af10925952a53e09ed5a34b126ba7ef1f1e5a2b881dac9aee5a4,
+  deploying with backup console-backups/20261027-bridge-startup-diagnostics.
+- Gary noted actions taking too long. Use focused checks during diagnosis and
+  the required full suite before reporting done; avoid full regression for
+  every experimental iteration or repeating controller navigation blindly.
+
+- Diagnostic build 1af33a78 deployed successfully. Native app exported actual
+  filtered wrapper markers from the first failed run: started, listening,
+  MSA requests and phone-scope-rejected repeatedly. This error had collapsed
+  network and scope failures, so its label alone did not prove an HTTP denial.
+- Backend 6731066 always requests the app's approved Xbox service scope; the
+  game's non-full-trust request does not grant the app xboxlive.signin scope.
+  It also verifies TLS with the native app's packaged CA bundle and distinguishes
+  network failure, invalid response and rejection using static codes. No TLS
+  bypass. Host wrapper tests 4/4, Windows build passed.
+- Frontend 12700b2 distinguishes full-trust/signin request markers and network,
+  response or trust failures. Focused xbox_runtime check passed, PS5 build
+  passed. Deployed SHA256
+  cb13ba36eddfcacf1e65b81bfe32685955a84a60bf07063604f7b14e97ce6f32,
+  wrapper 0980542c9818 prefix; backup console-backups/20261027-bridge-phone-trust.
+- Actual 1080p test launched MIO at 20:11Z, remained BLACK at ~40 seconds.
+  Closed only this test and reopened Playden to collect its new bridge result.
+  Still MUST RESTORE 4K before handing back. Pad CLOSED, Remote Play OFF.
+
+- The 1080p corrected-scope/trust run DID issue real phone MSA service tickets
+  five times inside MIO. After closing the test, native filtered bridge output
+  shows msa-request-signin + phone-ticket-issued repeatedly. RPC ticket errors
+  disappeared from latest session-3.log, but MIO reports [xbox] login failed and
+  create context failed. Thus ticket issuance is accepted, final game/SISU
+  sign-in remains FAILED, and black startup persists. Do not claim it works.
+- Existing xgameruntime_impl.dll lacks the newer AUTH_META diagnostics from
+  current Nexus sources. Investigating the downstream device/SISU exchange
+  without enabling traces that print RPS tickets or HTTP authorization bodies.
+- Full frontend regression on current trust/diagnostic code passed 153/153
+  (143.48 s). MIO is stopped; Playden running. Resolution still temporarily
+  1080p and MUST be restored to 4K. Pad CLOSED; Remote Play OFF.
