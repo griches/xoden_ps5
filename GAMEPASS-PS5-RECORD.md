@@ -653,3 +653,46 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Leave the active download running. Do not restart the app or cancel it for
   further tests. Virtual controller is closed; quit DevTools cleanly so Gary
   keeps control while the download continues. No actual Microsoft login needed.
+
+## 2026-10-27 — measured transfer, disk cleanup and PSBox login review
+
+- Independent transfer measurement uses FTP file-size inventories of the active
+  PS5 game directory, without trusting the UI speed counter. First window:
+  +338,438,656 bytes / 53.49 seconds = 6.33 MB/s (50.6 Mbps). Second window:
+  +1,779,500,288 bytes / 281.69 seconds = 6.32 MB/s (50.5 Mbps). The growing file
+  is COTEG-WinGDK.ucas; the only other growth is the tiny resume journal.
+  No full-size file preallocation: prepare_output truncates to committed bytes.
+- PS5 /data/playden-games contains one game folder, xbox-9pf697tg7pp7, and empty
+  management markers. It grew from 16.166 to 18.138 GiB during these checks.
+  No other local Game Pass install was found. Its growth explains the console
+  storage decrease. Do not interrupt the still-active download.
+- Mac internal disk had 14,065,024 KiB free. Project game downloads were empty;
+  /Volumes/PS5 was not mounted. Build outputs, not duplicate game installs,
+  accounted for most of this project's roughly 18 GiB of Mac usage.
+- Gary explicitly requested reclaiming that space. Removed the 9.9 GiB Rust
+  target/debug tree, rebuildable release deps/build/fingerprint/example caches,
+  and 36 older deployment backup folders. Kept release/xodus-cli (verified its
+  --help still runs), PS5 binary/ELF symbols, host build, native SDK/archive,
+  and one complete currently working package rollback:
+  console-backups/20261027-working-elder-download.
+- After cleanup free space is 28,749,796 KiB, an increase of 14,684,772 KiB
+  (14.00 GiB). Target shrank to 106 MiB and backups to 99 MiB. Current PS5
+  download and credentials were untouched. No source or Git history removed.
+- Backend 61b2499 disables host dev/test debug symbols and incremental caches
+  to limit future regrowth; cargo metadata --offline validated the config.
+  No rebuild was run merely to recreate the files just reclaimed. Native PS5
+  release configuration and existing symbols remain separate.
+- Reviewed RafaelNGP/xbox-cloud-gaming-ps5 at
+  938717d234a8c1d55ec68aa60b9a8ca39d04ab64, cloned read-only to
+  /tmp/psbox-login-review. Its MsaClient uses login.live.com device-code OAuth
+  with client 000000004c20a908 and service::user.auth.xboxlive.com::MBI_SSL;
+  the phone enters a code at microsoft.com/link. It persists a refresh token
+  and renews sessions natively. AuthManager also obtains marketplace XSTS and
+  checks Game Pass entitlements, so this is relevant beyond just cloud playback.
+- Our profile/library/package requests can likely use the corresponding Xbox
+  bearer chain. Our local game licenses additionally use Microsoft user/device
+  tickets for www.microsoft.com plus the device license and PC licensing
+  service. Compatibility of device-code credentials with those tickets is
+  unverified; do not promise a drop-in token-file import or completed fresh
+  sign-in. No account file read, sign-in attempt, cloud app install or console
+  restart was performed for this review. Controller remains disconnected.
