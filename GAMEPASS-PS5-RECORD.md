@@ -390,3 +390,11 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Deployed c1db7ec1a8ef259318752a542647add2a740d368d695bd613b22ba1df4e51790 (backup 20261027-xbox-install-gate).
 - Selected native Xbox Minishoot Install with the controller. Playden exited, helper launched worker, visible Xbox on Playden progress screen appeared (screenshot /tmp/xbox-native-progress.png). Worker resumed the earlier direct-download folder, completed preparation and published one prepared-game record. Handoff status returned; Playden reopened automatically.
 - New Xbox entry automatically started native preparation, observed step 2/6 at 35 percent (/tmp/playden-auto-setup.png). Fresh Xbox bottle launch acceptance is still pending. This is separate from the prior Local imported test copy.
+
+### Automatic runtime acceptance fixes
+
+- New Xbox install prepared/registers, but initial FAKE78003 launch aborted: Wine DXGID3D10CreateDevice unimplemented. Actual new logs are under the Xbox bottle's library/logs; /data/playden/logs/title-FAKE78003.log was stale from the old removed Hollow Knight title slot, not this launch.
+- Root cause: IsGeneratedRecipeId recognized Steam/Local only, so Xbox profiles missed DXVK overrides while enabling vkd3d. cb25b41 fixes Xbox generated identity and adds effective-settings regression. Native build passed. Full suite 150 pass/one imported-locations 60s timeout, isolated retry passed in 6.61s.
+- Recreated the Xbox test bottle through UI (saves/settings retained). New title FAKE78004 launched and rendered Minishoot loading screen at 100%; stalled in Xbox initialization. Log shows windows.web native activation fails; profile needs explicit native DLL overrides, not just the registry entry installed before settings publication.
+- Current working change adds required windows.web/xgameruntime overrides to generated Xbox profile and refreshes Xbox derived profiles when stopped so updates apply without manual per-game edits. New native package ca94d45ec7c71459daa897de70a052d226937798be2add4a3bc1aa68996ddd11 deploying with backup 20261027-xbox-dll; host suite in progress.
+- Stopped the stuck test title; virtual pad closed. No main-menu/gameplay success claimed for the new native Xbox entry yet.
