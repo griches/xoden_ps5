@@ -143,32 +143,41 @@ runtime::NativeStatus Ps5NativeCoordinator::QueryWith(const runtime::RuntimeInst
   const auto database = operations_.database(record.title_id);
   const auto source = ReadTitleSource(root_, record.title_id);
   const auto cache = registry_.Query(record.title_id);
+  const auto diagnostic = [&](const char* reason) {
+    if (!operations_.log) return;
+    operations_.log("native ownership title=" + record.title_id + " reason=" + reason +
+        " euid=" + std::to_string(geteuid()) + " database=" + std::to_string(static_cast<int>(database.inventory)) +
+        " source=" + std::to_string(static_cast<int>(source.availability)) +
+        " source_owned=" + std::to_string(source.owned_directory) +
+        " registry=" + std::to_string(static_cast<int>(cache.state)) +
+        (cache.reason.empty() ? "" : " registry_reason=" + cache.reason));
+  };
   if (database.inventory == TitleAvailability::kUnknown || source.availability == TitleAvailability::kUnknown ||
-      cache.state == RegistrationState::kUnavailable) return {};
+      cache.state == RegistrationState::kUnavailable) { diagnostic("inventory-unavailable"); return {}; }
   runtime::NativeStatus status; status.available = true;
   status.source_available = source.directory;
-  if (cache.state == RegistrationState::kCollision) { status.collision = true; return status; }
+  if (cache.state == RegistrationState::kCollision) { diagnostic("registry-collision"); status.collision = true; return status; }
   if (source.availability == TitleAvailability::kFree) {
     status.collision = database.inventory == TitleAvailability::kOccupied || cache.state != RegistrationState::kAbsent;
     return status;
   }
   const auto package = full_package ? package_.Inspect(record) : package_.InspectOwnership(record);
-  if (!package.known) return {};
+  if (!package.known) { diagnostic("package-unavailable"); return {}; }
   const auto content = source.owned_directory ? ContentId(root_, record.title_id) : std::nullopt;
   // The ownership query asks whose title this is; kit artifacts matter only to the full one (launch, registration).
   status.owned_manifest_matches = source.owned_directory && package.title_staged && package.manifest_matches &&
       (!full_package || package.artifacts_valid) &&
       package.title_source_path == (root_ / record.title_id).string() && content.has_value();
-  if (!status.owned_manifest_matches) { status.collision = true; return status; }
+  if (!status.owned_manifest_matches) { diagnostic(content ? "package-identity" : "source-content-id"); status.collision = true; return status; }
   if (database.inventory == TitleAvailability::kOccupied) {
     if (!database.identity || database.identity->title_id != record.title_id || database.identity->content_id != *content ||
         database.identity->metadata_path != "/user/app/" + record.title_id + "/sce_sys") {
-      status.collision = true; return status;
+      diagnostic("database-identity"); status.collision = true; return status;
     }
     status.installed = cache.state == RegistrationState::kReady;
     status.scan_pending = !status.installed;
   } else {
-    if (cache.state == RegistrationState::kReady) return {}; // Cache cannot replace native inventory.
+    if (cache.state == RegistrationState::kReady) { diagnostic("cache-without-database"); return {}; } // Cache cannot replace native inventory.
     status.scan_pending = cache.state == RegistrationState::kPending;
   }
   return status;

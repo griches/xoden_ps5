@@ -483,15 +483,22 @@ void CompleteInspectorRefusesMixedSettingsAndBusyPublisher() {
 }
 
 #ifdef PLAYDEN_TEST_SETTINGS_OWNER_INTEGRATION
-void RealFilesystemInstallerAndOwnerRecoverPendingPublication() {
+void RealFilesystemInstallerAndOwnerRecoverPendingPublication(bool xbox = false) {
   Fixture fixture; auto record = Record(); record.install_path = "/data/homebrew/FAKE78001/games/220";
+  if (xbox) {
+    record.game = playden::GameId::Xbox("9PF697TG7PP7");
+    record.runtime_number = kFirstRuntimeNumber + 9;
+    record.install_id = playden::ToInstallId(record.game);
+    record.data_root = "/data/playden/games/" + record.install_id;
+    record.recipe_id = playden::GeneratedRecipeId(record.game);
+  }
   record.artifacts = {{"runtime", "rev", fixture.view.artifacts[0].sha256},
                       {"recipe", "steam-220-hl2-v1-1", fixture.view.artifacts[1].sha256}};
   const auto owner_root = fixture.temporary.path / "owner"; std::filesystem::create_directory(owner_root); CHECK(chmod(owner_root.c_str(), 0700) == 0);
   playden::Storage storage(owner_root.string());
   auto availability = [](const std::string&) { return NativeTitleAvailability{TitleAvailability::kFree, TitleAvailability::kFree}; };
   RuntimeInstallRepository repository(storage, "installs.json", availability); CHECK(repository.Load().ok());
-  ReserveRequest request; request.install_id = record.install_id; request.runtime_number = record.runtime_number;
+  ReserveRequest request; request.install_id = record.install_id; request.runtime_number = record.runtime_number; request.game = record.game;
   request.default_profile_id = record.default_profile_id; request.runtime_bundle_id = record.runtime_bundle_id;
   request.recipe_id = record.recipe_id; request.recipe_version = record.recipe_version; request.settings_revision = record.settings_revision;
   request.launch_entry_id = record.launch_entry_id; request.launch_path = record.launch_path;
@@ -507,7 +514,21 @@ void RealFilesystemInstallerAndOwnerRecoverPendingPublication() {
   PackageInstallerOperations operations; operations.hash_file = TestHash; operations.hash_bytes = TestHashBytes;
   operations.free_bytes = [](const std::filesystem::path&) { return std::optional<std::uint64_t>(1ULL << 30); };
   operations.validate_bottle = [](const std::filesystem::path& bottle) { return std::filesystem::is_regular_file(bottle / "drive_c/windows/system.reg"); };
-  operations.provide_publication = [&](const RuntimeInstall& r) { return std::optional<ProfilePublication>(fixture.Publication(r)); };
+  operations.provide_publication = [&](const RuntimeInstall& r) {
+    auto publication = fixture.Publication(r);
+    if (xbox) {
+      const auto replace = [&](const std::string& before,const std::string& after) {
+        std::size_t start = 0;
+        while ((start = publication.descriptor_bytes.find(before,start)) != std::string::npos) {
+          publication.descriptor_bytes.replace(start,before.size(),after); start += after.size();
+        }
+      };
+      replace("install-hl2",r.install_id);
+      replace("steam-220-hl2-v1",r.recipe_id);
+      replace("\"app_id\":220","\"app_id\":" + std::to_string(r.runtime_number));
+    }
+    return std::optional<ProfilePublication>(std::move(publication));
+  };
   operations.publish_owned = [&](const RuntimeInstall& r, const PublicationPaths& paths, const ProfilePublication& publication) {
     ++publications;
     CHECK(!std::filesystem::exists(paths.profile.parent_path()) && !std::filesystem::exists(paths.input_directory));
@@ -528,9 +549,12 @@ void RealFilesystemInstallerAndOwnerRecoverPendingPublication() {
   // Downloaded game data follows completed title staging and precedes settings.
   std::filesystem::create_directories(fixture.host_data / "homebrew/FAKE78001/games/220");
   CHECK(service.Step(record.install_id).ok()); CHECK(service.Step(record.install_id).ok());
-  const auto bottle = fixture.host_data / "playden/games/install-hl2/library/prefixes/game";
+  const auto bottle = fixture.host_data / "playden/games" / record.install_id / "library/prefixes/game";
   Write(bottle / "user.reg", "WINE REGISTRY Version 2\n", 0600); Write(bottle / "drive_c/save.dat", "player-save", 0600);
-  CHECK(!service.Step(record.install_id).ok() && publications == 1 && native.submissions == 0);
+  const auto interrupted = service.Step(record.install_id);
+  if (interrupted.ok() || publications != 1 || native.submissions != 0)
+    std::fprintf(stderr,"pending publication xbox=%d result=%d publications=%u submits=%u reason=%s\n",xbox,interrupted.ok(),publications,native.submissions,interrupted.message.c_str());
+  CHECK(!interrupted.ok() && publications == 1 && native.submissions == 0);
   auto blocked = records.Find(record.install_id); CHECK(blocked && blocked->journal && blocked->journal->operation == "settings-publication");
   CHECK(!installer.Inspect(*blocked).profile_published);
   // Cold repository/OWNER/service recovery uses the same real filesystem
@@ -1419,6 +1443,14 @@ void ShippedRecipeResolvesWithAnyKit() {
   auto generated = Record();
   generated.recipe_id = "steam-220-auto";
   CHECK(!installer.Inspect(generated).title_source_path.empty());
+  auto xbox_journal = Record();
+  xbox_journal.runtime_number = kFirstRuntimeNumber + 9;
+  xbox_journal.install_id = "xbox-9pf697tg7pp7";
+  xbox_journal.data_root = "/data/playden/games/" + xbox_journal.install_id;
+  xbox_journal.recipe_id = "xbox-9pf697tg7pp7-auto";
+  CHECK(!installer.InspectOwnership(xbox_journal).title_source_path.empty());
+  xbox_journal.recipe_id = "xbox-9n5pkh0kw2l1-auto";
+  CHECK(installer.InspectOwnership(xbox_journal).title_source_path.empty());
 }
 
 // A shipped recipe's requirements against what the kit's template provides.
@@ -1512,6 +1544,7 @@ int main() {
   }
 #ifdef PLAYDEN_TEST_SETTINGS_OWNER_INTEGRATION
   RealFilesystemInstallerAndOwnerRecoverPendingPublication();
+  RealFilesystemInstallerAndOwnerRecoverPendingPublication(true);
 #endif
   FailedDriverCreatesNoPublicationDirectories();
   CompleteInspectorRefusesMixedSettingsAndBusyPublisher();

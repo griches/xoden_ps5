@@ -50,7 +50,7 @@ TitleRegistration TitleRegistry::Query(const std::string& title) {
       continue;
     }
     if (id != title) continue;
-    if (++matches > 1) return {RegistrationState::kCollision, path, {}};
+    if (++matches > 1) return {RegistrationState::kCollision, path, "duplicate-title"};
     if (path.empty()) return unavailable("no-path");
     const auto managed = Flag(game, "managed");
     if (!managed) return unavailable("no-managed");
@@ -63,7 +63,7 @@ TitleRegistration TitleRegistry::Query(const std::string& title) {
         Flag(game, "source_available") == false)
       continue;
     if (path != source || !*managed)
-      result = {RegistrationState::kCollision, path, {}};
+      result = {RegistrationState::kCollision, path, path != source ? "source-path" : "source-not-managed"};
     else {
       const auto installed = Flag(game, "installed"), available = Flag(game, "source_available");
       const auto type = Text(game, "source_type");

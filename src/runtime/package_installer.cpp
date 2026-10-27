@@ -562,7 +562,7 @@ bool FilesystemPackageInstaller::RecipeAccepted(const RuntimeInstall& record) co
   if (record.runtime_number == 0) return false;
   if (record.game != GameId{}) return record.game.valid() && record.recipe_id == playden::GeneratedRecipeId(record.game);
   // A copy that doesn't carry its game (read back from a journal): the Steam game its number names,
-  // or, for a number from the allocator's range, a Local game's generated recipe.
+  // or, for a number from the allocator's range, an imported/Xbox game's generated recipe.
   if (record.recipe_id == playden::GeneratedRecipeId(GameId::Steam(record.runtime_number))) return true;
   constexpr std::string_view kSuffix = "-auto";
   const std::string_view id = record.recipe_id;
@@ -570,7 +570,8 @@ bool FilesystemPackageInstaller::RecipeAccepted(const RuntimeInstall& record) co
       id.size() <= kSuffix.size() || id.substr(id.size() - kSuffix.size()) != kSuffix)
     return false;
   const auto game = playden::ParseInstallId(id.substr(0, id.size() - kSuffix.size()));
-  return game && game->store == Store::kLocal;
+  return game && (game->store == Store::kLocal ||
+                  (game->store == Store::kXbox && playden::ToInstallId(*game) == record.install_id));
 }
 
 std::optional<FilesystemPackageInstaller::ResolvedPaths>
@@ -1098,6 +1099,10 @@ PackageStatus FilesystemPackageInstaller::InspectWith(const RuntimeInstall& reco
     status.template_owned = status.mutable_bottle_present && BottleOwned(record, *paths);
     status.mutable_bottle_owned = status.template_owned;
     times.Add("bottle", since); since = PartTimes::Clock::now();
+    if (!walk_title && operations_.log && (!status.manifest_matches || !status.template_owned))
+      operations_.log("package ownership title=" + record.title_id + " euid=" + std::to_string(::geteuid()) +
+          " title_staged=" + std::to_string(status.title_staged) + " title_matches=" + std::to_string(status.manifest_matches) +
+          " bottle_present=" + std::to_string(status.mutable_bottle_present) + " bottle_owned=" + std::to_string(status.template_owned));
     // Ownership needs no kit artifacts: after a kit change they differ until Update,
     // which TitleCurrent and the full inspection (launch) report.
     status.artifacts_valid = walk_title && status.manifest_matches && ArtifactsMatch(record, *paths);
