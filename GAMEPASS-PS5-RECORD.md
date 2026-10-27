@@ -1425,3 +1425,17 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - A title capture was requested before discovering Playden had closed for
   the game launch. No completed frame was produced. Removed/confirmed absent
   the transient Playden request; no system screenshot or gallery operation.
+
+#### Game sign-in acceptance confirmed by Gary
+
+- With Call of the Elder Gods in the foreground after the successful new
+  unified login, Gary confirmed: "all signed in, saves present". This accepts
+  Xbox game sign-in and visibility of the existing saves for Elder Gods using
+  the freshly approved browser session. No old cleared session was restored.
+- This does not establish MIO acceptance with the new session, save load/play
+  testing, expiry/renewal or account-switch behavior. No saves were opened or
+  modified by the agent. Game remains running with Gary's physical controller.
+- One final full host regression run is in progress, log:
+  /tmp/gamepass-signin-final-host-tests.log. Do not start another full run unless
+  new changes or a new unresolved failure require it. Native/wrapper/app builds
+  and the previously listed focused checks have already passed.
