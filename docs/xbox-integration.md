@@ -216,3 +216,22 @@ Fifteen file-stat field offsets and the 120-byte total match SDK declarations.
 No native probe has been executed on the console. No networking, account refresh,
 license resolution, extraction or progress/cancellation API is implemented by
 this new crate yet. Installed downloads still use the existing Windows worker.
+
+## Console cleanup acceptance: real interrupted download
+
+- Selected A Game About Digging a Hole (9NGLST31DG26) in the native Xbox catalogue
+  and pressed Install. Worker displayed 10.9%, 40.4 / 369.4 MB, 9.0 MB/s when
+  captured (`/tmp/xbox-cleanup-download.png`). Interrupted this test worker;
+  Playden returned automatically with an interrupted-operation notice.
+- Native game details offered Resume download and Delete partial download
+  (`/tmp/playden-partial-details.png`). Selected Delete, verified its confirmation
+  (`/tmp/playden-delete-confirm.png`), then confirmed with the controller.
+- Before deletion, FTP listed xbox-9nglst31dg26 alongside the two prepared game
+  folders. After deletion, that partial folder and its quarantine were absent;
+  Minishoot's xbox-9n5pkh0kw2l1 and Doom 64's xbox-9mxnd4pqlk3w remained.
+- The UI disabled install/delete while working and returned to Install with no
+  Delete action (`/tmp/playden-delete-finished.png`). This verifies actual native
+  deletion on the console, not just a host fixture. Resume was offered but was
+  not exercised in this run; power-loss recovery remains host-fixture evidence.
+- Virtual pad was closed successfully after the check. Playden remains open on
+  the test game's details. Remote Play was not used. No test download remains.
