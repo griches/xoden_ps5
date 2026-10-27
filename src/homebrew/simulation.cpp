@@ -462,7 +462,7 @@ std::vector<std::string> split_overrides(const std::string& list) {
 
 std::string action_label(const std::string& key) {
     static const std::map<std::string, std::string> labels = {
-        {"cancel", "Cancel"}, {"confirm-destructive", "Confirm"}, {"ready-later", "Later"}, {"alert-ok", "OK"}, {"alert-settings", "Game settings"}, {"runtime-cleanup-confirm", "Clean up"}, {"quit-to-home", "Play"}, {"favorite", "Favorite"},
+        {"xbox-discard-confirm", "Delete partial download"}, {"cancel", "Cancel"}, {"confirm-destructive", "Confirm"}, {"ready-later", "Later"}, {"alert-ok", "OK"}, {"alert-settings", "Game settings"}, {"runtime-cleanup-confirm", "Clean up"}, {"quit-to-home", "Play"}, {"favorite", "Favorite"},
         {"collection", "Collections"}, {"note", "Compatibility and note"}, {"verify", "Verify files"},
         {"uninstall", "Uninstall"}, {"import-remove", "Remove from library"}, {"uninstall-delete-saves", "Delete saves too"}, {"logs", "Open logs"}, {"logs-back", "Back"},
         {"logs-pick", "Logs"}, {"log-install", "Install log"}, {"log-auth", "Sign-in log"},
@@ -1857,6 +1857,10 @@ void Simulation::open_release_notes(bool after_update) {
                                                : update.current_notes);
     notes.link = update.current_notes_url;
     open_modal(std::move(notes));
+}
+
+void Simulation::UpdateXboxPartials(std::vector<GameId> games, bool busy) {
+    xbox_partials_ = std::move(games); xbox_cleanup_busy_ = busy; rebuild_view();
 }
 
 bool Simulation::CanHandoffXbox() const {
@@ -4845,9 +4849,16 @@ void Simulation::rebuild_view() {
                 status.value = job_state_value(*job);
                 status.progress = job->total_bytes == 0 ? 0.0F : static_cast<float>(job->completed_bytes) / static_cast<float>(job->total_bytes);
             } else if (game->id.store == Store::kXbox) {
-                auto& install = row("details-install", RowKind::Action, "Install", "xbox-install");
+                const bool partial = std::find(xbox_partials_.begin(),xbox_partials_.end(),game->id) != xbox_partials_.end();
+                auto& install = row("details-install", RowKind::Action, partial ? "Resume download" : "Install", "xbox-install");
+                install.enabled = !xbox_cleanup_busy_;
                 install.value = "Check PC package";
                 install.subtitle = "To Console storage · Xbox checks access and available packages";
+                if (partial) {
+                    auto& discard = row("details-xbox-discard",RowKind::Action,"Delete partial download","xbox-discard");
+                    discard.enabled = !xbox_cleanup_busy_;
+                    discard.subtitle = xbox_cleanup_busy_ ? "Deleting download files…" : "Free the space used by this unfinished download";
+                }
             } else if (game->windows_installable.value_or(false)) {
                 auto& install = row("details-install", RowKind::Action, "Install", "live-install");
                 install.value = game->install_bytes ? format_bytes(*game->install_bytes) : "Size unknown";
@@ -6762,6 +6773,19 @@ void Simulation::activate() {
                 previous->second.play_detail.clear();
             pending_runtime_play_requests_.push_back(id);
         }
+    } else if (live() && action_name == "xbox-discard") {
+        const auto id = state_.navigation.detail_id.value_or(state_.navigation.selected_game_id);
+        if (!xbox_cleanup_busy_ && std::find(xbox_partials_.begin(),xbox_partials_.end(),id) != xbox_partials_.end()) {
+            xbox_discard_game_ = id;
+            ModalEntry confirm{"confirmation","Delete this partial download?",state_.navigation.focus_key,
+                               {"cancel","xbox-discard-confirm"},0,true};
+            confirm.body = "Downloaded files will be deleted. You can install the game again later. Saved games are kept.";
+            open_modal(std::move(confirm));
+        }
+    } else if (live() && action_name == "xbox-discard-confirm") {
+        if (!xbox_cleanup_busy_ && std::find(xbox_partials_.begin(),xbox_partials_.end(),xbox_discard_game_) != xbox_partials_.end())
+            pending_install_requests_.push_back({InstallRequestKind::Cancel,xbox_discard_game_});
+        xbox_discard_game_ = {}; close_modal();
     } else if (live() && action_name == "xbox-install") {
         const auto id = state_.navigation.detail_id.value_or(state_.navigation.selected_game_id);
         if (id.valid() && id.store == Store::kXbox)

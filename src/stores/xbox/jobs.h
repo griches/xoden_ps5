@@ -18,6 +18,7 @@ struct JobSnapshot {
     std::string phase = "loading", message, request_id;
     std::string worker_install_id, worker_title;
     std::vector<PreparedGame> prepared;
+    std::vector<GameId> partials;
 };
 struct JobConfig {
     std::string root, games_root;
@@ -30,14 +31,16 @@ class Jobs {
 public:
     explicit Jobs(JobConfig config);
     ~Jobs();
+    bool Discard(GameId game);
     bool Install(GameId game, std::string account_key, std::string market);
     std::shared_ptr<const JobSnapshot> Snapshot() const;
     void Shutdown();
 private:
-    struct Request { GameId game; std::string account, market; };
+    struct Request { GameId game; std::string account, market; bool discard = false; };
     void Run();
     void Load();
     void Execute(const Request& request);
+    void ExecuteDiscard(GameId game);
     void Publish(std::string phase, std::string message = {});
     JobConfig config_;
     Storage storage_;

@@ -3120,6 +3120,19 @@ void xbox_install_does_not_wait_for_steam() {
     activate(model,"details-install");
     const auto requests = model.TakeInstallRequests();
     check(requests.size() == 1 && requests.front().game_id == id, "Xbox install reaches its worker");
+    model.UpdateXboxPartials({id},false);
+    check(has_row(model,"details-xbox-discard"),"partial Xbox download can be removed from details");
+    activate(model,"details-xbox-discard");
+    check(model.TakeInstallRequests().empty(),"opening cleanup confirmation does not delete files");
+    activate(model,"xbox-discard-confirm");
+    const auto cleanup = model.TakeInstallRequests();
+    check(cleanup.size() == 1 && cleanup.front().kind == playden::homebrew::InstallRequestKind::Cancel && cleanup.front().game_id == id,
+          "cleanup targets the confirmed Xbox game");
+    model.UpdateXboxPartials({id},true);
+    check(!find_row(model,"details-xbox-discard")->enabled && !find_row(model,"details-install")->enabled,
+          "cleanup prevents a competing install");
+    model.UpdateXboxPartials({},false);
+    check(!has_row(model,"details-xbox-discard"),"completed cleanup removes its action");
 }
 
 void xbox_search_covers_the_complete_catalog() {

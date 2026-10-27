@@ -37,5 +37,61 @@ int main() {
     { stores::xbox::Jobs reload(config);Wait(reload,"idle");assert(reload.Snapshot()->prepared.size()==1); }
     Put(store,"prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9N5PKH0KW2L1\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\"xbox-9n5pkh0kw2l1\",\"executable\":\"../escape.exe\"}]}");
     { stores::xbox::Jobs reload(config);Wait(reload,"idle");assert(reload.Snapshot()->prepared.empty()); }
+    // Orphan partials remain manageable even after a newer job finishes.
+    Put(store,"prepared-games.json","{\"schema\":1,\"games\":[]}");
+    const auto partial = root/"games/xbox-9np1p1wfs0lb";
+    std::filesystem::create_directories(partial/"nested");
+    Storage partial_store(partial.string());
+    Put(partial_store,".nexus-streaming-v1.jsonl","resume");
+    Put(partial_store,"nested/content.bin","partial bytes");
+    {
+        stores::xbox::Jobs cleanup(config); Wait(cleanup,"idle");
+        assert(cleanup.Snapshot()->partials.size() == 1);
+        assert(!cleanup.Discard(GameId::Xbox("9N5PKH0KW2L1")));
+        assert(cleanup.Discard(GameId::Xbox("9NP1P1WFS0LB"))); Wait(cleanup,"cleaned");
+        assert(!std::filesystem::exists(partial));
+        assert(cleanup.Snapshot()->partials.empty());
+    }
+    // A symlink in partial content is refused; its destination is untouched and
+    // the resume marker survives to allow a subsequent cleanup attempt.
+    std::filesystem::create_directories(partial);
+    Put(partial_store,".nexus-streaming-v1.jsonl","resume");
+    Put(store,"keep.txt","saved data");
+    std::filesystem::create_symlink(root/"keep.txt",partial/"link");
+    {
+        stores::xbox::Jobs cleanup(config); Wait(cleanup,"idle");
+        assert(cleanup.Discard(GameId::Xbox("9NP1P1WFS0LB"))); Wait(cleanup,"failed");
+        assert(std::filesystem::exists(root/"keep.txt"));
+        assert(std::filesystem::exists(partial/".nexus-streaming-v1.jsonl"));
+    }
+    // Prepared and corrupt manifests both prevent cleanup admission.
+    Put(store,"prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9NP1P1WFS0LB\",\"folder\":\"xbox-9np1p1wfs0lb\"}]}");
+    {
+        stores::xbox::Jobs cleanup(config); Wait(cleanup,"idle");
+        assert(cleanup.Snapshot()->partials.empty());
+        assert(!cleanup.Discard(GameId::Xbox("9NP1P1WFS0LB")));
+    }
+    Put(store,"prepared-games.json","broken");
+    {
+        stores::xbox::Jobs cleanup(config); Wait(cleanup,"idle");
+        assert(cleanup.Snapshot()->partials.empty());
+        assert(!cleanup.Discard(GameId::Xbox("9NP1P1WFS0LB")));
+    }
+    std::filesystem::remove(partial/"link");
+    std::filesystem::remove(root/"prepared-games.json");
+    Put(store,"job-request.json",R"({"schema":1,"requestId":"11111111-1111-1111-1111-111111111111","operation":"install","productId":"9NP1P1WFS0LB"})");
+    Put(store,"job-result.json",R"({"schema":1,"requestId":"11111111-1111-1111-1111-111111111111","productId":"9NP1P1WFS0LB","status":"downloading"})");
+    std::filesystem::remove(partial/".nexus-streaming-v1.jsonl");
+    Put(partial_store,".xodus-streaming-tmp.msixvc","metadata");
+    {
+        stores::xbox::Jobs cleanup(config); Wait(cleanup,"failed"); // interrupted download
+        assert(cleanup.Snapshot()->partials.size() == 1);
+        assert(cleanup.Discard(GameId::Xbox("9NP1P1WFS0LB"))); Wait(cleanup,"cleaned");
+        assert(!std::filesystem::exists(partial));
+        const auto bytes = store.Read("job-result.json"); assert(bytes.ok());
+        const auto result = steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));
+        assert(result && result->Find("status")->text() == "cancelled");
+    }
+    { stores::xbox::Jobs reload(config); Wait(reload,"idle"); assert(reload.Snapshot()->partials.empty()); }
     std::filesystem::remove_all(root);
 }

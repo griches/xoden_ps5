@@ -1783,7 +1783,8 @@ void Controller::TickXboxJobs() {
   if (state->revision == xbox_revision_ && account == xbox_account_key_) return;
   if (runtime_ && runtime_->Shared()->status == RuntimeHostStatus::kStarting) return;
   xbox_revision_ = state->revision; xbox_account_key_ = account;
-  if (!state->message.empty() && state->phase == "failed") model_.ShowLayoutNotice(state->message);
+  model_.UpdateXboxPartials(state->partials,state->phase == "cleaning");
+  if (!state->message.empty() && (state->phase == "failed" || state->phase == "cleaned")) model_.ShowLayoutNotice(state->message);
   xbox_locations_.clear(); xbox_programs_.clear();
   for (const auto& game : state->prepared) {
     if (game.account_key != account) continue;
@@ -1804,6 +1805,11 @@ void Controller::TickInstalls() {
   }
   for (const auto& request : model_.TakeInstallRequests()) {
     if (request.game_id.store == Store::kXbox) {
+      if (request.kind == InstallRequestKind::Cancel && xbox_jobs_) {
+        if (!model_.CanHandoffXbox() || !xbox_jobs_->Discard(request.game_id))
+          model_.ShowLayoutNotice("This partial download cannot be removed right now.");
+        continue;
+      }
       if (request.kind != InstallRequestKind::Install || !xbox_jobs_ || !xbox_library_ || !runtime_) {
         model_.ShowLayoutNotice("The Xbox download service is unavailable for this action."); continue;
       }
