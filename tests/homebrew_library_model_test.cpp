@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "homebrew/queue_layout.hpp"
+#include "homebrew/browse.hpp"
 #include "homebrew/simulation.hpp"
 #include "homebrew/store_art.hpp"
 
@@ -3102,7 +3103,25 @@ void live_import_choice_and_details() {
           "then copies it to the chosen drive");
 }
 
+void xbox_search_covers_the_complete_catalog() {
+    auto model = make_live();
+    LibraryUpdate update;
+    update.source = playden::Store::kXbox;
+    for (int i = 0; i < 600; ++i)
+        update.games.push_back(game(playden::GameId::Xbox(std::to_string(100000000000ULL + i)),
+                                    i == 599 ? "Last catalog game" : "Example " + std::to_string(i)));
+    check(model.UpdateLibrary(std::move(update)), "complete Xbox library accepted");
+    auto state = model.state();
+    state.library.scope = "xbox";
+    state.library.query = "last catalog";
+    const auto matches = playden::homebrew::filtered_games(state);
+    check(matches.size() == 1 && matches.front()->title == "Last catalog game", "search reaches game 600 without loading pages");
+    const auto scopes = playden::homebrew::library_rail_scopes(state);
+    check(std::find(scopes.begin(), scopes.end(), "xbox") != scopes.end(), "Xbox has its own library rail");
+}
+
 int main() {
+    xbox_search_covers_the_complete_catalog();
     live_import_sheet_sends_requests();
     live_import_choice_and_details();
     store_art_follows_the_store();

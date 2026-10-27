@@ -125,6 +125,8 @@ std::vector<const Game*> filtered_games(const State& state)
             continue;
         if (state.library.scope == "imported" && game.id.store != Store::kLocal)
             continue;
+        if (state.library.scope == "xbox" && game.id.store != Store::kXbox)
+            continue;
         if (collection != nullptr && !collection->members.contains(game.id))
             continue;
         if (state.library.scope != "hidden" && state.library.hidden.contains(game.id))
@@ -292,6 +294,8 @@ std::vector<std::string> library_rail_scopes(const State& state)
     std::vector<std::string> result{"installed", "all", "favorites", "hidden"};
     if (has_imported_games(state))
         result.push_back("imported");
+    if (std::any_of(state.games.begin(), state.games.end(), [](const Game& game) { return game.id.store == Store::kXbox; }))
+        result.push_back("xbox");
     for (const Collection& collection : state.library.collections)
         result.push_back(collection.id);
     result.push_back("new-collection");

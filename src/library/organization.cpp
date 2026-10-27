@@ -101,7 +101,7 @@ bool BuiltInScope(const std::string& value) {
 }
 
 // The Library rails of installed and imported games: scopes, never collection IDs.
-bool RailScope(const std::string& value) { return value == "installed" || value == "imported"; }
+bool RailScope(const std::string& value) { return value == "installed" || value == "imported" || value == "xbox"; }
 
 bool ReservedCollectionId(const std::string& value) {
   return BuiltInScope(value) || RailScope(value) || value == "new-collection";

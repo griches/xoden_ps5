@@ -1547,6 +1547,10 @@ class Render::Impl
                                std::to_string(std::count_if(state.games.begin(), state.games.end(),
                                                             [](const Game &game) { return game.id.store == Store::kLocal; })),
                                state.library.scope == "imported"});
+        const auto xbox_games = std::count_if(state.games.begin(), state.games.end(),
+                                               [](const Game& game) { return game.id.store == Store::kXbox; });
+        if (xbox_games)
+            entries.push_back({"rail-xbox", "Xbox", std::to_string(xbox_games), state.library.scope == "xbox"});
         for (const Collection &collection : state.library.collections)
             entries.push_back({"rail-" + collection.id, collection.name,
                                std::to_string(collection.members.size()),

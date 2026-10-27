@@ -48,3 +48,18 @@ are retained. This still needs acceptance with fresh generated settings.
 Latest Playden changes its launcher title to PPSA97031. Account data and kit
 remain under the shared Playden data root. Deployment must account for the old
 FAKE77031 launcher and keep rollback available. Do not edit pinned kit hashes.
+
+## 2026-10-27 catalog checkpoint
+
+- Backend `6e9893f` implements bounded account-bound jobs. On-console refresh
+  completed with 669 games and an active subscription; the actual 328610-byte
+  snapshot validates in the native reader.
+- Native reader and asynchronous registry source committed as `ce564da`.
+  Full host suite passes 149/149; PS5 package builds successfully.
+- Build scripts explicitly retain FAKE77031; this deployment uses the existing
+  launcher identity. Verified raw backup retained in sibling xodus-games.
+- Console FTP transparently decodes SELF on retrieval. Ordinary byte comparison
+  fails even for correct uploads. The uidcp get-raw envelope preserves exact
+  on-disk bytes; use it for executable backup and verification.
+- Installed catalog checkpoint includes an explicit DevLoop frame capture hook.
+  Native UI console acceptance follows; install handoff/setup remains unfinished.
