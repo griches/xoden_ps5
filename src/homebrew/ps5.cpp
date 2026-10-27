@@ -152,11 +152,12 @@ struct UsbKeyboard {
 std::string title_root = "/app0";
 std::string log_root = "/app0/logs";
 bool start_xbox_handoff(const std::string& request_id, const std::string& worker,
-                        const std::string& package_root, std::string* error) {
+                        const std::string& package_root, std::string* error, bool game_session = false) {
     playden::Storage storage("/data/playden/xbox"), package(package_root);
     const auto elf = package.Read("xbox-handoff.elf", 1024 * 1024);
     if (!elf.ok()) { *error = "The Xbox handoff helper is missing from Playden."; return false; }
-    const auto text = request_id + "\n" + worker + "\n" PLAYDEN_PS5_TITLE_ID "\n";
+    const auto text = request_id + "\n" + worker + "\n" PLAYDEN_PS5_TITLE_ID "\n" +
+        (game_session ? std::string("game-session\n") : std::string{});
     if (!storage.WriteAtomicPrivate("handoff-request.txt", playden::Bytes(text.begin(),text.end())).ok()) {
         *error = "The Xbox handoff request could not be saved."; return false;
     }
@@ -167,7 +168,7 @@ bool start_xbox_handoff(const std::string& request_id, const std::string& worker
         if (bytes.ok() && std::string(bytes.value().begin(),bytes.value().end()) == expected) return true;
         usleep(250000);
     }
-    *error = "The Xbox handoff helper did not acknowledge this download. Try again."; return false;
+    *error = "The Xbox handoff helper did not acknowledge this request. Try again."; return false;
 }
 // Explicit developer request only; the dedicated capture folder is cleaned by
 // DevLoop after retrieval. Never write to the console's media gallery directly.
@@ -609,6 +610,10 @@ int main() {
                 auto held = playden::ps5::TryHoldEffectiveUid();
                 *busy = !held;
                 return held;
+            };
+            config.prepare_xbox_handoff = [package_root = paths.title_root](const std::string& title,
+                const std::string& session, std::string* error) {
+                return start_xbox_handoff(session, title, package_root, error, true);
             };
             // Play: start a prepared title with its session argument. LncUtil is
             // resolved through the system service module (its static imports are null).

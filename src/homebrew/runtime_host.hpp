@@ -128,6 +128,9 @@ struct RuntimeHostConfig {
   // Native start of a prepared title with its arguments ("session=<UUID>").
   // Called only on the application thread, from Handoff. Empty disables Play.
   std::function<ps5::TitleResult(const std::string& title_id, const std::vector<std::string>& arguments)> launch_title;
+  // Worker-only: arm a helper that waits for this launcher to exit before opening
+  // an Xbox title with the durable launch session. No game starts at this point.
+  std::function<bool(const std::string& title, const std::string& session, std::string* error)> prepare_xbox_handoff;
   // Unregisters a game's PS5 title through the one-shot title remover (worker
   // only; bounded). The nonce ties its answer to this request. Empty disables
   // removal of PS5 titles.
@@ -223,6 +226,7 @@ struct RuntimeMaintenanceView {
 
 // Play: the launch in progress, or how the last one ended.
 struct RuntimeLaunchView {
+  bool quit_for_handoff = false;
   std::string install_id;
   std::uint32_t runtime_number = 0;
   GameId game;

@@ -519,6 +519,15 @@ LaunchResult LaunchService::Cancel() {
   return LaunchResult::Accepted();
 }
 
+LaunchResult LaunchService::RefusePreparedHandoff(const std::string& message) {
+  if (persistence_uncertain_ || !session_ || recovered_pending_ ||
+      session_->phase != LaunchSessionPhase::kPrepared || snapshot_.state != LaunchState::kReadyToHandoff)
+    return Reject(LaunchError::kInvalidSession, "handoff-not-prepared", "No unstarted handoff is prepared.");
+  if (!PersistFailure(LaunchError::kNative, "handoff-helper-unavailable", message))
+    return Reject(LaunchError::kPersistence, "handoff-failure-not-saved", "The launch refusal could not be saved.");
+  return Reject(LaunchError::kNative, "handoff-helper-unavailable", message);
+}
+
 LaunchResult LaunchService::Begin(const RuntimeInstall &record,
                                   const std::string &account_token) {
   if (!dependencies_.uuid || !dependencies_.now_ms)

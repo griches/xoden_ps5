@@ -325,6 +325,7 @@ struct RuntimeHost::Composition {
   std::unique_ptr<rt::StorageLaunchSessionJournal> launch_journal;
   std::unique_ptr<rt::FilesystemReconcileSessionSource> sessions;
   std::unique_ptr<rt::LaunchService> launch;
+  std::string external_handoff_session;
   // Last worker preflight per install, with its time, for Handoff.
   std::map<std::string, std::pair<rt::LaunchPreflight, std::int64_t>> preflights;
   // The old and new games root while the 0.6 games move is unfinished.
@@ -2231,8 +2232,26 @@ rt::LaunchEvidence RuntimeHost::Evidence(Composition& c, const rt::RuntimeInstal
   return evidence;
 }
 
-void RuntimeHost::PublishLaunch(Composition& c, const rt::LaunchSnapshot& launch) {
+void RuntimeHost::PublishLaunch(Composition& c, const rt::LaunchSnapshot& incoming) {
+  auto launch = incoming;
+  // Ready is published only by the worker. Arm after preflight/cloud checks and
+  // before the application thread can commit its handoff; helper IO stays here.
+  if (launch.state == rt::LaunchState::kReadyToHandoff && config_.prepare_xbox_handoff &&
+      c.external_handoff_session != launch.session_id) {
+    const auto record = c.records.Find(launch.install_id);
+    if (record && GameOf(record->game, record->runtime_number).store == Store::kXbox) {
+      std::string error;
+      if (config_.prepare_xbox_handoff(record->title_id, launch.session_id, &error)) {
+        c.external_handoff_session = launch.session_id;
+      } else {
+        c.launch->RefusePreparedHandoff(error.empty() ? "The Xbox launch helper could not start." : error);
+        launch = c.launch->Snapshot();
+      }
+    }
+  }
   RuntimeLaunchView view;
+  view.quit_for_handoff = launch.state == rt::LaunchState::kLaunching &&
+      !c.external_handoff_session.empty() && c.external_handoff_session == launch.session_id;
   view.install_id = launch.install_id;
   view.state = launch.state;
   view.code = launch.code;
@@ -3882,7 +3901,9 @@ bool RuntimeHost::RunServices() {
         return Evidence(c, record, session);
       };
       launch.activity = [&c](const rt::RuntimeInstall& record) { return c.coordinator->Activity(record.title_id); };
-      launch.backend = [this](const rt::RuntimeInstall& record, const std::string& session) {
+      launch.backend = [this, &c](const rt::RuntimeInstall& record, const std::string& session) {
+        if (config_.prepare_xbox_handoff && GameOf(record.game, record.runtime_number).store == Store::kXbox)
+          return ps5::TitleResult{c.external_handoff_session == session, 0, "xbox-helper"};
         return config_.launch_title(record.title_id, {"session=" + session});
       };
       // Playden's own state is already durable; nothing waits to be written.

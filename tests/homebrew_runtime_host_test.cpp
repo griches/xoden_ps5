@@ -1420,6 +1420,86 @@ void ReplacedKitAsksForRestart() {
   CHECK(held.refusals.at(220).find("changed while Playden was running") != std::string::npos);
 }
 
+void XboxHandoffIsArmedOnWorkerBeforeLauncherExit() {
+  for (bool accept : {false, true}) {
+    Fixture fixture;
+    auto config = fixture.Config();
+    config.host_namespace_prefix = fixture.root;
+    config.session_data_root = fixture.root / "data";
+    config.package_paths.console_data_root = "/data";
+    config.package_paths.host_data_root = fixture.root / "data";
+    config.package_operations.hash_file = HashArtifactFile;
+    config.package_operations.hash_bytes = HashArtifactBytes;
+    config.package_operations.free_space_unverifiable = true;
+    config.package_operations.validate_bottle = [](const fs::path& bottle) {
+      return fs::is_regular_file(bottle / "system.reg") && fs::is_regular_file(bottle / "user.reg");
+    };
+    auto kit = SyntheticKit(fixture.root / "kit");
+    const std::string system32 = "template/bottle/drive_c/windows/system32/kernel32.dll";
+    Write(kit.view.root / system32, "fixture", 0644);
+    kit.view.files.push_back({system32, 7, *HashArtifactFile(kit.view.root / system32), 0644});
+    config.admit_kit = [kit](std::string*) { return std::optional<RuntimeKit>(kit); };
+    unsigned uuids = 0;
+    config.uuid = [&]() -> std::optional<std::string> {
+      return "00000000-0000-4000-8000-00000000000" + std::to_string(++uuids);
+    };
+    config.unix_time = [] { return std::int64_t{1760000000}; };
+    config.launch_title = [](const std::string&, const std::vector<std::string>&) {
+      CHECK(false); return TitleResult{};  // Xbox must use the acknowledged helper.
+    };
+    const auto application_thread = std::this_thread::get_id();
+    std::atomic<unsigned> armed{0};
+    std::string session;
+    config.prepare_xbox_handoff = [&](const std::string& title, const std::string& id, std::string* error) {
+      CHECK(std::this_thread::get_id() != application_thread);
+      CHECK(title == "FAKE78001" && id.size() == 36);
+      session = id; ++armed;
+      if (!accept) *error = "The helper is unavailable.";
+      return accept;
+    };
+    std::string pe(256, '\0');
+    pe[0] = 'M'; pe[1] = 'Z'; pe[60] = static_cast<char>(128); pe[128] = 'P'; pe[129] = 'E';
+    pe[132] = 0x64; pe[133] = static_cast<char>(0x86); pe[152] = 0x0b; pe[153] = 0x02;
+    config.xbox_runtime_dir = (fixture.root / "xbox-runtime").string();
+    for (const auto* name : {"xgameruntime.dll", "xgameruntime_impl.dll", "windows.web.dll"})
+      Write(fs::path(config.xbox_runtime_dir) / name, pe, 0600);
+    const auto game = playden::GameId::Xbox("9N5PKH0KW2L1");
+    const std::string game_root = "/data/playden-games/xbox-9n5pkh0kw2l1";
+    Write(fixture.root / fs::path(game_root).relative_path() / "Game.exe", pe, 0644);
+    RuntimeHost host(config);
+    CHECK(host.Start()); WaitFor(host, Started);
+    const auto number = host.RuntimeNumberFor(game); CHECK(number);
+    RuntimePrepareRequest request{*number, game_root, "internal", "Xbox game"};
+    request.game = game; request.launches = {{"", "", "Game.exe", "", ""}};
+    host.Prepare(request);
+    const auto prepared = WaitFor(host, [&](const RuntimeSnapshot& s) {
+      return s.refusals.count(*number) || (!s.preparing_app && !s.installs.empty() && s.installs[0].state == PreparationState::kReady);
+    }, 60);
+    if (prepared.refusals.count(*number)) std::fprintf(stderr, "%s\n", prepared.refusals.at(*number).c_str());
+    CHECK(!prepared.refusals.count(*number));
+    host.Play(*number);
+    const auto ready = WaitFor(host, [](const RuntimeSnapshot& s) { return s.plays_handled == 1; }, 30);
+    CHECK(armed == 1 && ready.launch && !ready.launch->quit_for_handoff);
+    CHECK(ready.handoff_ready == accept);
+    if (accept) {
+      CHECK(host.Handoff());
+      const auto launched = host.Snapshot();
+      CHECK(launched.launch && launched.launch->quit_for_handoff);
+      CHECK(launched.launch->state == LaunchState::kLaunching);
+      CHECK(!host.Handoff() && armed == 1);
+      playden::Storage journal_storage(config.state_root.string());
+      StorageLaunchSessionJournal journal(journal_storage);
+      const auto pending = journal.LoadPending();
+      CHECK(pending.ok && pending.session && pending.session->session_id == session);
+      CHECK(pending.session->phase == LaunchSessionPhase::kHandoffBegun);
+    } else {
+      CHECK(!host.Handoff());
+      CHECK(ready.launch->state == LaunchState::kFailed);
+    }
+    host.Shutdown();
+  }
+}
+
 void PreparesGameWithoutShippedRecipe() {
   Fixture fixture;
   auto config = fixture.Config();
@@ -5279,6 +5359,7 @@ int main(int argc, char** argv) {
   SetupFromAnEarlierKitAsksForRecreate();
   RepairsBottleRegistryModes();
   PlaysReadyTitleThroughHandoff();
+  XboxHandoffIsArmedOnWorkerBeforeLauncherExit();
   ReplacedKitAsksForRestart();
   MaintainsReadyTitle();
   ModdedGameFolderStillPlays();

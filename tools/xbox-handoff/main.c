@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// One console job: wait for Playden to exit, run its Xbox worker, then return.
+// One console job: wait for Playden to exit, run its Xbox worker or prepared game, then return.
 // Never terminates a title and abandons the handoff if another game is started.
 #include <stdint.h>
 #include <stdio.h>
@@ -57,23 +57,32 @@ static int current(char* title) {
     if (sceLncUtilGetAppTitleId(app, buffer) || strlen(buffer) != 9) return -1;
     memcpy(title, buffer, 10); return 1;
 }
-static int launch(const char* title) {
+static int launch(const char* title, const char* session) {
+    char argument[48]; const char* args[2] = {argument, NULL};
+    if (session) snprintf(argument, sizeof argument, "session=%s", session);
     uint32_t user = 0;
     if (sceUserServiceGetForegroundUser(&user)) return 0;
     launch_params params = {sizeof params, user, 0, 0, 0, 0};
-    uint32_t rc = sceLncUtilLaunchApp(title, NULL, &params);
-    if (rc & 0x80000000u) { params.check_flag = 1; rc = sceSystemServiceLaunchApp(title, NULL, &params); }
+    uint32_t rc = sceLncUtilLaunchApp(title, session ? args : NULL, &params);
+    if (rc & 0x80000000u) { params.check_flag = 1; rc = sceSystemServiceLaunchApp(title, session ? args : NULL, &params); }
     return !(rc & 0x80000000u);
 }
 int main(void) {
     if (seteuid(1)) return 1;
     int lock = open(ROOT "handoff.lock", O_CREAT | O_WRONLY, 0600);
     if (lock < 0 || flock(lock, LOCK_EX | LOCK_NB)) { if (lock >= 0) close(lock); return 1; }
-    char id[64], worker[32], home[32];
+    char id[64], worker[32], home[32], mode[32] = {0};
     FILE* file = fopen(ROOT "handoff-request.txt", "r");
     int valid = file && line(file, id, sizeof id) && line(file, worker, sizeof worker) && line(file, home, sizeof home)
-        && fgetc(file) == EOF && uuid(id) && worker_title(worker)
+        && uuid(id) && worker_title(worker)
         && (!strcmp(home, "FAKE77031") || !strcmp(home, "PPSA97031"));
+    if (valid) {
+        int next = fgetc(file);
+        if (next != EOF) {
+            ungetc(next, file);
+            valid = line(file, mode, sizeof mode) && !strcmp(mode, "game-session") && fgetc(file) == EOF;
+        }
+    }
     if (file) fclose(file);
     if (!valid || seteuid(0)) { close(lock); return 1; }
     sceUserServiceInitialize(NULL); sceLncUtilInitialize();
@@ -83,7 +92,7 @@ int main(void) {
     double start = now();
     while ((state = current(title)) == 1 && !strcmp(title, home) && now() - start < 90) usleep(250000);
     if (state != 0) { report(id, "canceled"); close(lock); return 1; }
-    if (!launch(worker)) { report(id, "launch-failed"); close(lock); return 1; }
+    if (!launch(worker, mode[0] ? id : NULL)) { report(id, "launch-failed"); close(lock); return 1; }
     report(id, "starting"); start = now(); int seen = 0;
     while (now() - start < 24 * 60 * 60) {
         state = current(title);
@@ -96,5 +105,5 @@ int main(void) {
     // Let the console finish shutting down Wine. Recheck before opening Playden.
     usleep(1000000);
     if (current(title) != 0) { report(id, "interrupted"); close(lock); return 1; }
-    int ok = launch(home); report(id, ok ? "returned" : "return-failed"); close(lock); return ok ? 0 : 1;
+    int ok = launch(home, NULL); report(id, ok ? "returned" : "return-failed"); close(lock); return ok ? 0 : 1;
 }

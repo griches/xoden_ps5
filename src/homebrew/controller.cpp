@@ -1140,6 +1140,7 @@ void Controller::TickRuntime() {
   }
   const auto snapshot_shared = runtime_->Shared();
   const auto& snapshot = *snapshot_shared;
+  if (snapshot.launch && snapshot.launch->quit_for_handoff) model_.HandoffXbox();
   // Queued Plays are settled once the worker has handled every request; their
   // sessions or refusals are then visible.
   if (snapshot.plays_handled >= plays_requested_) play_queued_.clear();

@@ -230,6 +230,8 @@ public:
   LaunchResult Request(const std::string &install_id);
   LaunchResult PlayWithoutSync();
   LaunchResult Cancel();
+  // A worker could not arm an external launcher. Only a prepared, unstarted session may fail here.
+  LaunchResult RefusePreparedHandoff(const std::string& message);
 
   // This is the only method that can invoke the native backend. The injected
   // thread predicate is enforced immediately before all handoff effects.

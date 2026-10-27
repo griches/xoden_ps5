@@ -718,7 +718,24 @@ void RequestedSettingsUpdateBlocksPlayAndHandoff() {
   f.records.records["install-hl2"].journal = PreparationJournal{kSession, "settings-request", "capture-update"};
   CHECK(!service.Handoff().accepted && f.backend_calls == 0);
 }
+void ExternalHelperRefusalOnlyEndsUnstartedHandoff() {
+  Fixture f; auto service = f.Service();
+  CHECK(!service.RefusePreparedHandoff("missing helper").accepted);
+  CHECK(service.Request("install-hl2").accepted);
+  const auto refused = service.RefusePreparedHandoff("missing helper");
+  CHECK(!refused.accepted && refused.code == "handoff-helper-unavailable");
+  CHECK(service.Snapshot().state == LaunchState::kFailed);
+  CHECK(service.Snapshot().message == "missing helper");
+  CHECK(!service.Handoff().accepted && f.backend_calls == 0);
+  CHECK(service.Finish().accepted && !f.journal.pending);
+  f.uuid = "0f0e2d6c-3a52-4d7e-9d0b-6c51b1f1d2a3";
+  CHECK(service.Request("install-hl2").accepted && service.Handoff().accepted);
+  CHECK(!service.RefusePreparedHandoff("late refusal").accepted);
+  CHECK(f.backend_calls == 1 && f.journal.pending);
+}
+
 int main() {
+  ExternalHelperRefusalOnlyEndsUnstartedHandoff();
   RequestedSettingsUpdateBlocksPlayAndHandoff();
   MissingAndUnreadyInstallsNeverInvokeBackend();
   EveryFreshPreflightGateBlocksBeforePersistenceOrBackend();
