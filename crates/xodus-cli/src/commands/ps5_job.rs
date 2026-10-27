@@ -1,6 +1,6 @@
 //! Private, bounded Playden job protocol. Requests contain identities, never paths,
 //! credentials or CDN URLs. A prepared result is not a published Playden install.
-use std::{collections::{BTreeMap, HashSet}, fs::{File, OpenOptions}, io::{Read, Write}, path::Path, process::ExitCode, time::Duration};
+use std::{collections::{BTreeMap, HashSet}, fs::{File, OpenOptions}, io::{Read, Write, Seek, SeekFrom}, path::Path, process::ExitCode, time::Duration};
 use fs2::FileExt;
 use serde_json::{Value, json};
 use xodus::tokens::TokenManager;
@@ -50,6 +50,8 @@ fn publish(root: &Path, name: &str, value: &Value) -> Result<()> {
     super::durable_file::publish(&temp, &root.join(name)).map_err(|_| "result-publish")
 }
 fn state(root: &Path, request: &Request, status: &str, detail: Value) -> Result<()> {
+    #[cfg(windows)]
+    crate::ps5_worker::phase(status);
     publish(root, "job-result.json", &json!({"schema":1,"requestId":request.id,"operation":request.operation,
         "productId":request.product,"status":status,"updatedAt":chrono::Utc::now().to_rfc3339(),"detail":detail}))
 }
@@ -96,6 +98,80 @@ fn catalog_rows(body: &Value, requested: &[String]) -> Result<Vec<Value>> {
             "description":localized["ShortDescription"].as_str().filter(|s|s.len()<=8192),"artwork":image}));
     }
     Ok(rows)
+}
+
+fn program_path(value: &str) -> Result<String> {
+    let value = value.replace('\\', "/");
+    if value.is_empty() || value.len() > 256 || !value.bytes().all(|b| (32..127).contains(&b))
+        || value.contains(':') || value.split('/').any(|p| p.is_empty() || p == "." || p == "..")
+        || !value.to_ascii_lowercase().ends_with(".exe") { return Err("program-path"); }
+    Ok(value)
+}
+fn declared_program(bytes: &[u8]) -> Result<String> {
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(bytes);
+    let mut stack: Vec<String> = Vec::new();
+    let mut programs = HashSet::new();
+    loop {
+        let event = reader.read_event().map_err(|_| "game-config-xml")?;
+        let starts_element = matches!(&event, Event::Start(_));
+        match event {
+            Event::Start(ref element) | Event::Empty(ref element) => {
+                if stack.len() > 16 { return Err("game-config-depth"); }
+                let name = element.local_name();
+                if name.as_ref() == "Executable" && stack.iter().map(String::as_str).eq(["Game", "ExecutableList"]) {
+                    let mut program = None; let mut eligible = true;
+                    for attribute in element.attributes() {
+                        let attribute = attribute.map_err(|_| "game-config-attribute")?;
+                        let value = attribute.normalized_value(quick_xml::XmlVersion::Implicit1_0).map_err(|_| "game-config-attribute")?;
+                        match attribute.key.as_ref() {
+                            "Name" => program = Some(program_path(&value)?),
+                            "IsDevOnly" if value != "false" => eligible = false,
+                            "TargetDeviceFamily" if value != "PC" => eligible = false,
+                            _ => (),
+                        }
+                    }
+                    if eligible { programs.insert(program.ok_or("game-config-program")?); }
+                }
+                if starts_element { stack.push(name.as_ref().to_owned()); }
+            }
+            Event::End(_) => { if stack.pop().is_none() { return Err("game-config-xml"); } }
+            Event::DocType(_) => return Err("game-config-doctype"),
+            Event::Eof => break,
+            _ => (),
+        }
+    }
+    if !stack.is_empty() || programs.len() != 1 { return Err("program-choice-required"); }
+    programs.into_iter().next().ok_or("program-choice-required")
+}
+fn executable(root: &Path) -> Result<String> {
+    let program = declared_program(&read(&root.join("MicrosoftGame.config"), 1024 * 1024)?)?;
+    let mut path = root.to_owned();
+    for part in program.split('/') {
+        path.push(part);
+        if std::fs::symlink_metadata(&path).map_err(|_| "program-missing")?.file_type().is_symlink() { return Err("program-symlink"); }
+    }
+    let mut file = File::open(path).map_err(|_| "program-open")?;
+    let mut header = [0u8;64]; file.read_exact(&mut header).map_err(|_| "program-header")?;
+    if &header[..2] != b"MZ" { return Err("program-header"); }
+    let offset = u32::from_le_bytes(header[60..64].try_into().map_err(|_| "program-header")?);
+    if !(64..=1024*1024).contains(&offset) { return Err("program-header"); }
+    file.seek(SeekFrom::Start(offset.into())).map_err(|_| "program-header")?;
+    let mut pe = [0u8;6]; file.read_exact(&mut pe).map_err(|_| "program-header")?;
+    if pe != *b"PE\0\0\x64\x86" { return Err("program-x64-required"); }
+    Ok(program)
+}
+fn remember_prepared(root: &Path, entry: Value) -> Result<()> {
+    let path = root.join("prepared-games.json");
+    let mut rows = if path.exists() {
+        let value: Value = serde_json::from_slice(&read(&path, 2*1024*1024)?).map_err(|_| "prepared-index-json")?;
+        if value["schema"] != 1 { return Err("prepared-index-schema"); }
+        value["games"].as_array().filter(|r| r.len() <= 400).ok_or("prepared-index-shape")?.clone()
+    } else { Vec::new() };
+    rows.retain(|row| row["productId"] != entry["productId"]);
+    if rows.len() >= 400 { return Err("prepared-index-full"); }
+    rows.push(entry);
+    publish(root, "prepared-games.json", &json!({"schema":1,"games":rows}))
 }
 
 async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, games: &Path, req: &Request) -> Result<()> {
@@ -150,7 +226,11 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
     state(root, req, "preparing", json!({"contentId":content}))?;
     if super::prepare_ps5::run(client,tokens,destination.to_string_lossy().into(),Some(req.market.clone())).await != ExitCode::SUCCESS { return Err("preparation-failed"); }
     if tokens.get_user().map_err(|_| "account-changed")?.username != account { return Err("account-changed"); }
-    state(root, req, "prepared", json!({"accountKey":account_key,"folder":folder,"contentId":content}))
+    let program = executable(&destination)?;
+    let entry = json!({"accountKey":account_key,"folder":folder,"contentId":content,"executable":program,
+        "requestId":req.id,"productId":product});
+    remember_prepared(root, entry.clone())?;
+    state(root, req, "prepared", entry)
 }
 
 pub async fn run(client: &reqwest::Client, tokens: &TokenManager, root: &Path, games: &Path) -> ExitCode {
@@ -199,5 +279,14 @@ mod tests {
         state(dir.path(),&req,"checking-account",json!({})).unwrap(); state(dir.path(),&req,"failed",json!({"code":"account-changed"})).unwrap();
         let result: Value = serde_json::from_slice(&read(&dir.path().join("job-result.json"),4096).unwrap()).unwrap();
         assert_eq!(result["requestId"],req.id); assert_eq!(result["status"],"failed"); assert!(read(&dir.path().join("job-result.json"),8).is_err());
+    }
+    #[test] fn executable_selection_rejects_escape_ambiguity_and_non_pc_entries() {
+        assert_eq!(declared_program(br#"<Game><ExecutableList><Executable Name="Game.exe"/></ExecutableList></Game>"#).unwrap(), "Game.exe");
+        assert_eq!(declared_program(br#"<Game><ExecutableList><Executable Name="Tools\Game.exe"/><Executable Name="Dev.exe" IsDevOnly="true"/></ExecutableList></Game>"#).unwrap(), "Tools/Game.exe");
+        for xml in [br#"<Game><ExecutableList><Executable Name="../escape.exe"/></ExecutableList></Game>"#.as_slice(),
+            br#"<Game><ExecutableList><Executable Name="Game.exe"/><Executable Name="Other.exe"/></ExecutableList></Game>"#,
+            br#"<Game><ExecutableList><Executable Name="Game.exe" TargetDeviceFamily="XboxOne"/></ExecutableList></Game>"#,
+            br#"<!DOCTYPE Game><Game><ExecutableList><Executable Name="Game.exe"/></ExecutableList></Game>"#,
+            br#"<Game><Unexpected><Executable Name="Game.exe"/></Unexpected></Game>"#] { assert!(declared_program(xml).is_err()); }
     }
 }

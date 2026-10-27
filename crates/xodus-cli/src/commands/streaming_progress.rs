@@ -186,6 +186,8 @@ pub(super) async fn report(mut events: mpsc::Receiver<ProgressEvent>) {
 }
 
 fn emit(state: &State, sequence: u64, rate: u64) {
+    #[cfg(windows)]
+    crate::ps5_worker::progress(&state.record(sequence, rate));
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
     // Explicit prefix isolates the protocol from any ordinary CLI log output.

@@ -233,6 +233,10 @@ async fn main() -> ExitCode {
     if args.ps5_worker && ps5_worker::initialize().is_err() {
         return ExitCode::FAILURE;
     }
+    #[cfg(windows)]
+    if args.ps5_worker && matches!(&args.command, SubCommand::Ps5Job) && ps5_worker::start_window().is_err() {
+        return ExitCode::FAILURE;
+    }
     let filter = tracing_subscriber::EnvFilter::from_env("XODUS_LOG");
     let registry =
         tracing_subscriber::registry().with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_filter(filter));
@@ -336,9 +340,11 @@ async fn main() -> ExitCode {
         #[cfg(windows)]
         SubCommand::Ps5Job => {
             if !args.ps5_worker { return ExitCode::FAILURE; }
-            commands::ps5_job::run(&client, &tokens,
+            let result = commands::ps5_job::run(&client, &tokens,
                 std::path::Path::new(r"Z:\data\playden\xbox"),
-                std::path::Path::new(r"Z:\data\playden-games")).await
+                std::path::Path::new(r"Z:\data\playden-games")).await;
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            result
         }
         SubCommand::PreparePs5 { source, market } => commands::prepare_ps5::run(&client, &tokens, source, market).await,
         #[cfg(target_os = "linux")]

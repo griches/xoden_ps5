@@ -19,6 +19,7 @@ wry = { version = "0.56.1", optional = true }
 async-trait = "0.1.92"
 clap = { version = "4.6.6", features = ["derive"] }
 serde_json = "1.0.151"
+quick-xml = "0.42.0"
 chrono = { workspace = true }
 inquire = "0.9.4"
 futures-util = "0.3.34"
@@ -29,6 +30,9 @@ tempfile = "3.27.0"
 rustix = "1.1.4"
 ctrlc = "3.5.2"
 nix = "0.31.3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
 
 [features]
 default = ["native-webview", "eappx-extraction"]

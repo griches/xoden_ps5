@@ -7191,6 +7191,7 @@ dependencies = [
  "inquire",
  "msixvc",
  "nix",
+ "quick-xml 0.42.0",
  "reqwest 0.13.4",
  "rustix",
  "serde_json",
@@ -7200,6 +7201,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "windows-sys 0.61.2",
  "wry",
  "xodus",
 ]
