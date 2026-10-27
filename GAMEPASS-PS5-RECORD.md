@@ -1041,3 +1041,17 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Normal native account activation and game-runtime acceptance are still
   unfinished. No account was restored or adopted after reset. Virtual pad
   CLOSED; Remote Play remains OFF at Gary's request.
+
+- Backend b5a2979 reports static failure stages through the native observer.
+  Console retry at 19:25:11Z identified device-refresh, before code issuance.
+- Backend 493e23c scopes device renewal locks to their credential store:
+  isolated memory managers share an async lock only among clones; host-file
+  managers use a private sibling session-lock directory instead of global temp.
+  Credential tests 31/31, CLI tests 79/79, native PS5 cross-build and app build
+  passed. Deployed SHA256
+  8f27b888af4dc54d0b175337e0bcbf95e0e1d249dd04a716b6b94fd467cc5450,
+  backup console-backups/20261027-scoped-device-renewal.
+- Actual PS5 retry at 19:27:32Z now renews the device and DISPLAYS a fresh phone
+  code. Screenshot /tmp/gamepass-scoped-renewal-login.png. Requested Gary's
+  approval; no active account adoption claimed. Pad CLOSED immediately after
+  starting the test. Remote Play remains OFF.
