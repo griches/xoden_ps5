@@ -16,10 +16,13 @@ std::string XboxBridgeDiagnostics(std::string_view log) {
         const char* marker=nullptr;
         if (line.find(" start pid ")!=line.npos) marker="started";
         else if (line.find(" listening")!=line.npos) marker="listening";
-        else if (line.find(" MSA token for ")!=line.npos) marker="msa-request";
+        else if (line.find(" MSA token for ")!=line.npos) marker=line.find("full trust true")!=line.npos?"msa-request-full-trust":"msa-request-signin";
         else if (line.find("Phone test MSA service ticket issued")!=line.npos) marker="phone-ticket-issued";
         else if (line.find("MSA token issued")!=line.npos) marker="legacy-ticket-issued";
         else if (line.find("Microsoft rejected the phone runtime scope")!=line.npos) marker="phone-scope-rejected";
+        else if (line.find("Phone runtime refresh network failure")!=line.npos) marker="phone-refresh-network";
+        else if (line.find("Phone runtime refresh invalid response")!=line.npos) marker="phone-refresh-response";
+        else if (line.find("Phone runtime CA bundle")!=line.npos) marker="phone-trust-unavailable";
         else if (line.find("Microsoft rejected the phone runtime ticket")!=line.npos) marker="phone-ticket-rejected";
         else if (line.find("Microsoft rejected the runtime device ticket")!=line.npos) marker="device-ticket-rejected";
         else if (line.find("Active phone session is invalid")!=line.npos) marker="invalid-phone-session";
