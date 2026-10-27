@@ -395,7 +395,8 @@ void Jobs::Load() {
                 next->phase=phase=="cancelled"?"cancelled":"failed";
                 const auto code=detail?Text(*detail,"code"):std::string{};
                 next->message=phase=="cancelled"?"Sign-in cancelled. Your saved account and games were kept.":
-                    code=="browser-account-mismatch"?"That Microsoft account does not match your PS5 account. Try again with the same account.":
+                    code=="browser-account-mismatch"?"That Microsoft account does not match your PS5 account. Sign out before changing accounts.":
+                    (code=="browser-verification-pending" || code.rfind("browser-verify-",0)==0)?"Microsoft approval is saved privately. Xbox verification did not finish. Choose Sign in with Microsoft to retry without logging in again.":
                     code=="phone-sign-in-required"?"Sign in with Microsoft to connect your account.":
                     code=="browser-sign-in-expired"?"Sign-in expired. Try again for a new pairing code.":
                     "Microsoft sign-in did not finish. Your saved account was kept; try again.";
