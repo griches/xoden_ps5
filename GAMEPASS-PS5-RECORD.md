@@ -1229,3 +1229,122 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Full frontend regression on current trust/diagnostic code passed 153/153
   (143.48 s). MIO is stopped; Playden running. Resolution still temporarily
   1080p and MUST be restored to 4K. Pad CLOSED; Remote Play OFF.
+
+### Downstream game grant restriction and account-flow cleanup (20:33Z)
+
+- Corrected Xboxlive.signin scope spelling to match the existing XAL library.
+  Runtime now requests the game's own client grant first, and prefers the
+  documented OAuth d= representation when validating Xbox user tickets.
+  Actual MIO test still stalled; filtered native evidence records
+  game-application-rejected followed by app-level phone-ticket-issued for all
+  five requests. A valid app/library ticket is NOT a successful game login.
+- Independent public challenge requests for MIO's app ID, both uppercase and
+  lowercase, returned HTTP 400 invalid_client. No challenge or user approval
+  was requested. No old account was restored. Further work needs a suitable
+  game authorisation path rather than repeating the same phone approval.
+- Backend c700f56 adds bounded fixed-code live diagnostics at
+  /data/playden/logs/xbox-runtime-status.log (Windows only), avoiding raw
+  credentials/provider data and reducing restart cycles. 5 wrapper tests,
+  9 device-code tests and Windows build pass. Live-status DLL prepared but NOT
+  deployed; console still uses game-grant build SHA256
+  c83cc25e222027aaaac5130f929cb4b499faa678fa7df00528737300d55efdf6.
+- RESTORED MIO 3840x2160 through its normal Game settings UI. Screenshot
+  /tmp/gamepass-mio-restored-four-k.png. Revision 2->3, Settings applied at
+  20:30:58Z. No save loaded or modified. Pad CLOSED, Remote Play remains OFF.
+- Finishing automatic catalogue refresh after successful phone approval with
+  no connected account, plus account-cancellation cleanup. Focused real
+  controller + native-runner integration passed: exactly one sign-in test and
+  one automatic refresh, no Steam auth calls or game-completion flags.
+
+
+### Crash recovery and single Microsoft browser sign-in (2026-10-27, from 20:49Z)
+
+- Recovered the original Codex thread from local history. It had resumed after
+  the app crash; sent it a coordination message and it stopped editing. Its
+  handoff is /tmp/gamepass-browser-relay-handoff.md. No subagents were spawned.
+- Gary wants ONE Sign in with Microsoft action covering game authorisation,
+  library and licensing. The phone/computer choice has been removed. Native
+  browser success saves one primary user session atomically and automatically
+  refreshes the library/revalidates existing installs. Failed/late saves retain
+  the prior account; logout removes all account methods. First empty-device
+  setup has implementation and synthetic coverage, but no live acceptance.
+- Source spans xodus-ps5-backend, playden-ps5 and the new source-controlled
+  xodus-games/ps5-extras/signin directory. The Mac page is localhost port 47832;
+  the native temporary TLS listener is port 47834. Pairing uses the TV's grouped
+  16-character certificate fingerprint prefix. Browser adapter uses a disposable
+  Chrome profile and private CDP pipes. Safari can host the local page.
+- Latest DEPLOYED app SHA256:
+  04bcf768149c1694b4fdaceb3aa6e95f29d4aa3c09b8699688f4c68c354d2716.
+  Backup: playden-ps5/console-backups/20261027-signin-callback-order.
+  Its sole sign-in action and readable URL/uppercase pairing code were seen on
+  the actual PS5. Existing phone account/library and installs remain available.
+- Real browser attempts have NOT completed console acceptance. Early failures:
+  browser-disconnected and browser-session-order. Native now ignores stale
+  callbacks from previous login legs (3 focused protocol tests pass). Mac view
+  now ignores destroyed execution contexts during navigation, records only fixed
+  diagnostics and no longer misleadingly calls every post-login error a Chrome
+  launch failure. The latest authoritative native failure was xbox-user, i.e.
+  browser transport advanced into Xbox verification. Do NOT claim login works.
+- The previously completed original Mac embedded-browser login also failed the
+  same Xbox profile verification. Added explicit raw/d=/t= RPS representation
+  validation to profile.rs. A rebuilt Mac CLI profile check was blocked in
+  SecItem/Keychain (confirmed using a stack sample), not a browser window.
+  A profile check is currently waiting for Gary to approve Xodus Keychain access.
+  It prints only success/subscription booleans, never credentials. CUA refuses
+  to operate SecurityAgent; those OS prompts require Gary's own clicks.
+- Prefix fix and post-save-notification fix are NOT DEPLOYED yet. Native cross
+  build runs in /tmp/gamepass-signin-profile-native-build.log. Once a credential
+  commit succeeds, a lost computer connection must no longer mark it failed.
+  Current local sign-in server uses the Mac redirect fix; don't restart it during
+  an active attempt. Its stdout/stderr diagnostic prefix is SIGNIN_VIEW.
+- Original exporter also had a real outdated-format bug: it exported only four
+  legacy entries, missing user-session. Exporter now exports a complete atomic
+  session (or a complete legacy session), fails closed, uses private output, and
+  has 4 passing tests. Legacy ps5_xbox.py signin now checks console-idle twice,
+  uses random staging, verifies read-back hash and always cleans staging; 8
+  Python tests passed. NO Mac session export/UID credential transfer was run in
+  this recovery turn, and no cleared old console login was restored.
+- Checks: native TLS/protocol build and Windows DLL build passed; 38 credential
+  checks (36 plus 2 new primary-flow checks), 3 native relay protocol tests,
+  4 local TLS relay tests, wrapper 5 tests and focused UI/jobs/controller tests
+  passed across the iterations. Full app suite ran twice with only an evolving
+  UI test failing; that test was corrected and passes focused. A third full run
+  was stopped after Gary requested faster iteration. Run the required full suite
+  ONCE after the implementation settles; don't keep repeating it while debugging.
+- Gary explicitly allows terminating the game for this work. Closed PPSA99322
+  twice and agent-launched Playden for deployment. No saves were loaded or game
+  settings changed. MIO remains 4K. Virtual pad is CLOSED; Remote Play remains OFF.
+- All recovery changes are still UNCOMMITTED, including the earlier thread's
+  backend relay work. The combined gamepass-ps5 subtree checkout is not synced
+  with these changes yet. No pushes/releases were performed. Preserve unrelated
+  existing work, particularly the earlier appended 20:33 work record section.
+
+
+#### Recovery checkpoint after the services stopped answering
+
+- Source is now committed locally: backend aa94997, app b5eb3f7,
+  exporter/handover b7ad28a, local page 729e5bc. None has been pushed.
+- Final prepared app (NOT DEPLOYED) SHA256:
+  0244bdb9af7556d28919d11e7b01b347487d635c5ed9facfae6d54bfafa2be66.
+  It includes the RPS representation verification change and preserves a
+  successful credential commit even if the final computer notification fails.
+- Latest Mac profile check returned failure; no successful verification is
+  established. No Xodus login/profile subprocess remains running. Do not keep
+  asking for Keychain approval without identifying its current need.
+- Final full host run completed with 150/153 passing. Two failures were tests
+  still selecting the removed phone option; they were updated to the unified
+  browser sign-in and both pass focused, including automatic library loading.
+  The installed-locations check still times out at line 597 on a focused rerun.
+  Therefore do NOT claim a clean full test suite. Focused auth/protocol/TLS
+  checks and PS5/native/Windows builds pass; live sign-in remains unaccepted.
+- At approximately 23:06, console FTP, loader, controller and capture services
+  were all unavailable. A local discovery found no alternate console exposing
+  ftpsrv and the ELF loader together.
+- Gary said try again: FTP/loader briefly returned. Reloaded the known ps5vkctl
+  and DevLoop payloads; one status and one ping worked, then further control
+  requests stalled. The deployment aborted BEFORE copying files. FTP stopped
+  answering again. Asked Gary whether the menu responds and to close Game Pass
+  from Home if possible. Do not overwrite the running app while its state is
+  uncertain. No reboot was triggered by this session.
+- Virtual pad remains closed. The local page server remains available on Mac
+  localhost port 47832; its last attempt is failed, with no active auth job.
