@@ -1,0 +1,45 @@
+{
+  "importedOn": "2026-10-27",
+  "components": [
+    {
+      "path": "playden-ps5",
+      "sourceCommit": "547a6c81a1086b6ed9cefe6a27f97934203ab95d",
+      "sourceBranch": "xbox-store",
+      "upstream": "https://github.com/leolobato/playden-ps5.git",
+      "integration": "subtree",
+      "localChangesIncluded": false
+    },
+    {
+      "path": "xodus-ps5-backend",
+      "sourceCommit": "61b2499cd17ebd786022b347ff0db69d35f595de",
+      "sourceBranch": "ps5-account-backend",
+      "upstream": "https://github.com/xodus-gaming/xodus.git",
+      "integration": "subtree",
+      "localChangesIncluded": false
+    },
+    {
+      "path": "xodus-games",
+      "sourceCommit": "bcc0c348ff276f480487be2f1456e2cc401535f1",
+      "sourceBranch": "main",
+      "upstream": null,
+      "integration": "subtree",
+      "localChangesIncluded": false
+    },
+    {
+      "path": "xodus",
+      "sourceCommit": "514dd56f360a4bdf12f4acde5148bac5ce5f957f",
+      "sourceBranch": "ps5-decrypt",
+      "upstream": "https://github.com/xodus-gaming/xodus.git",
+      "integration": "subtree",
+      "localChangesIncluded": true
+    },
+    {
+      "path": "xodus-nexus",
+      "sourceCommit": "3006f141331cf5579d12261e4ac80ba7c2ffcf74",
+      "sourceBranch": "main",
+      "upstream": "https://github.com/domsvoboda/xodus-nexus.git",
+      "integration": "submodule",
+      "localChangesIncluded": false
+    }
+  ]
+}

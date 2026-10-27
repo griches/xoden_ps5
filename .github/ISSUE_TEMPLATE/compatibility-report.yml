@@ -1,0 +1,79 @@
+name: Game Pass compatibility report
+description: Report a PC Game Pass game's PS5 test result, including successful tests.
+title: "[Compatibility] "
+labels: [compatibility]
+body:
+  - type: input
+    id: game
+    attributes:
+      label: Game and PC edition
+      placeholder: Exact title; PC Game Pass / Microsoft Store edition
+    validations:
+      required: true
+  - type: input
+    id: product
+    attributes:
+      label: Microsoft product ID or store link
+      description: Include the selected package/version if known.
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Works - gameplay tested
+        - Partial - playable with a specific problem
+        - Launches - gameplay not sufficiently tested
+        - Broken - launch or gameplay failed
+        - Untested - installation/download report only
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: App build or commit
+      placeholder: Commit hash or build identifier
+    validations:
+      required: true
+  - type: input
+    id: kit
+    attributes:
+      label: Runtime kit version
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: PS5 firmware and loader version
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - Direct PS5 download in the app
+        - Older PS5 worker download
+        - Mac companion / imported copy
+        - Other - explain below
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings and input
+      description: Graphics backend, selected executable/arguments, changed settings, controller or USB input.
+  - type: textarea
+    id: coverage
+    attributes:
+      label: What did you test?
+      description: Menus, movement, actions/combat, save/reload, session length and any problems. A download or main menu alone does not establish Works.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Errors, screenshots and evidence
+      description: Include the failure stage if applicable. Remove tokens, account details, signed URLs and console addresses before attaching logs.
+  - type: input
+    id: date
+    attributes:
+      label: Date tested
+      placeholder: YYYY-MM-DD

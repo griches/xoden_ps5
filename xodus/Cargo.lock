@@ -7111,6 +7111,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "xgameruntime-wrapper"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "keyring-core",
+ "quick-xml 0.42.0",
+ "reqwest 0.13.4",
+ "tokio",
+ "xodus",
+]
+
+[[package]]
 name = "xmlserde"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

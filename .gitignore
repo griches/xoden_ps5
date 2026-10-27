@@ -1,0 +1,19 @@
+# Local credentials and console configuration
+.env
+.env.*
+!.env.example
+**/xodus-keyring.ron
+**/account.json
+**/job-request.json
+**/job-result.json
+/xodus-games/ps5-extras/companion/config.json
+/xodus-games/console-backups/
+# Generated output
+**/target/
+**/build/
+**/deps/
+**/.deps/
+**/node_modules/
+**/__pycache__/
+*.pyc
+.DS_Store

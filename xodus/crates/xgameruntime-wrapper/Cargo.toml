@@ -1,0 +1,18 @@
+[package]
+name = "xgameruntime-wrapper"
+version = "0.1.0"
+edition = "2024"
+
+# Linked by windows/build.sh into xgameruntime.dll, which forwards every
+# runtime export to xgameruntime_impl.dll and serves xodus requests in-process.
+[lib]
+name = "xodus_wrapper"
+crate-type = ["staticlib"]
+
+[dependencies]
+xodus = { path = "../xodus" }
+chrono = { workspace = true }
+keyring-core = { version = "1.0.0", features = ["sample"] }
+quick-xml = { version = "0.42.0", features = ["serialize", "overlapped-lists"] }
+reqwest = { workspace = true }
+tokio = { workspace = true }
