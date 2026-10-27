@@ -7,9 +7,11 @@ test evidence; this page tracks outstanding functionality.
 
 - [ ] Fresh Microsoft sign-in on PS5, using a phone/device-code flow if its
   credentials can support the PC game licensing requirements.
-- [ ] Complete PC-license and game-runtime validation of phone login. OAuth,
-  Xbox profile/marketplace tickets and Store-scope refresh passed in isolation.
-  Keep the working account until candidate validation passes; then test
+- [ ] Complete native phone sign-in and game-runtime validation. OAuth, Xbox
+  profile/marketplace tickets, Store refresh and a real MIO PC content license
+  with authenticated content-key unpack passed. Direct refresh into MIO's own
+  MSA client was rejected; the runtime exchange needs more work. Keep the
+  working account until candidate validation passes; then test
   sign-out, fresh sign-in, refresh, cancellation, expiry and account replacement.
 - [ ] Continue tuning direct-download throughput. Deployed bounded parallel
   ranges measured 12.3–15.5 MB/s during MIO, including a single-large-file window,
