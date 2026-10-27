@@ -7,6 +7,9 @@
 #include <filesystem>
 #include <unistd.h>
 int main() {
+    const auto diagnostic=playden::runtime::XboxBridgeDiagnostics("20:00:00.123 start pid 1 tokens PRIVATE-PATH\n20:00:00.125 listening\n20:00:00.130 MSA token for 123 full trust true\n20:00:00.140 MSATokenRequest failed: Microsoft rejected the phone runtime scope PRIVATE-TOKEN\n");
+    assert(diagnostic.find("msa-request")!=std::string::npos && diagnostic.find("phone-scope-rejected")!=std::string::npos);
+    assert(diagnostic.find("PRIVATE")==std::string::npos && diagnostic.find("123")==std::string::npos);
     char temp[]="/tmp/playden-xbox-runtime-XXXXXX";assert(mkdtemp(temp));const auto root=std::filesystem::canonical(temp);
     std::filesystem::create_directories(root/"runtime");std::filesystem::create_directories(root/"prefix/drive_c/windows/system32");
     std::filesystem::permissions(root/"prefix",std::filesystem::perms::owner_all);

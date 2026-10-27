@@ -9,6 +9,26 @@
 #include <optional>
 
 namespace playden::runtime {
+std::string XboxBridgeDiagnostics(std::string_view log) {
+    std::string result;
+    while (!log.empty()) {
+        const auto end=log.find('\n');const auto line=log.substr(0,end);
+        const char* marker=nullptr;
+        if (line.find(" start pid ")!=line.npos) marker="started";
+        else if (line.find(" listening")!=line.npos) marker="listening";
+        else if (line.find(" MSA token for ")!=line.npos) marker="msa-request";
+        else if (line.find("Phone test MSA service ticket issued")!=line.npos) marker="phone-ticket-issued";
+        else if (line.find("MSA token issued")!=line.npos) marker="legacy-ticket-issued";
+        else if (line.find("Microsoft rejected the phone runtime scope")!=line.npos) marker="phone-scope-rejected";
+        else if (line.find("Microsoft rejected the phone runtime ticket")!=line.npos) marker="phone-ticket-rejected";
+        else if (line.find("Microsoft rejected the runtime device ticket")!=line.npos) marker="device-ticket-rejected";
+        else if (line.find("Active phone session is invalid")!=line.npos) marker="invalid-phone-session";
+        else if (line.find("token store:")!=line.npos) marker="credential-store-unavailable";
+        if (marker) { if(result.size()>4096) result.erase(0,result.find('\n')+1);result+="xodus-bridge ";result+=marker;result+='\n'; }
+        if (end==log.npos) break;log.remove_prefix(end+1);
+    }
+    return result;
+}
 namespace {
 constexpr std::size_t kMaximumDll = 32 * 1024 * 1024;
 struct File {

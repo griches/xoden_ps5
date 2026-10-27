@@ -267,6 +267,8 @@ std::optional<std::string> NewestSessionLog(const std::filesystem::path& data_ro
     if (reports.size() > 1) text += "\n== " + reports[1].second.filename().string() + " (start)\n" + FileTail(reports[1].second, 0, 32 * 1024);
   }
   const auto user = data_root / "library/prefixes/game" / playden::steam::cloud::kPrefixUserFolder / "AppData";
+  const auto bridge=rt::XboxBridgeDiagnostics(FileTail(user.parent_path()/"xodus-wrapper.log",32*1024));
+  if (!bridge.empty()) text="== Xbox sign-in bridge (filtered)\n"+bridge+"\n"+text;
   fs::path engine; fs::file_time_type engine_time{};
   for (const auto& company : Folders(user / "LocalLow"))
     for (const auto& product : Folders(company))
