@@ -1370,3 +1370,39 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Combined gamepass-ps5 now contains all component source changes via local
   subtree merges, with a corrected single-flow roadmap. Everything is local;
   nothing was pushed or released.
+
+#### 23:30 recovery: preserve new approval and identify Xbox rejection
+
+- The 23:19 native attempt failed at `xbox-user` after Microsoft approval.
+  Added bounded, numeric-only Xbox user-auth diagnostics. The fresh 23:29
+  attempt returned HTTP 401, with no numeric XErr in the response. The local
+  page now reports this result instead of an unexplained early disconnect.
+- A newly approved browser grant is now saved privately as an INACTIVE
+  candidate before Xbox identity verification. It cannot serve the library,
+  licenses or runtime until verification and the existing account comparison
+  succeed. Verification retries reuse it; logout, expiry or account changes
+  clear it. This is the new approval, never a restored old cleared session.
+- Found and corrected doubled RPS prefixes in the fallback representations:
+  already-prefixed tickets now try bare/d=/t= exactly once each. No evidence
+  yet that this resolves the provider rejection.
+- Latest DEPLOYED and launched app SHA256:
+  9990207548dcd566f72fed2277ef0baf84a845d4cce2f8612b9639e3723c69aa.
+  Backup: playden-ps5/console-backups/20261027-signin-prefix-normalization.
+  Prior candidate/diagnostic build afaab80974737d9b4c81b9b2c2bf41ebb060c349f0ab62789adfe3de3a3c473c
+  produced the HTTP 401 and confirmed the new approval reached private storage.
+- Awaiting Gary choosing Settings > Xbox account > Sign in with Microsoft
+  again. This should use the cached approval without a new browser login.
+  The Mac page still displays the preceding HTTP 401 result until another
+  browser job starts; the cached verification result appears on the console.
+- Focused checks passed: candidate isolation/expiry/logout/account-switch,
+  numeric-only diagnostic extraction, RPS prefix normalization, 3 relay
+  protocol tests, 5 TLS-helper tests, and app xbox_jobs/library_model/account.
+  Native PS5, wrapper DLL and app builds passed. No further full suite was run
+  during live debugging. The previously recorded installed-locations timeout
+  remains unresolved. Sign-in acceptance, library refresh and game auth are
+  NOT established.
+- Backend e4d95ff and frontend 2133fec are local commits. No pushes/releases.
+  DevLoop was not loaded, virtual pad remains closed, physical pad stays with
+  Gary, Remote Play remains off. Captured the app's own frame through its
+  existing hook over FTP and removed the transient capture; no gallery/saves
+  or MIO settings were touched. Local helper restarted with the new protocol.

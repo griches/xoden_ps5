@@ -78,3 +78,22 @@ test('premature success, oversized frames and cancellation never claim saved sig
     } finally {await server.close();}
   }
 });
+
+test('verification rejection reports only numeric diagnostics and keeps approval distinct from sign-in',async()=>{
+  const updates=[];
+  const server=await fixture(socket=>{
+    socket.write(JSON.stringify({type:'open',session:1,url:'https://login.live.com/ppsecure/InlineLogin.srf',headers:{}})+'\n');
+    socket.write(JSON.stringify({type:'close',session:1})+'\n');
+    socket.write(JSON.stringify({type:'failed',approvalSaved:true,code:'browser-verify-http-401',rejections:[{http:401,xerr:2148916233,Message:'synthetic-private-provider-message'}]})+'\n');
+  });
+  try {
+    await assert.rejects(browserSignIn({host:'127.0.0.1',code,port:server.port,signal:new AbortController().signal,
+      report:update=>updates.push(update),createView:async()=>({async open(){},close(){},async dispose(){}})}),error=>{
+        assert.match(error.message,/HTTP 401, Xbox code 2148916233/);
+        assert.match(error.message,/without logging in again/);
+        assert.ok(!error.message.includes('synthetic-private'));
+        return true;
+      });
+    assert.ok(!updates.some(update=>update.stage==='signed-in'));
+  } finally {await server.close();}
+});

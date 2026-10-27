@@ -62,6 +62,16 @@ export async function browserSignIn({host,code,signal,report,createView,port=478
         queue=queue.then(async()=>{
           if(finished)return;
           let value;try{value=JSON.parse(line.toString('utf8'));}catch{throw Error('Invalid PS5 sign-in response.');}
+          if(value.type==='failed'){
+            if(active!==undefined || latest===0 || value.approvalSaved!==true)throw Error('The PS5 did not confirm Microsoft approval.');
+            if(value.code==='browser-account-mismatch')throw Error('That Microsoft account does not match your PS5 account. Sign out on the PS5 before changing accounts.');
+            const rejection=Array.isArray(value.rejections)?value.rejections.at(-1):undefined;
+            const http=Number.isInteger(rejection?.http)&&rejection.http>=400&&rejection.http<=599?rejection.http:undefined;
+            const xerr=Number.isSafeInteger(rejection?.xerr)&&rejection.xerr>=0?rejection.xerr:undefined;
+            const kind=['connect','timeout','request','response'].includes(rejection?.kind)?rejection.kind:undefined;
+            const detail=http?` (HTTP ${http}${xerr!==undefined?`, Xbox code ${xerr}`:''})`:kind?` (${kind})`:'';
+            throw Error(`Microsoft approval is saved privately on your PS5, but Xbox verification did not finish${detail}. Choose Sign in with Microsoft on the PS5 to retry verification without logging in again.`);
+          }
           if(value.type==='complete'){
             if(active!==undefined || latest===0 || value.saved!==true)throw Error('The PS5 did not confirm a completed sign-in.');
             report({stage:'signed-in',message:'Sign-in saved securely on your PS5. You can close this page and return to your console.'});
