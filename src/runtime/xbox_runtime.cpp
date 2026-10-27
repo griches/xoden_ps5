@@ -4,6 +4,8 @@
 #include "platform/managed_directory.h"
 #include "platform/storage.h"
 #include <cerrno>
+#include <algorithm>
+#include <cstring>
 
 namespace playden::runtime {
 namespace {
@@ -25,8 +27,14 @@ bool InstallXboxRuntime(const std::string& source, const std::string& prefix,
     for (const char* name : {"xgameruntime.dll","xgameruntime_impl.dll","windows.web.dll"}) {
         struct stat info{};
         if (!input->InspectChild(name,&info) || !S_ISREG(info.st_mode)) { *reason = std::string("The Xbox runtime is missing ") + name; return false; }
-        const auto bytes = source_files.Read(name,32*1024*1024);
+        auto bytes = source_files.Read(name,32*1024*1024);
         if (!bytes.ok() || !X64(bytes.value())) { *reason = std::string("The Xbox runtime file is not a valid x64 image: ") + name; return false; }
+        // Xodus ships this Wine-built PE as a replacement WinRT component.
+        // Its builtin marker asks Wine for an accompanying Unix module; this
+        // console uses the self-contained native PE instead.
+        if (std::strcmp(name,"windows.web.dll") == 0 && bytes.value().size() >= 80 &&
+            std::memcmp(bytes.value().data()+64,"Wine builtin DLL",16) == 0)
+            std::fill(bytes.value().begin()+64,bytes.value().begin()+80,0);
         if (output->InspectChild(name,&info)) {
             if (!S_ISREG(info.st_mode)) { *reason = "An Xbox runtime destination is not a regular file."; return false; }
         } else if (errno != ENOENT) { *reason = "An Xbox runtime destination cannot be safely opened."; return false; }

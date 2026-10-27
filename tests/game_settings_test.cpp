@@ -1830,11 +1830,12 @@ int main(int argc, char** argv) {
     {
       auto xbox = generated;
       xbox.id = "xbox-9n5pkh0kw2l1-auto";
+      xbox.game = playden::GameId::Xbox("9N5PKH0KW2L1");
       CHECK(IsGeneratedRecipeId(xbox.id));
       CHECK(!IsGeneratedRecipeId("xbox-invalid-auto"));
       EffectiveSettings xbox_settings;
       CHECK(BuildEffectiveSettings(xbox, nullptr, {{"d3d12", "vkd3d-proton"}}, vkd3d_kit, &xbox_settings, &error));
-      CHECK(xbox_settings.dll_overrides == std::string(kDxvkOverrides) + ";" + kVkd3dProtonOverrides);
+      CHECK(xbox_settings.dll_overrides == std::string(kDxvkOverrides) + ";" + kVkd3dProtonOverrides + ";windows.web=n;xgameruntime=n");
     }
     const auto with_vkd3d = settings.dll_overrides;
     CHECK(BuildEffectiveSettings(generated, nullptr, {{"dll_overrides", with_vkd3d}}, vkd3d_kit, &settings, &error));

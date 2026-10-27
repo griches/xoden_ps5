@@ -980,6 +980,13 @@ bool BuildEffectiveSettings(const GameRecipe& recipe, const SettingsPreset* pres
       list += (list.empty() ? "" : ";") + std::string(dxgi ? kVkd3dProtonOverrides : kVkd3dProtonDxgiOverrides);
     overrides_row.value = list;
   }
+  // Xbox's runtime needs these native components even when Wine activates them
+  // through WinRT. Keep the requirement in the published profile, not only in
+  // user.reg, which normal settings publication may rewrite.
+  if (RecipeGame(recipe).store == Store::kXbox) {
+    if (!overrides_row.value.empty()) overrides_row.value += ";";
+    overrides_row.value += "windows.web=n;xgameruntime=n";
+  }
   out.dll_overrides = overrides_row.value;
   if (!out.dll_overrides.empty() && !IsProsperoDllOverrides(out.dll_overrides))
     return fail("dll_overrides", "library overrides are too long");

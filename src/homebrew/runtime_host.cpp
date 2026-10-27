@@ -1751,7 +1751,11 @@ std::string RuntimeHost::PublishSavedSettings(Composition& c, const rt::RuntimeI
   const bool unowned_upgrade = !moved && NeedsUnownedPublication(c, record);
   if (unowned_upgrade) Log("settings update app=" + std::to_string(record.runtime_number) + " publishes the game folder unowned");
   // "Steam features" only swaps the game's own files, so it follows the saved value at once.
-  if (!force && saved.revision <= record.settings_revision && !moved && !unowned_upgrade)
+  // Xbox's generated launch requirements evolve with its bundled integration.
+  // Refresh them while stopped even without a user settings edit, so an app
+  // update repairs existing Xbox profiles as well as newly prepared games.
+  const bool refresh_xbox = GameOf(record).store == Store::kXbox && rt::IsGeneratedRecipeId(record.recipe_id);
+  if (!force && saved.revision <= record.settings_revision && !moved && !unowned_upgrade && !refresh_xbox)
     return ApplyPreparationSteps(c, record, steam_account_known);
   if (!c.kit) return "No verified runtime kit is installed.";
   if (saved.revision < record.settings_revision)
@@ -1855,9 +1859,10 @@ std::string RuntimeHost::PublishSavedSettings(Composition& c, const rt::RuntimeI
   if (plan.app_id != record.runtime_number || plan.recipe_id != record.recipe_id || plan.recipe_version != record.recipe_version ||
       plan.launch_entry_id != next.launch_entry_id || plan.profile_id != record.default_profile_id)
     return again("The settings no longer match this game's PS5 title; prepare it again.");
-  // A forced publication runs only when the new runtime changes what the settings write (120 Hz output), so a
-  // respin that changes nothing there keeps its publication, registration and bottle as they are.
-  if (force) {
+  // Runtime defaults refresh only when the generated files change. Besides
+  // avoiding needless writes, this keeps an identical revision out of the
+  // publication request protocol.
+  if (force || refresh_xbox) {
     // POSIX reads, as elsewhere here: the PS5 libc++ has no locale support for file streams.
     const auto read = [](const std::filesystem::path& path) {
       std::string bytes;
@@ -3943,7 +3948,8 @@ bool RuntimeHost::RunServices() {
         for (const auto& record : c.repository.Snapshot()) {
           // Only newer settings: the Steam account is not known yet, so Steam files wait for Play.
           const auto saved = config_.settings_record ? config_.settings_record(GameOf(record)) : std::nullopt;
-          if (!saved || saved->revision <= record.settings_revision || !record.moved_from.empty() ||
+          const bool xbox_defaults = GameOf(record).store == Store::kXbox && rt::IsGeneratedRecipeId(record.recipe_id);
+          if ((!xbox_defaults && (!saved || saved->revision <= record.settings_revision)) || !record.moved_from.empty() ||
               !MaintenanceRefusal(c, record).empty()) continue;
           bool published = false;
           const auto refused = RepublishSettings(c, record, &published, false);
