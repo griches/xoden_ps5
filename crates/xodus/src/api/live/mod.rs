@@ -9,6 +9,7 @@ use crate::models::soap;
 
 mod rst;
 mod utils;
+pub mod device_code;
 
 /// Fixed diagnostic categories, never error text, XML, keys or account data.
 pub fn exchange_failure_stage(error: &(dyn std::error::Error + 'static)) -> Option<&'static str> {
