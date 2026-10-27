@@ -1,0 +1,11 @@
+{
+  "name": "gamepass-ps5-signin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild browser/view.ts --bundle --platform=node --format=esm --outfile=build/browser.mjs",
+    "start": "node server.mjs",
+    "test": "node --test *.test.mjs"
+  },
+  "devDependencies": { "esbuild": "0.25.12" }
+}
