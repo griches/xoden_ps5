@@ -7207,6 +7207,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "xodus-ps5-native"
+version = "0.1.0"
+dependencies = [
+ "msixvc",
+ "msixvc-common",
+]
+
+[[package]]
 name = "xodus-service"
 version = "0.1.0"
 dependencies = [

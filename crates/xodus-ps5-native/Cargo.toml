@@ -1,0 +1,12 @@
+[package]
+name = "xodus-ps5-native"
+version = "0.1.0"
+edition = "2024"
+rust-version = { workspace = true }
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+msixvc = { path = "../msixvc" }
+msixvc-common = { path = "../msixvc-common" }
