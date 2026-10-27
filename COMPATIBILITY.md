@@ -35,7 +35,7 @@ this list.
 | Halo Infinite | ⚪ Untested | — | — | Download cancelled and partial files removed. No launch attempted; no separate campaign compatibility result. Anti-cheat discussion alone is not a console test. |
 | Hollow Knight | 🔵 Launches | 0.13 | Controller menus | Historical Mac-prepared/imported Game Pass copy reached the signed-in main menu. Menu navigation verified; no recorded gameplay or save-slot acceptance. Removed at Gary's request. Needs retesting through the current native install flow. [Record](xodus-games/GAMEPASS-PS5-RECORD.md#console-launch-acceptance--26-october-2026). |
 | Minishoot' Adventures | ✅ Works | 0.13 | Unity; controller | Native Xbox install reached signed-in menus and tutorial. Movement escaped the crystal; traversal, collision, damage and pause worked. Saved progress reloaded and quitting returned to the app. Shooting, extended play and a fresh install on the latest embedded downloader remain untested. [Gameplay](xodus-games/GAMEPASS-PS5-RECORD.md#gameplay-acceptance-on-the-native-xbox-install), [save/reload](xodus-games/GAMEPASS-PS5-RECORD.md#native-play-button-and-return-accepted). |
-| MIO: Memories in Orbit | ⚪ Untested | — | — | Download pause, app restart and resume counters verified at 32% / 1.1 GB. Download then cancelled; partial cleanup verified. No gameplay test. |
+| MIO: Memories in Orbit | ⚪ Untested | — | — | Direct PS5 download and automatic D3D12/vkd3d runtime preparation completed on 2026-10-27. Home title registered while the app was running. Earlier pause/restart/resume and cancelled-partial cleanup tests passed. No gameplay test. |
 | 1000xRESIST | ⚪ Untested | — | — | PC package/size picker tested at 8.0 GB; cancelled before downloading. No launch test. |
 
 ## Reporting a test
