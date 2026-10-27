@@ -696,3 +696,76 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   unverified; do not promise a drop-in token-file import or completed fresh
   sign-in. No account file read, sign-in attempt, cloud app install or console
   restart was performed for this review. Controller remains disconnected.
+
+## 2026-10-27 — speed investigation and completed-download registration
+
+- Read-only PS5 -> Mac FTP measurement discarded all bytes: 67,121,224 bytes in
+  2.753 s = 24.38 MB/s (195.1 Mbps), while the game download was active. This
+  proves the measured 6.3 MB/s install rate is below the available local-link
+  throughput; it does not identify whether Microsoft/CDN or local processing
+  is the bottleneck. No user controller was needed for this read-only test.
+- Current implementation downloads up to four files concurrently, but one large
+  .ucas file still uses one HTTP range stream. No native speed cap was found;
+  aggregate limiter defaults to unlimited. Parallel ranges remain a possible
+  follow-up, not a measured improvement yet.
+- Tried eight-block XTS batching, preserving byte-for-byte ciphertext in tests.
+  Optimized Mac benchmark was 5038.4 MB/s scalar vs 4792.3 MB/s batched (0.95x).
+  Reverted the experiment and its build-flag change. No speed optimization was
+  deployed. Rebuilt the production Rust archive before further PS5 builds.
+- Elder Gods finished native content download/preparation at 15:26:17Z. The
+  subsequent PS5 title preparation was interrupted at publication. Retrying
+  requires existing game files only; do not download the game again.
+- Playden 40af144 fixes a separate Xbox recovery bug: the serialized publication
+  install omits GameId, and FilesystemPackageInstaller::RecipeAccepted only
+  admitted Steam or Local generated recipes in that fallback. Xbox auto recipes
+  now work when bound to their canonical install id. Added real filesystem /
+  OWNER / repository cold-recovery integration with Xbox identity plus rejection
+  of another Xbox game's generated recipe. Red test reproduced the failure;
+  fixed full suite passed 152/152 (134.65 s).
+- After that fix the console reached a second, explicit condition:
+  native ownership title=FAKE78001 reason=registry-collision euid=1 database=free
+  source=occupied source_owned=1 registry_reason=source-not-managed.
+  ShadowMount retained a removed title's unmanaged source row after reuse.
+- Playden 547a6c8 allows re-adding that row only after the coordinator verifies
+  the canonical source folder, its ownership and package marker, free native
+  inventory and a correctly armed publication. Default registry registration
+  still rejects unmanaged collisions. Tests cover foreign/missing ownership,
+  occupied or unknown inventory and writable source folders. Full suite 152/152
+  passed (134.13 s), PS5 build passed.
+- Deployed binary SHA256
+  `0da3710612ad9f01274f077678b4c6421e54decbc4b5f3628e788541df773474`, backup
+  `console-backups/20261027-owned-source-reclaim`. Console retry pending.
+- Gary explicitly requested frequent explanatory updates; maintain at least
+  one concise update per minute during ongoing work. Status questions do not
+  stop work. Virtual pad must close after each brief retry/check.
+
+### Completed-download registration acceptance and loader recovery result
+
+- At 16:00:05Z, retry with 547a6c8 passed the prior recipe identity and unmanaged
+  source collision failures using the existing files. The saved operation
+  advanced to await-native; Queue showed "Waiting for the PS5" and instructed
+  quitting Playden. This is not completed registration or gameplay acceptance.
+- Exited through Settings > Quit Playden > Confirm, then closed the virtual pad.
+  Console returned Home. A read-only FTP copy of app.db queried on the Mac showed
+  no tbl_contentinfo row for FAKE78001. No console database writes were made.
+- Reopened Playden: startup recovery correctly kept await-native without issuing
+  a duplicate registration. The game still had no native database row.
+- Read-only ShadowMount inspection: manual.lst contains the canonical source
+  /data/homebrew/FAKE78001; debug.log records its API addition at 16:00:05 but no
+  subsequent scan. Repeated earlier FAKE77031 launches show mount unavailable
+  (Device busy), then runtime preparation timeouts. Loader-level progress is
+  stalled; exact internal cause remains unproven.
+- Playden README already documents new titles remaining Waiting for the PS5 and
+  recommends reloading ShadowMountPlus. Reviewed exact 1.7beta7 source: duplicate
+  instance startup requests SIGTERM and waits for graceful shutdown. Downloaded
+  the official same-version release ELF (2,517,288 bytes; SHA256
+  a8f9d7f76e8749912508ade0cd5c78076b5bbf1271813c78c80c3d3d9d4777ee).
+- At approximately 16:06Z, quit Playden through its menu again, closed the pad,
+  confirmed launcher idle, then sent that exact same-version loader via elfldr.
+  Afterwards FTP 2121, launcher 9111 and elfldr 9021 all stopped responding.
+  Console may have frozen; no remote screen verification is available. Do not
+  claim successful recovery. Reboot/jailbreak may be needed before more console
+  testing. Do not send further payloads while the services are unreachable.
+- Existing Elder Gods content was not deleted, redownloaded or modified by this
+  recovery attempt. No gameplay acceptance and no download speed improvement.
+  Virtual pad was closed before reload; Remote Play and DevTools were off.
