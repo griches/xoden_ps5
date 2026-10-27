@@ -176,3 +176,20 @@ toggle confirmation, refusal, ordinary FTP, FEAT errors and delete responses;
 they are registered as `console_title_deploy` in ctest. Full suite passes 152/152.
 Use this path instead of the old `/tmp/deploy-playden-*.py` UID payload wrappers.
 Console publication and cleanup UI acceptance are still outstanding.
+
+Native library probe continuation: the existing MSIXVC library and its
+Tokio/reqwest dependencies cross-compile to an x86_64 FreeBSD static archive with
+emulated TLS. The probe needed a declaration of `getentropy` for aws-lc's C
+sources; no entropy implementation or working TLS connection has been supplied
+or claimed. Isolated fixture: `/tmp/xbox-native-msixvc-probe` (not product code).
+The probe resolved reqwest 0.13.5 rather than using the backend's lockfile; final
+integration must use pinned/reviewed inputs.
+
+ABI audit found `sizeof(struct stat)` is 120 in the PS5 SDK versus 224 in default
+Rust libc. These cannot be used interchangeably. Selecting
+`--cfg libc_unstable_freebsd_version="11"` currently fails rebuilding Rust std at
+`std/src/sys/fs/unix.rs:954` because dirent d_fileno is u32 while std expects u64.
+An isolated/custom standard-library adaptation or an explicit C IO bridge is
+needed before console execution. Do not treat the successful default-target
+archive build as a runnable PS5 backend. Current log:
+`/tmp/xbox-native-msixvc-probe/build-freebsd11.log`.
