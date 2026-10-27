@@ -29,6 +29,22 @@ int main() {
     assert(prefix.Read("user.reg").value()==first.value());
     assert(system32.Read("xgameruntime.dll").value()==dll);
     assert(system32.Read("windows.web.dll").value()==dll);
+    // Exercise multiple copy chunks and a PE header beyond the first chunk.
+    auto large = dll;
+    large.resize(1024 * 1024 + 17, 0x5a);
+    large[60] = 0; large[61] = 0x80; large[62] = 0; large[63] = 0;
+    std::copy(dll.begin()+128,dll.begin()+134,large.begin()+32768);
+    assert(source.WriteAtomicPrivate("xgameruntime_impl.dll",large).ok());
+    assert(system32.WriteAtomicPrivate("xgameruntime_impl.dll.xbox-runtime.tmp",{'s','t','a','l','e'}).ok());
+    assert(playden::runtime::InstallXboxRuntime((root/"runtime").string(),(root/"prefix").string(),456,&reason));
+    assert(system32.Read("xgameruntime_impl.dll", 2*1024*1024).value() == large);
+    assert(!std::filesystem::exists(root/"prefix/drive_c/windows/system32/xgameruntime_impl.dll.xbox-runtime.tmp"));
+    auto invalid = large;
+    invalid[60] = 0xff; invalid[61] = 0xff; invalid[62] = 0xff; invalid[63] = 0x7f;
+    assert(source.WriteAtomicPrivate("xgameruntime_impl.dll",invalid).ok());
+    assert(!playden::runtime::InstallXboxRuntime((root/"runtime").string(),(root/"prefix").string(),456,&reason));
+    assert(system32.Read("xgameruntime_impl.dll", 2*1024*1024).value() == large);
+    assert(source.WriteAtomicPrivate("xgameruntime_impl.dll",large).ok());
     assert(source.WriteAtomicPrivate("windows.web.dll",{'b','a','d'}).ok());
     assert(!playden::runtime::InstallXboxRuntime((root/"runtime").string(),(root/"prefix").string(),789,&reason));
     assert(system32.Read("windows.web.dll").value()==dll);

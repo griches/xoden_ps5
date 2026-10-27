@@ -2,19 +2,98 @@
 #include "runtime/xbox_runtime.h"
 #include "runtime/game_settings.h"
 #include "platform/managed_directory.h"
-#include "platform/storage.h"
+#include <unistd.h>
 #include <cerrno>
 #include <algorithm>
 #include <cstring>
 
 namespace playden::runtime {
 namespace {
-bool X64(const Bytes& bytes) {
-    if (bytes.size() < 64 || bytes[0] != 'M' || bytes[1] != 'Z') return false;
-    const std::uint32_t offset = bytes[60] | (std::uint32_t(bytes[61]) << 8) |
-        (std::uint32_t(bytes[62]) << 16) | (std::uint32_t(bytes[63]) << 24);
-    return offset >= 64 && offset <= bytes.size()-6 && bytes[offset] == 'P' && bytes[offset+1] == 'E' &&
-        bytes[offset+2] == 0 && bytes[offset+3] == 0 && bytes[offset+4] == 0x64 && bytes[offset+5] == 0x86;
+constexpr std::size_t kMaximumDll = 32 * 1024 * 1024;
+struct File {
+    int fd;
+    ~File() { if (fd >= 0) close(fd); }
+};
+bool ReadAt(int fd, unsigned char* bytes, std::size_t size, off_t offset) {
+    if (lseek(fd, offset, SEEK_SET) != offset) return false;
+    while (size) {
+        const auto count = read(fd, bytes, size);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) return false;
+        bytes += count; size -= static_cast<std::size_t>(count);
+    }
+    return true;
+}
+bool ValidImage(int fd, off_t* size, bool* builtin) {
+    struct stat info{};
+    unsigned char header[80]{};
+    if (fstat(fd, &info) != 0 || !S_ISREG(info.st_mode) || info.st_size < 80 ||
+        info.st_size > static_cast<off_t>(kMaximumDll) || !ReadAt(fd, header, sizeof(header), 0)) return false;
+    if (header[0] != 'M' || header[1] != 'Z') return false;
+    const std::uint32_t offset = header[60] | (std::uint32_t(header[61]) << 8) |
+        (std::uint32_t(header[62]) << 16) | (std::uint32_t(header[63]) << 24);
+    unsigned char pe[6]{};
+    if (offset < 64 || offset > info.st_size - 6 || !ReadAt(fd, pe, sizeof(pe), offset) ||
+        std::memcmp(pe, "PE\0\0\x64\x86", 6) != 0) return false;
+    *size = info.st_size;
+    *builtin = std::memcmp(header + 64, "Wine builtin DLL", 16) == 0;
+    return true;
+}
+bool Transfer(int source, int destination, off_t size, bool patch, bool verify) {
+    // Fixed buffers avoid holding multiple complete runtime DLLs in the title heap.
+    unsigned char bytes[16 * 1024], existing[16 * 1024];
+    if (verify) {
+        struct stat info{};
+        if (fstat(destination, &info) != 0 || info.st_size != size) return false;
+    }
+    for (off_t offset = 0; offset < size;) {
+        const auto count = static_cast<std::size_t>(std::min<off_t>(sizeof(bytes), size - offset));
+        if (!ReadAt(source, bytes, count, offset)) return false;
+        if (patch && offset == 0) std::fill(bytes + 64, bytes + 80, 0);
+        if (verify) {
+            if (!ReadAt(destination, existing, count, offset) || std::memcmp(bytes, existing, count) != 0) return false;
+        } else {
+            std::size_t written = 0;
+            while (written < count) {
+                const auto n = write(destination, bytes + written, count - written);
+                if (n < 0 && errno == EINTR) continue;
+                if (n <= 0) return false;
+                written += static_cast<std::size_t>(n);
+            }
+        }
+        offset += static_cast<off_t>(count);
+    }
+    return true;
+}
+bool InstallFile(const platform::ManagedDirectory& input, const platform::ManagedDirectory& output,
+                 const char* name) {
+    File source{input.OpenRegularFile(name)};
+    off_t size = 0; bool builtin = false;
+    if (source.fd < 0 || !ValidImage(source.fd, &size, &builtin)) return false;
+    const bool patch = builtin && std::strcmp(name, "windows.web.dll") == 0;
+    struct stat info{};
+    if (output.InspectChild(name, &info)) {
+        if (!S_ISREG(info.st_mode)) return false;
+        File existing{output.OpenRegularFile(name)};
+        if (existing.fd < 0) return false;
+        if (Transfer(source.fd, existing.fd, size, patch, true)) return true;
+    } else if (errno != ENOENT) return false;
+    const std::string temporary = std::string(name) + ".xbox-runtime.tmp";
+    if (output.InspectChild(temporary, &info)) {
+        if (!S_ISREG(info.st_mode) || !output.RemoveRegularFile(temporary)) return false;
+    } else if (errno != ENOENT) return false;
+    bool ok = false;
+    {
+        File target{output.CreateExclusiveFile(temporary, 0600)};
+        ok = target.fd >= 0 && Transfer(source.fd, target.fd, size, patch, false) && fsync(target.fd) == 0;
+    }
+    if (ok) {
+        File target{output.OpenRegularFile(temporary, true, 0600)};
+        ok = target.fd >= 0 && Transfer(source.fd, target.fd, size, patch, true);
+    }
+    if (ok) ok = output.RenameChild(temporary, output, name) && output.Sync();
+    if (!ok) output.RemoveRegularFile(temporary);
+    return ok;
 }
 }
 bool InstallXboxRuntime(const std::string& source, const std::string& prefix,
@@ -23,26 +102,11 @@ bool InstallXboxRuntime(const std::string& source, const std::string& prefix,
     auto input = ManagedDirectory::Open(source,DirectoryPolicy::kApprovedTree);
     auto output = ManagedDirectory::Open(prefix + "/drive_c/windows/system32",DirectoryPolicy::kApprovedTree);
     if (!input || !output) { *reason = "The Xbox runtime or the game's Windows folder is unavailable."; return false; }
-    Storage source_files(source), destination(output->path().string());
     for (const char* name : {"xgameruntime.dll","xgameruntime_impl.dll","windows.web.dll"}) {
-        struct stat info{};
-        if (!input->InspectChild(name,&info) || !S_ISREG(info.st_mode)) { *reason = std::string("The Xbox runtime is missing ") + name; return false; }
-        auto bytes = source_files.Read(name,32*1024*1024);
-        if (!bytes.ok() || !X64(bytes.value())) { *reason = std::string("The Xbox runtime file is not a valid x64 image: ") + name; return false; }
-        // Xodus ships this Wine-built PE as a replacement WinRT component.
-        // Its builtin marker asks Wine for an accompanying Unix module; this
-        // console uses the self-contained native PE instead.
-        if (std::strcmp(name,"windows.web.dll") == 0 && bytes.value().size() >= 80 &&
-            std::memcmp(bytes.value().data()+64,"Wine builtin DLL",16) == 0)
-            std::fill(bytes.value().begin()+64,bytes.value().begin()+80,0);
-        if (output->InspectChild(name,&info)) {
-            if (!S_ISREG(info.st_mode)) { *reason = "An Xbox runtime destination is not a regular file."; return false; }
-        } else if (errno != ENOENT) { *reason = "An Xbox runtime destination cannot be safely opened."; return false; }
-        const auto existing = destination.Read(name,32*1024*1024);
-        if (existing.ok() && existing.value() == bytes.value()) continue;
-        if (!destination.WriteAtomicPrivate(name,bytes.value()).ok()) { *reason = std::string("The Xbox runtime file could not be installed: ") + name; return false; }
-        const auto verified = destination.Read(name,32*1024*1024);
-        if (!verified.ok() || verified.value() != bytes.value()) { *reason = "The installed Xbox runtime did not verify."; return false; }
+        if (!InstallFile(*input, *output, name)) {
+            *reason = std::string("The Xbox runtime file could not be validated or installed: ") + name;
+            return false;
+        }
     }
     return ApplyBottleRegistryValues({{"Software\\Wine\\DllOverrides","windows.web","\"native\""}},prefix,unix_time,"user.reg",reason);
 }
