@@ -363,3 +363,13 @@ installation and game launching work in Playden, with automatic compatibility
 handling (especially renderer selection) and considering latest Playden.
 Proceeding into native Playden integration; source checkout initially clean,
 branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
+
+
+## 2026-10-27 — Structured console jobs and native catalog
+
+- Backend commit `6e9893f`: account-bound `--ps5-worker ps5-job` refresh/install protocol, bounded identities, live membership/entitlements, atomic result and complete catalog. Four new protocol tests pass; Windows release build passes. Broader commands tests: 93 pass, known case-insensitive Mac case-resolver fixture fails.
+- Deployed worker and launched refresh through the existing imported utility. Console completed refresh: 669 games, 328610-byte cache, subscription active. No companion data relay. Native Playden parser validated the actual cache (private temporary file, not committed).
+- Native Xbox catalog reader and asynchronous library source added and wired in host/console registries; not yet console-deployed. Full host tests and PS5 build running.
+- Controller closed after test; console idle. Remote Play remained off.
+- Build scripts explicitly target FAKE77031 even though upstream CMake defaults changed; current build can preserve installed title identity.
+- Remaining: UI job submission, visible worker progress/return, automatic native install publication and Xbox DLL setup, fresh-settings renderer acceptance, sign-in UX. Do not call the integrated store complete.

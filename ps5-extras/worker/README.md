@@ -2,7 +2,7 @@
 
 This Windows x64 worker is intended to run inside the console's existing
 Playden/Wine runtime. It is a backend prototype, not a native Playden Xbox UI,
-and has not yet been executed on the console. No Mac relay is used by the worker.
+and has now been executed on the console. No Mac relay is used by the worker.
 
 `--ps5-worker` explicitly uses the existing private console account file at
 `Z:\data\playden\xbox\xodus-keyring.ron` and redirects stdout/stderr to
@@ -35,7 +35,20 @@ Build in Lima from xodus-ps5-backend with the x86_64-pc-windows-gnu target,
 from this MSIXVC worker, avoiding its unrelated OpenSSL cross dependency.
 Default Mac builds retain EAPPX extraction and native webview support.
 
-Still required: console acceptance, controller UI/catalogue integration,
-on-console sign-in UX, install-time access checks in the final PS5 UI, automatic
-per-game runtime finalization, and a launch test. Do not describe this binary
+Console acceptance: direct download and preparation of Minishoot completed, and
+the downloaded copy reached its signed-in main menu. The structured `ps5-job`
+refresh also completed on-console with 669 games and an active subscription.
+
+`--ps5-worker ps5-job` reads a bounded `job-request.json` from the private Xbox
+directory. Schema 1 requests use a UUID `requestId`, `operation` (`refresh` or
+`install`), and two-letter `market`. Installs also require the catalog
+`accountKey` and a 12-character `productId`; `contentId` is optional. Requests
+cannot specify paths or URLs. Results are atomically published in
+`job-result.json`; refresh publishes the full sanitized `catalog.json`.
+An install rechecks live membership and entitlement, then downloads and prepares
+the package. A `prepared` result still requires native Playden runtime setup
+and title publication before it can be called installed.
+
+Still required: controller job handoff/progress UI, on-console sign-in UX,
+automatic per-game runtime finalization and end-to-end native UI acceptance. Do not describe this binary
 as an independently working PS5 store until those checks pass.
