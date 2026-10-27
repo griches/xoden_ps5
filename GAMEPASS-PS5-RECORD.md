@@ -1094,3 +1094,60 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   latest log check. Next: await approval, inspect terminal result, then deploy
   prepared persistence-check build and repeat Test phone sign-in after restart.
   Do not ask for another approval if the candidate was saved successfully.
+
+### Fresh native phone approval and persistence accepted (19:39Z)
+
+- Gary approved the QR login and replied done. Native job terminal SUCCESS at
+  19:38:06Z: OAuth, Xbox service tickets, PC content license and content key
+  validated; separate candidate saved by the real private host callback.
+- Deployed prepared backend cbc4968 + frontend f8a530d, SHA256
+  61e2fbab9299fd4309f555d829f6670cc58e97fce391d750fd5501a78ac2c5f5,
+  backup console-backups/20261027-saved-phone-check. Restarted the app and
+  repeated Test phone sign-in. It refreshed the saved candidate, obtained the
+  licence again and completed SUCCESS at 19:39:48Z without another code or
+  approval. Screenshot /tmp/gamepass-phone-after-restart.png explicitly shows
+  Phone sign-in and PC license verified; game sign-in still being tested.
+- This proves real console persistence and renewal, not active-account/library
+  adoption or runtime acceptance. Working on native OAuth account integration
+  next; the cleared legacy session was not restored. Pad CLOSED, Remote Play OFF.
+
+- Backend 6303191 adds a separate active phone session with an opaque
+  phone-account namespace (no fabricated email/Store PUID), serialized real
+  scope refresh, and a logout-safe conditional save. Explicit library refresh
+  may adopt a verified candidate only when no old account exists. Profile,
+  subscription, library and content licensing now accept this session.
+  Credential tests 34/34, CLI 79/79, native 5/5 and both PS5 builds passed.
+- Deployed SHA256
+  580c31b0b5d3a1119fa553316fa8f07f7ab71113d9cae08037fd56b3f3ee3f39
+  with backup console-backups/20261027-phone-active-library. Native Refresh
+  19:46:04Z->19:46:31Z SUCCESS; real account gamertag visible in Settings.
+  Actual Library screenshot /tmp/gamepass-phone-navigation-one.png shows
+  672 games and covers loaded. This accepts phone-session profile, live Store
+  entitlements/subscription and catalogue access on PS5 without legacy login.
+- Installed count is currently ZERO because prepared-game account bindings
+  still belong to the previous sign-in namespace. Need revalidate existing
+  installed PC content against the newly signed-in account before rebinding;
+  do not redownload or blindly reassign games. Runtime acceptance still pending.
+- Backend f4a2220 makes the opt-in runtime test load credentials into a
+  memory-only store (including Drop) and verifies t=/d= ticket form with Xbox
+  before returning it. 4/4 host tests and Windows DLL build passed. DLL not
+  deployed yet; still opt-in, no fallback to cleared legacy credentials.
+- Pad CLOSED; Remote Play remains OFF.
+
+- Backend a2d3d51 revalidates old-account prepared installs only when an active
+  PC subscription and current entitlement exist, the strict local folder is
+  present without symlinks, and a fresh PC license decrypts its authenticated
+  content key. Updates only account bindings; game files/saves remain intact.
+  CLI first run hit the known local HTTP fixture WouldBlock race (79/80);
+  clean serial rerun passed 80/80. Native cross-build and app build passed.
+- Frontend 40f4e52 shows installed-game account validation status; 153/153
+  host tests passed in 132.46 s. Deployed SHA256
+  48c8f18fdc1482f84e198de3211372150b36781a17841e62d0e0d17d3eb02c76,
+  backup console-backups/20261027-phone-installed-revalidation.
+- Native refresh 19:53:52Z->19:54:27Z SUCCESS. Actual Library screenshot
+  /tmp/gamepass-revalidated-installs.png shows Installed 2 and All 672. Both
+  installed game licences revalidated and bindings updated, no redownload.
+- Working on packaging the updated in-game bridge in the app so the native
+  managed installer can copy it into a stopped game's bottle safely; no UID
+  transfer payloads and no direct private-bottle FTP writes. Game acceptance
+  remains pending.
