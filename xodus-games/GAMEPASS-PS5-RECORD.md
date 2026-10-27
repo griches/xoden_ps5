@@ -973,3 +973,43 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Virtual controller CLOSED. Remote Play and DevTools remain off. Console
   available to Gary; continue off-console authentication work without taking
   his controller unless a concrete further console check is needed.
+
+### Native phone sign-in implementation checkpoint (18:57Z)
+
+- At Gary's request, started Remote Play and loopback live viewer; verified
+  connected 1080p feed. Later Gary regained TV access and requested it stopped.
+  Both server and viewer stopped; no Remote Play session remains. Virtual pad
+  was closed before the following deployment; reopen only for brief acceptance.
+- Backend 23b9a35 stores a separate phone candidate with a bounded private schema
+  and real expiry; no active-account replacement. 9 device-code tests and
+  credential-account tests pass. Backend 0919114 ports the existing runtime DLL
+  wrapper into the active backend and adds opt-in XODUS_TEST_PHONE_LOGIN=1.
+  It never falls back to the working account in test mode or explicitly saves
+  its keyring snapshot. 3 host tests and Windows DLL build pass. TEST DLL NOT
+  DEPLOYED. App-level service-ticket acceptance inside a game is unverified.
+- Backend d39d02e adds signin-test native jobs bound to a public PC package.
+  Code/link display, OAuth polling, Xbox profile/marketplace, Store PC license
+  and authenticated content key are checked before saving the isolated candidate.
+  This does not adopt the candidate, and existing device credentials are copied
+  to memory for validation. Requires an existing private console device store.
+- Fixed persistence before releasing this test: HostFileBackend reads existing
+  private keyring RON into a memory-only sample store. Each write invokes the
+  host's existing Storage.WriteAtomicPrivate callback; failed commits roll back
+  the memory entry, and Drop never rewrites the working credential file. This
+  avoids relying on keyring-core's automatic Drop save. 3 synthetic host-file
+  tests pass, 30 credential tests pass, 77 CLI tests pass, native 5/5 tests and
+  PS5 Rust cross-build pass. No new device or credentials printed/exported.
+- Frontend 469dbc8 adds Settings > Xbox account > Test phone sign-in, transient
+  Microsoft code display, native cancellation/drain, and honest verification
+  status preserving the working account. Tests reject foreign verification
+  links, clear codes on cancel/terminal, and prevent a phone check being treated
+  as a download or completed installation. Full suite: first run 152/153 with
+  an unrelated installed-locations timeout; isolated retry passed (6.39 s), then
+  complete rerun 153/153 passed (135.54 s). PS5 build passed. All code pushed.
+- Deployed frontend 469dbc8 + backend d39d02e. Current app SHA256
+  351a68de9c5543c3985404c0d2e45384ffe0bf7c4cffb415c3cf0b54497feae2.
+  Backup console-backups/20261027-native-phone-signin. ELF symbol inspection
+  confirms it contains HostFileBackend. Console acceptance of code display,
+  cancellation, actual native phone approval and durable candidate pending.
+  Native first-time provisioning, candidate adoption and game-runtime bridge
+  acceptance are still unfinished; keep Gary's existing session intact.
