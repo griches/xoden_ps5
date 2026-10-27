@@ -1,0 +1,157 @@
+# Community recipes
+
+A community recipe tells Playden how to start one Steam game on the PS5. It is a
+Playden recipe (the same JSON as `runtime/recipes/*.json`) with a few more fields
+that say who tested it, where and how well. Playden reads the recipe part with
+`ParseGameRecipe` and the whole file with `ParseCommunityRecipe`
+(`src/runtime/game_settings.h`).
+
+## Make one
+
+1. Get the game to start from **Game settings** (program, arguments, library
+   overrides, other rows).
+2. Set the game's rating and note under **Compatibility and note**.
+3. In **Game settings > Advanced**, choose **Export as recipe**. Playden writes
+   `recipe-<app id>.json` next to its logs (`/data/playden/logs` on the console, `logs/`
+   in the data folder on a Mac).
+4. Fill in `community.author`, check the file, and send it as a pull request to
+   Playden's repository.
+
+## Format (format_version 1)
+
+```json
+{
+  "recipe_id": "community-1592280",
+  "recipe_version": 1,
+  "app_id": 1592280,
+  "name": "Selaco",
+  "launch_entries": [
+    {"id": "program", "label": "SELACO.exe", "executable": "SELACO.exe", "working_directory": "", "arguments": ""}
+  ],
+  "arguments": "",
+  "resolution_arguments": "",
+  "dll_overrides": "",
+  "architecture": "pe64",
+  "runtime": "wine-wow64",
+  "prefix": "game",
+  "graphics": "opengl",
+  "detected": "opengl graphics=opengl",
+  "defaults": {
+    "resolution": "1280x720"
+  },
+  "locked": [],
+  "steam_appid": 1592280,
+  "executable": "SELACO.exe",
+  "community": {
+    "format_version": 1,
+    "min_kit": "kit-h",
+    "tested_firmware": "13.60",
+    "tested_date": "2026-10-10",
+    "status": "playable",
+    "notes": "Menus need the mouse preset.",
+    "author": "",
+    "base": {"repository": "https://github.com/…/prospero-win-profiles", "path": "profiles/selaco.profile", "revision": "abc123"}
+  }
+}
+```
+
+Recipe fields:
+
+| Field | Meaning |
+|---|---|
+| `launch_entries` | The program that starts, relative to the game folder; its `working_directory` (empty: the program's folder) and its own `arguments`. |
+| `arguments` | Arguments the game needs. `{resolution}` is replaced by `resolution_arguments`, with `{w}` and `{h}` from the Resolution setting. |
+| `dll_overrides` | The full Wine library override list, like `d3d9,dxgi=n;dinput8=n,b`. Nothing is added to it. |
+| `architecture` | `pe32` or `pe64`, from the program's PE header. |
+| `graphics` | `auto`, `gdi`, `dxvk` or `opengl`. |
+| `defaults` | Game settings by setting id (`SettingsCatalogue()`), only values that differ from Playden's default. |
+| `locked` | Setting ids the player must choose "Change anyway" to change. |
+| `requirements` | What the runtime kit's template bottle must provide: `{"audio": "ps5"}` (Wine's PS5 audio driver) is the only one so far. On a kit without it, Playden refuses to prepare or start the game and names what is missing. |
+| `registry` | Values the bottle gets under `HKEY_CURRENT_USER` when the game's files are prepared, as a Steam install script's would be: `{"Software\\Wine\\AppDefaults\\game.exe\\Direct3D": {"VideoMemorySize": "4096"}}`. Only some keys are allowed; see [Registry values](#registry-values). |
+
+Community fields:
+
+| Field | Meaning |
+|---|---|
+| `steam_appid`, `executable` | Identity: must match `app_id` and a launch entry's `executable`. |
+| `community.min_kit` | The runtime kit it was tested with. Older kits may lack what it needs. |
+| `community.tested_firmware`, `tested_date` | PS5 system software and day of the test. |
+| `community.status` | `works`, `playable`, `broken` or `untested`. |
+| `community.notes`, `author` | Free text. |
+| `community.base` | Optional. A prospero-win-profiles profile (repository, path, revision) that Playden uses as the base; this file's values apply on top. |
+
+Rules: `format_version` is 1; unknown fields are ignored; a file with another
+`status` or a `steam_appid` that does not match `app_id` is refused.
+
+Recipes are released under [CC0 1.0](../runtime/recipes/LICENSE) (public domain dedication). By sending a
+recipe, you agree to release it under CC0 1.0.
+
+Applying community recipes from the preset chooser is planned.
+
+## Other stores
+
+A recipe can name a game that is not from Steam, with two more fields:
+
+```json
+"store": "local",
+"game": "local-<uuid>"
+```
+
+Give both or neither; a file with only one is refused, as is an unknown `store`. `local` is the only store so far: it
+is a game imported from a folder. Without them, the recipe is for the Steam game `app_id`, as before.
+
+An imported game is keyed by its local ID, which Playden makes when you add it, so a recipe for one only fits the
+console that exported it. Community recipes still target Steam games.
+
+## Registry values
+
+Use `registry` only for a value the game reads from the registry and that no
+other field or Game settings row sets. Playden writes the values into the
+game's bottle whenever it prepares the game or applies its settings.
+
+A recipe may write two kinds of key, both under `HKEY_CURRENT_USER` (write the
+key without the `HKEY_CURRENT_USER\` part):
+
+| Key | For | Example |
+|---|---|---|
+| `Software\Wine\AppDefaults\<program>\<section>` | Wine settings for the game's program only. | `Software\Wine\AppDefaults\ffxiiiimg.exe\Direct3D`, value `VideoMemorySize` |
+| `Software\<publisher>\…` | The game's own keys: settings, install paths, accepted EULAs. | `Software\Square Enix\FINAL FANTASY XIII`, value `Language` |
+
+Every other key is refused, and the recipe does not load. Here is where those
+needs go instead:
+
+| Refused | Why | Use instead |
+|---|---|---|
+| `Software\Wine\AppDefaults\<program>\DllOverrides`, `Software\Wine\DllOverrides` | Game settings would not show these overrides. | `dll_overrides` |
+| `Version` under `AppDefaults\<program>`, `Control Panel\Desktop` `LogPixels` | Game settings writes them on every start. | The Windows version and text scale rows in `defaults` |
+| Other `Software\Wine\…` keys (for example `Drivers`, `Direct3D`) | They change Wine for the whole bottle, including what the kit checks (`Drivers\Audio`). | A section under `AppDefaults\<program>` |
+| `Environment` | It would get around the environment allow-list. | The `environment` row in `defaults` |
+| `Software\Microsoft`, `Software\Classes`, `Software\Policies`, `Control Panel`, other roots | Windows' own keys, not the game's. | Ask in an issue first. |
+| `HKEY_LOCAL_MACHINE` values | The field writes `HKEY_CURRENT_USER` only. | Playden applies the game's Steam install script (`installscript.vdf`), including its `HKEY_LOCAL_MACHINE` values. Ask in an issue if a game needs more. |
+
+Other rules: string values only, at most 16 values, printable ASCII, no `"` in
+names or values, no `\` in values, no `[` or `]` in keys, and each value once
+(letter case does not make two values different).
+
+## Shipped recipes
+
+A recipe Playden ships lives in `runtime/recipes/` and is used for that game
+instead of the one Playden makes from Steam's launch options. To add one:
+
+1. Get the game working from Game settings and export it as a recipe (see
+   [Make one](#make-one)).
+2. Name the file and its `recipe_id` `steam-<app id>-<short name>-v<version>`,
+   for example `steam-292120-ffxiii-v1`, and leave out the `community` block.
+   Change the version only when a change needs the game prepared again.
+3. Add the file name to `runtime/recipes/recipes.lst` (the console title
+   cannot list folders).
+4. Put in `locked` every row whose other values are known to stop the game. The
+   player then sees "Required by this game" and must choose "Change anyway" to
+   change it. Final Fantasy XIII locks `graphics` (its Direct3D 9 goes to DXVK
+   through `dll_overrides` whatever the row says) and `steam_features` (it quits
+   without the Steam emulator).
+5. Set `steam_features` in `defaults` if the game needs the Steam emulator. A
+   shipped recipe without it keeps the game's own Steam files.
+6. Add a test in `tests/game_settings_test.cpp` that loads the recipe and
+   checks its arguments and settings, and say in the pull request what you ran
+   on a console.

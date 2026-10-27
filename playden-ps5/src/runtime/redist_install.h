@@ -1,0 +1,109 @@
+#pragma once
+
+#include "runtime/install_script.h"
+
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace playden::runtime {
+
+// Redistributables a game's Steam install scripts run on its first start ("Run Process"
+// entries: PhysX, Visual C++, DirectX, .NET). The console can't start their installers, so:
+// Windows Installer packages are installed by Playden itself (runtime/msi_package.h), installers
+// whose DLLs Wine provides are skipped, and other programs are skipped and logged.
+
+enum class RedistAction { kMsi, kCovered, kNotRun };
+
+// What Playden does with an entry. For kMsi, package is the package's path inside the game
+// folder ('/' separators), found from `msiexec /i <package>` or a process that is the package.
+RedistAction ClassifyRedist(const RedistEntry& entry, const std::string& install_dir, std::string* package);
+
+struct RedistOutcome {
+  std::string script;   // the install script, relative to the game folder
+  std::string name;
+  std::string result;   // "installed", "already", "covered", "not-run", "failed"
+  std::string detail;   // the package, program or failure reason
+  std::size_t files = 0;
+};
+
+struct RedistInstallResult {
+  std::vector<RedistOutcome> outcomes;
+};
+
+// Finds install scripts at the top of game_root and in its redistributable folders
+// (_CommonRedist, Redist, Support, __Installer…, up to four folders deep), and installs their
+// Windows Installer packages into the stopped bottle at prefix_dir. A package installed before
+// (the same SHA-256, listed in <prefix>/.playden-redist) is not installed again. A package that
+// fails is reported and left out; the others still install.
+RedistInstallResult InstallRedistributables(const std::string& game_root, const std::string& install_dir,
+                                            const std::string& prefix_dir, std::int64_t unix_time);
+
+// Microsoft's MFC library, which Wine doesn't provide, for the games that import it (runtime/game_probe.h
+// FindMfcImports): Playden downloads Microsoft's Visual C++ 2015-2022 redistributable once per console, keeps the
+// verified setup program, and installs only the MFC files of its "Additional" package into a game's bottle.
+
+// The redistributable for one architecture, pinned to a release: the URL embeds its SHA-256.
+struct VcRedist {
+  std::string architecture;  // "x86" or "x64"
+  std::string url;
+  std::string sha256;        // lower case
+  std::uint64_t bytes = 0;
+  std::string package_id;    // the bundle's MsiPackage with MFC
+  std::string version;       // names the cache folder
+};
+// Microsoft's 14.44.35211 for x86 and x64.
+std::vector<VcRedist> MicrosoftVcRedists();
+
+// Whether a file the package installs is one of MFC's (mfc140*.dll, mfcm140*.dll): the only ones Playden takes
+// from it, so the C runtime never replaces the kit's Wine builtins.
+bool MfcFileName(std::string_view name);
+
+// One ranged GET: the bytes [offset, offset + length) of url, or nothing with a reason.
+using RangeFetch = std::function<std::optional<std::string>(const std::string& url, std::uint64_t offset,
+                                                            std::uint64_t length, std::string* error)>;
+inline constexpr std::uint64_t kRedistChunkBytes = 8ull << 20;
+
+struct MfcInstallResult {
+  std::string result;  // "installed", "already" or "failed"
+  std::string detail;  // why it failed
+  std::string source;  // "download" or "cache", when installed
+  std::size_t files = 0;
+  std::string cache_problem;  // the download installed but could not be kept for other games: why
+  bool download_failed = false;  // failed because the bundle could not be downloaded (or wasn't the pinned one)
+};
+
+// Installs redist's MFC files into the stopped bottle at prefix_dir, once: the bottle's .playden-redist lists the
+// bundle's SHA-256 afterwards. The bundle is <cache_root>/vc-<version>/<architecture>/<file name of url> when that
+// file has the pinned SHA-256 (a file that doesn't is removed), otherwise fetched in kRedistChunkBytes ranges,
+// verified, and kept there for other games.
+MfcInstallResult InstallMfcRuntime(const VcRedist& redist, const std::string& cache_root, const std::string& prefix_dir,
+                                   const RangeFetch& fetch, std::int64_t unix_time);
+
+// Whether the bottle at prefix_dir lists redist's MFC as installed.
+bool MfcInstalled(const VcRedist& redist, const std::string& prefix_dir);
+
+// The latest MFC scan of a game (runtime/game_probe.h FindMfcImports), kept in its bottle (.playden-mfc) so Play
+// doesn't walk the game folder each time: the programs found, per architecture, and the game files' fingerprint
+// then.
+struct MfcScanRecord {
+  std::string fingerprint;
+  std::string x86_program;
+  std::string x64_program;
+};
+std::optional<MfcScanRecord> ReadMfcScan(const std::string& prefix_dir);
+bool WriteMfcScan(const std::string& prefix_dir, const MfcScanRecord& record);
+// What changes when a game's files are installed or updated: the size and time of the install record and file
+// list Playden's downloads and copies write at the game's root (.playden-install.json, .playden-files). Empty for
+// a folder without them (a game added over FTP), whose scan is never reused.
+std::string GameFilesFingerprint(const std::string& game_root);
+
+// Adds folders to a PATH value: prepend in order before the existing entries, append after
+// them, each only when not already listed (case-insensitive).
+std::string ExtendPath(const std::string& current, const std::vector<std::string>& prepend,
+                       const std::vector<std::string>& append);
+
+}  // namespace playden::runtime

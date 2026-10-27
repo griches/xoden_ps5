@@ -1,0 +1,264 @@
+{
+  "ps5_payload_sdk": {
+    "version": "v0.43",
+    "url": "https://github.com/ps5-payload-dev/sdk/releases/download/v0.43/ps5-payload-sdk.zip",
+    "sha256": "a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb"
+  },
+  "prospero_launcher_helper": {
+    "base_revision": "b48b7d7236eca25c7b9dfd6c040c763ae05dde80",
+    "owned_title_revision": "66ab4f10f9a6c6a5a42d05f1d165230c13ae2ab7",
+    "foundation_revision": "9c0b994a048521af6fb84c73ded364504fe250e9",
+    "protocol_sha256": "bb02c4aa814eaba7a7a423a31b29ff41f786212c2953678cf29434e85fa0f869",
+    "variants": {
+      "FAKE77031": "910f12157ea9ddcb3fd1c84864b02a0eee95d33133bafdf9058426f66d3dd316"
+    },
+    "payload_sdk": {
+      "version": "v0.42",
+      "url": "https://github.com/ps5-payload-dev/sdk/releases/download/v0.42/ps5-payload-sdk.zip",
+      "sha256": "8cfbc7cd5811e719eb4f0c47eea668d3dc7b40bc8ab11c4a5031d40c23ec02da"
+    },
+    "source": "third_party/PS5-Lapy-JB-Daemon submodule, fork branch main at owned_title_revision; build with scripts/build-lapy-helper.sh"
+  },
+  "title_remover": {
+    "sha256": "b39725072337816d4c6d2b159849df5e5a3d86505b7450357d774cc8d8f90ca0",
+    "payload_sdk": "ps5_payload_sdk",
+    "source": "tools/title-remover/main.c; build with scripts/build-title-remover.sh (reproducible; sent by Playden to the payload loader on 127.0.0.1:9021)"
+  },
+  "miniz": {
+    "version": "3.0.2",
+    "source": "https://github.com/richgel999/miniz/releases/download/3.0.2/miniz-3.0.2.zip (amalgamated miniz.c/miniz.h)",
+    "files": {
+      "miniz.c": "0fcdc9888cb3a29ca8f176bac087e5fe6c7258a6ab06b1c271c1e109a11d3740",
+      "miniz.h": "295d1a0041aea09609598c0f1f35c1977ca05ad662acbadcfdaac44c140af37b"
+    },
+    "purpose": "Reads release zips for Playden's self-update; writing APIs left out"
+  },
+  "self_update_relaunch": {
+    "sha256": "e32c635cca2d67b0a94b388e17711748c9f4955238a02914135b432d529396e2",
+    "payload_sdk": "ps5_payload_sdk",
+    "source": "tools/self-update-relaunch/main.c; build with scripts/build-self-update-relaunch.sh (reproducible; sent by Playden to the payload loader on 127.0.0.1:9021 when it quits to finish an update)"
+  },
+  "ps5_opengl": {
+    "version": "1.0.2",
+    "source_revision": "a519561626933257213d64a4a8bd5e02b55dceb2",
+    "sdk_url": "https://github.com/darkxex/ps5-opengl/releases/download/v1.0.2/ps5-opengl-sdk-1.0.2.tar.gz",
+    "sdk_sha256": "30d8e51dd062739b629346102be5932728ba714bc50b1bdcdf08306c8843d9a4",
+    "sdk_manifest_sha256": "0d432edc9d648d6e0cccb4d5eb3db8484f10ba4b075b5ccf23edda3251b66360",
+    "libPS5OpenGL_sha256": "11ab03a347cf75e143c7aa896ff0fd94714ded471a92146aa0f2aba82722ae95",
+    "source": "third_party/ps5-opengl submodule, fork branch main: the v1.0.2 tree (original tag a519561, kept as darkxex/ps5-opengl 6b6bb20 after the original repository was removed) with this fork's CI settings. sdk_manifest_sha256 pins sdk/manifest.sha256, which lists every SDK file; libPS5OpenGL.a is only a linker script naming the real libraries"
+  },
+  "ps5_native_app_boilerplate": {
+    "revision": "f98de734b68b0b980d38ff03a330066afd6ae16d",
+    "source": "third_party/ps5-native-app-boilerplate submodule (selected Hui PS5 build)",
+    "patch": "sce_module_writer.cpp heap size changed to 0x10000000 in a build-local copy",
+    "libc_prx_sha256": "e6ff45d16adf687855cc3b33b0c8a4132b6504360b221e0a34c7e99fb3ba0036"
+  },
+  "compiler_rt_builtins": {
+    "version": "18.1.8",
+    "sha256": "61002d0f8fa316a09db9c97f47744cfa5866862e9dc3fdd554d7cf6fdc3c2566",
+    "url": "http://archive.ubuntu.com/ubuntu/pool/universe/l/llvm-toolchain-18/libclang-rt-18-dev_18.1.8-20ubuntu11_amd64.deb",
+    "archive_sha256": "e7077f4fda48dcac60df1d99beca2d784300ae654d1f660ec904f206edb4d576",
+    "member": "usr/lib/llvm-18/lib/clang/18/lib/linux/libclang_rt.builtins-x86_64.a",
+    "why": "ps5-opengl needs __emutls_get_address; Homebrew LLVM ships only Darwin builtins"
+  },
+  "recorded_host_toolchain": {
+    "platform": "macOS Apple Silicon",
+    "apple_clang": "17.0.0",
+    "cmake": "3.30.3",
+    "ninja": "1.13.2",
+    "sdl2_compat": "2.32.72",
+    "note": "Host compiler, SDL2 (2.x, through pkg-config) and OpenGL come from the system; libcurl for the host and PS5 is built from the pinned steam_network_probe sources (scripts/network-deps)."
+  },
+  "utf8proc": {
+    "version": "2.11.3",
+    "revision": "e5e799221b45bbb90f5fdc5c69b6b8dfbf017e78",
+    "source": "https://github.com/JuliaStrings/utf8proc",
+    "files": {
+      "LICENSE.md": "3b510150d34f248a221bb88e1d811238d6c6c18b51231822c42974c39bb07256",
+      "utf8proc.c": "edf80118fd34796bcabef4567cc684adebc7058f2afe8cfdc11b7a78e383ed84",
+      "utf8proc.h": "a4e498b7392c383cf3b22e662da21e0b48f1264806235d87b5d8bd166232f658",
+      "utf8proc_data.c": "950e549dbfc853c4304425f3af1875e72fa9fc9697c273c763400c2da4e380a7"
+    }
+  },
+  "steam_network_probe": {
+    "status": "passed on PS5 native title; production transport selected",
+    "curl": {
+      "version": "8.22.0",
+      "source_sha256": "f7ef3ae8a22e521f289803fe93543eb64c329b58aa73a9e224dfd915a2a5f4f7",
+      "ps5_nonblock_patch_sha256": "8ad3d3b23ed6c526d89e289c0acc11784df994f6ba99a3d6392cac0f5065e526"
+    },
+    "mbedtls": {
+      "version": "3.6.6",
+      "source_sha256": "8fb65fae8dcae5840f793c0a334860a411f884cc537ea290ce1c52bb64ca007a",
+      "config": [
+        "MBEDTLS_THREADING_C",
+        "MBEDTLS_THREADING_PTHREAD"
+      ],
+      "config_sha256": "92f08b8ed84a09b84ff9a1728a2b7868c45dabdcdda6574dc8ae3b64d290c035"
+    },
+    "ca_bundle": {
+      "version": "2026-09-25",
+      "sha256": "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505"
+    },
+    "public_headers": {
+      "curl/curl.h": "9ec2e9040d8d95545a4c331461c54748651edc3852a6ceca0672f858103e0528",
+      "curl/curlver.h": "c4ed114da4eca953a328fa2efa8128308fc32879f15b58c245b2592f4bfaf9dc",
+      "curl/easy.h": "f101da02dd373151ea7b00082cb62c9d6e482361ab26b6d430ee96aab1b71565",
+      "curl/header.h": "e92525a91bb1119034dd45dd42d255ff9b6a49d964ca7105964e0107671b3395",
+      "curl/mprintf.h": "a79657fa15db71e732bcb58bc4645ab65bdb3222767f34be5bab56aa0d4f4cc9",
+      "curl/multi.h": "0466a7c91067cb11c98f37e16103b992b66e84221467c2a70ef951877502f77a",
+      "curl/options.h": "32fe87f843367d25a9db91a47386652402f08c9668617b4c51295ef31d93f8b0",
+      "curl/stdcheaders.h": "d7588b86814a35ffc3766ff6242e6f6705e04401fc9c208a195caff3503af81c",
+      "curl/system.h": "edb2c507a084448a5e3c7e2b9c65c408e22ffeaca5ab0c1ee2e76d82a21113fa",
+      "curl/typecheck-gcc.h": "62bf346ae4dc33bc61cd99a9e935c62dfbcd8120399cdbd5874d15897a57e681",
+      "curl/urlapi.h": "d888326d5bdebb84b5fe133d7ef7703d4e88732757ce4d6b0476f0c668d38a6e",
+      "curl/websockets.h": "05b70dbce5274aa6e360703bb17d67a0390fea18bf4437745a25b08b55d6962b"
+    },
+    "ps5_archives": {
+      "libcurl.a": "48073d585213b7698514c3d15ee9f85f6fa74ba8d7f3728116b96271601eb951",
+      "libeverest.a": "beb61a9fb21e7a9cc016f0ad7fc9027cc09da674a3f2c743bfa8d1bfe06de00c",
+      "libmbedcrypto.a": "10702b58c100c6c6dfde592949a8282c708518c030f6672b6bed955113bcecde",
+      "libmbedtls.a": "d7e12979e590a796a8f6383fec0b5e285b3badc19afc44f4cb89da7e7544c8b2",
+      "libmbedx509.a": "547c3ea5244efe1836edbec54a43c5fda31244926892084076fdcbeccc217aa6",
+      "libp256m.a": "412e12a472d4b2a3377760ccea57c87609831197c9183736ccd848d23b27da02"
+    },
+    "ps5_build_flags": "-ffile-prefix-map=<source root>/= (relative source paths; byte-reproducible with SDK v0.43 and LLVM 18.1.8)"
+  },
+  "homebrew_ui": {
+    "revision": "0a6fb4b851da86cd4e9512aae3abf1352a96086a",
+    "source": "third_party/ps5-homebrew-ui submodule, fork branch main: upstream 4b3fbb7 plus the latin-glyph, macOS OpenGL 4.1 and CFF SDF commits (not yet upstream)",
+    "stb_image": {
+      "source": "Vendored third_party/stb/stb_image.h (stb v2.30)",
+      "sha256": "594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3"
+    },
+    "assets": {
+      "fixtures/ui-comparison/assets/fonts/Barlow-Regular.ttf": "95aa02c7c43096e0dd44d787ba6216864a67157e402adab59b35572e0c1577ea",
+      "fixtures/ui-comparison/assets/fonts/Barlow-Medium.ttf": "f8906f762cb73dca441da034bc363b2d8e2e68bc10d5c05e58717646c20cc4b4",
+      "fixtures/ui-comparison/assets/fonts/Barlow-SemiBold.ttf": "86577cb32f8abe3673db53ca0f4221e6856751a4f6730c867e00f720f8bb1fc5",
+      "fixtures/ui-comparison/assets/fonts/BarlowCondensed-Medium.ttf": "262bd143292ce479ee0cd09a42b47ab173fca8e9c6eb5ed0b5c8a845bc371d17",
+      "fixtures/ui-comparison/assets/fonts/BarlowCondensed-SemiBold.ttf": "7b619d14bc2327509a9ef32b0890f709626f7ecc9ff61191c2a4314c5499d2d9",
+      "fixtures/ui-comparison/assets/fonts/NotoSansCJKsc-Regular.otf": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+      "fixtures/ui-comparison/assets/fonts/NotoSansArabic.ttf": "63111b5b2e074dd48cc67692e0a2726d86ee94c1c37fe8598257b7b4e87e869e",
+      "fixtures/ui-comparison/assets/fonts/barlow-OFL.txt": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f",
+      "fixtures/ui-comparison/assets/fonts/barlowcondensed-OFL.txt": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f",
+      "fixtures/ui-comparison/assets/fonts/noto-cjk-LICENSE.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+      "fixtures/ui-comparison/assets/fonts/noto-arabic-OFL.txt": "07fc70bfeb985cc1a87a8587d0a0c80bab11c86c9dc3fd95b6f0cb332f983e96",
+      "assets/fonts/NotoSans-Regular.ttf": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5",
+      "assets/fonts/NotoSans-OFL.txt": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb"
+    }
+  },
+  "qrcodegen": {
+    "source": "https://github.com/nayuki/QR-Code-generator",
+    "revision": "3c6d0b3cefb4e049dc337e82237c9644399716a8",
+    "license": "MIT",
+    "files": {
+      "qrcodegen.c": "6a2b9cc65176f2345dde260c74b6d352627e8a0a6385d086ae0e9c5d0913c70c",
+      "qrcodegen.h": "e82df4bff37d18b5863b9e7486fe6bda1b6cda8c3b9ecebfec473907265cb589",
+      "LICENSE": "f97d5844abb82e8548ed0ac82374e31bc17562b20584f395bd8ae0935044caca",
+      "README.md": "414777ae32f259704c25485f3af95a372e6075d137418fa3e6c58c206b0d5f10"
+    }
+  },
+  "depot_codecs": {
+    "lzma_sdk": {
+      "version": "24.09",
+      "source": "https://github.com/ip7z/7zip/tree/24.09/C",
+      "files": {
+        "LzmaDec.c": "b9ca2b8707400347c75d6fef288d1354a3b4cf93e8da42f26207b8bd4c4d5e59",
+        "LzmaDec.h": "3aaf07b4ae4173a2d103179455dc7089b5ddbc7fc3db3c0e40964a7499c69266",
+        "7zTypes.h": "5de943c886d5d7bbcf16203e9b292a9e7be327b43fe3dfd9f4ad07d6d0870ef6",
+        "Precomp.h": "fea249c753dfbbdd69d9397e91497205452b784279f70cad4658dc567cd2f85f",
+        "Compiler.h": "959dac87ac7109502f6467e910d0722b932176e243153bf8c663479aa8c29b20"
+      }
+    },
+    "zstd": {
+      "version": "1.5.6",
+      "url": "https://github.com/facebook/zstd/releases/download/v1.5.6/zstd-1.5.6.tar.gz",
+      "sha256": "8c29e06cf42aacc1eafc4077ae2ec6c6fcb96a626157e0593d5e82a34fd403c1"
+    }
+  },
+  "prospero_win": {
+    "revision": "e709a0b72361c6c8e16c80ff93a3705a5e5421b7",
+    "url": "https://github.com/leolobato/prospero-win.git",
+    "default_source": "third_party/prospero-win",
+    "published": false,
+    "status": "development-source; release kit and native acceptance pending",
+    "retained_runtime_artifact_revision": "bceed2d-kit-h-r1",
+    "upstream_url": "https://github.com/mpereiraesaa/prospero-win.git",
+    "branch": "main",
+    "note": "Rebased onto upstream b510eb3 on 2026-10-08. Any-title shell on fixed kit B (25a967d). Firmware 13.60 uses the authorized no-drop fallback; games retain root recovery. Runtime remains bea2be5. Same tree as kit C's shell revision 850e62c (history squashed; the old commits are on backup/playden-ps5-850e62c). 33130a9 adds publication metadata schema 3 (game_root.unowned) for game folders on exFAT drives. a9ce0d0 pins the packager to the kit D runtime built from 8ff88bf (rebased forks, direct-memory heap). Test branch feat/upstream-2026-10-10 (2026-10-10): rebased onto upstream ce890c0 (Mesa WGL/Zink OpenGL, PS5 OpenGL SDK path removed); patch 0663 dropped, ours renumbered 0950-0955; 3f8f559 pins the packager to the kit G runtime f29127a. Rebased again onto upstream 644e32e (kit H): our 0602 and the translator fallback 063f851 dropped for upstream #678/#677, patch 0956 keeps a window's pixel format with Mesa's WGL; 77231eb pins the packager to the kit H runtime bceed2d. 03b6495 (feat/playden-ps5) adds only test, documentation and allowlist fixes on top of ab3b29e. 13fa077 adds Wine patch 0603 (upstream PR #688: Windows memory queries report the title's direct-memory budget) and ea6e6ee pins the packager to the kit H r8 runtime built from 13fa077. c5808b2 pins the packager to the kit 0.10 runtime built from cd3de27 (media backend and Wine patches 0964, 0965, 0970-0972, 0980, 0981). 7961dcb adds only test and documentation fixes on top of c5808b2. d0e60e8 adds Wine patch 0982 (the PS5 high reserved area at 0x1000000000 asks for 512 GiB and halves down to 16 GiB, PW_PS5_HIGH_RESERVE_GB); kit 0.10 and its runtime are unchanged until a kit is built from it. f729534 (feat/120hz-output) adds Wine patch 0983 (the PS5 driver reports 120 Hz when the title asks for it) and the [display] frame_rate key; the title passes PS5_VIDEOOUT_REFRESH and PS5_VIDEOOUT_FRAME_RATE to libvulkan.prx. ee24762 pins the packager to the kit 0.12 runtime built from f729534. ffb3b7a changes only the title shell: the game keeps its XInput controller, neutral, while the PS5 system overlay has the DualSense; the kit 0.12 runtime is unchanged. 031302d adds Wine patch 0984 (the PS5 user driver posts WM_DEVICECHANGE when the title's controller connects or disconnects) and a sink call in ntdll for it; a DualSense that turns off disconnects the game's controller again. A kit with it needs ntdll.prx and win32u.prx from 031302d. ce28942 changes only the title shell: it reads [runtime] version; a profile without it (version 1) keeps wave64 pixel shaders with RADV_PS5_PS_WAVE64=1 unless it asks for pswave32, version 2 takes the driver's default (wave32 with PS5_Mesa 15f78ec). A kit with it lists the capability profile-version-2. e709a0b pins the packager to the kit 0.13 runtime built from 031302d (no NW.js patch 0985)."
+  },
+  "prospero_bottle_preparation": {
+    "hl2-fresh-v16": {
+      "files": {
+        "source-binding.reviewed.json": "73a4d8e520d29f729f86c1c0bc40a4a4153621b57d33edaac310c21ad0087eea",
+        "loader-provenance.reviewed.json": "1ee41d59d09cbd83e40fe5a83d4d9311b173b8ead2876df7ffea19ea459a56b1",
+        "prefix.manifest": "7eb7083aa4393ac14d9018ab53bd65edfcff6a0227c6b382517d7c878589b67a",
+        "initialization-provenance.json": "a738900562e116d9e2de15a2fdc0c68f2d6860e92108fb5dee7c8c5bcbcacc81"
+      },
+      "wine_source_head": "490f6d5dcbb2a5047345b8af88d114bbcaad69a8",
+      "retained_runtime_commit": "e16ec8f3a19dec4a1162e7554ab73ce41f83bdb9",
+      "template_inventory_sha256": "ea9268c22c48f90aca28ca68b37f9c55bb038e7083c1fed18be571070aa39639"
+    },
+    "hl2-fresh-v16-neutral": {
+      "files": {
+        "source-binding.reviewed.json": "73a4d8e520d29f729f86c1c0bc40a4a4153621b57d33edaac310c21ad0087eea",
+        "loader-provenance.reviewed.json": "1ee41d59d09cbd83e40fe5a83d4d9311b173b8ead2876df7ffea19ea459a56b1",
+        "prefix.manifest": "7eb7083aa4393ac14d9018ab53bd65edfcff6a0227c6b382517d7c878589b67a",
+        "initialization-provenance.json": "a738900562e116d9e2de15a2fdc0c68f2d6860e92108fb5dee7c8c5bcbcacc81"
+      },
+      "wine_source_head": "490f6d5dcbb2a5047345b8af88d114bbcaad69a8",
+      "retained_runtime_commit": "e16ec8f3a19dec4a1162e7554ab73ce41f83bdb9",
+      "template_inventory_sha256": "6ae89cdb3cbfc4dc4c00ac404a46a05169ad17a9a3ca73cde56ce7fb72b3ef54",
+      "derived_from": "hl2-fresh-v16",
+      "derivation": "Same initialized export; every template file that embedded a host build path is replaced by the path-neutral runtime build of the same Wine module (results/20261006-release-kit/template-substitutions.json)."
+    }
+  },
+  "sqlite3": {
+    "version": "3.53.1",
+    "source_id": "c88b22011a54b4f6fbd149e9f8e4de77658c",
+    "source_repository": "https://github.com/notmaj0r/CheatRunner.git",
+    "source_revision": "59dcb9efaba71af00dc29d6cfe35da7d1ea43651",
+    "files": {
+      "sqlite3.c": "9ac97192c93a6d9671d2ea667ba14e3c8fe3719a171afc5827c9d86d0278fc14",
+      "sqlite3.h": "16d6e2f265fb13ece42329da39a865d4c540045b444d16b4bf9f7e1a7e39408f"
+    },
+    "purpose": "Read-only native installed-title inventory; no native database writes"
+  },
+  "prospero_kit": {
+    "kit_id": "playden-kit",
+    "published": false,
+    "status": "Kit 0.13, installed as playden-kit (kit 0.12 and earlier: hl2-fw1360-dev1; Playden retires that folder and points bottles' Wine Mono at playden-kit). Kit 0.12 with ntdll.prx and win32u.prx from prospero-win 031302d (Wine patch 0984: the game keeps its controller under the system overlay and gets WM_DEVICECHANGE when it connects or disconnects), the any-title shell from ce28942 (reads [runtime] version; capability profile-version-2) and libvulkan.prx from PS5_Mesa 15f78ec (pixel shaders in wave32 by default). Mono, Mesa WGL/Zink and template contents unchanged apart from the template's Wine Mono RuntimePath, so bottles need no Recreate. Released unchanged from dev kit 0.13-dev.20261024.4 (renamed). Earlier kits (0.12, 0.11, 0.10, H r1-r9): see this file's git history.",
+    "manifest_sha256": "d1dbc8e1b5b98691950369a89ef87c1dff5b7064a31844ccf20a4bed99b0e55b",
+    "files_sha256": "1e51857d8e19813b33cfaace0260f139b8835770a6ef5fe0d291270c77b446ca",
+    "console_root": "/data/playden/kits/playden-kit",
+    "firmware": [
+      "13.60"
+    ],
+    "capabilities": [
+      "display-120hz",
+      "dxvk",
+      "game-root-unowned",
+      "offline_bottle",
+      "opengl-zink",
+      "per_game_title",
+      "profile-version-2",
+      "settings-profile-environment",
+      "title-any-id",
+      "vkd3d-proton",
+      "wine-mono",
+      "wine-shared-sections",
+      "wow64_i386"
+    ],
+    "wrapper_revision": "ce289425bb34acbcc98f77b4e00ac98b3c16e4bc",
+    "runtime_artifact_revision": "031302d-kit-0.13",
+    "runtime_inventory_source": "Kit 0.13: kit 0.12 with ntdll.prx and win32u.prx from the prospero-win 031302d cross build (0984-cross.sh, the 0.12 recipe), the any-title shell built from ce28942 with tools/build_native.sh, and libvulkan.prx from PS5_Mesa 15f78ec. Kit 0.12: kit 0.11 with libvulkan.prx and win32u.prx from the prospero-win 7c81f68 cross build and the any-title shell built from f729534. Earlier kits: see this file's git history.",
+    "wine_mono": {
+      "version": "11.3.0",
+      "url": "https://dl.winehq.org/wine/wine-mono/11.3.0/wine-mono-11.3.0-x86.tar.xz",
+      "archive_sha256": "54a1b0111c3fe4b785eae688af94d27e64995707ad648b6fee8000381b80d298",
+      "kit_path": "mono/wine-mono-11.3.0",
+      "staging": "tools/kit-h/update_r4.py: symbolic links replaced by copies of their targets, lib/mono/*-api reference assemblies left out (673 files)"
+    },
+    "template_preparation": "hl2-fresh-v16-neutral-bceed2d"
+  }
+}
