@@ -48,6 +48,7 @@ fn token_file() -> String {
 fn log(message: impl AsRef<str>) {
     // Public live diagnostics contain fixed codes only. The private log retains
     // details; tokens, headers, URLs and provider text never enter this file.
+    #[cfg(windows)]
     if let Some(code)=public_status_code(message.as_ref()) {
         if let Ok(mut file)=std::fs::OpenOptions::new().create(true).append(true).open(r"Z:\data\playden\logs\xbox-runtime-status.log") {
             if file.metadata().is_ok_and(|meta|meta.len()<128*1024) {
