@@ -465,3 +465,33 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Questions and status requests do not stop ongoing authorized work. This is
   also saved in Gary's global AGENTS.md. Remote Play remains off; virtual pad
   stays closed while Gary uses his controller.
+
+
+## 2026-10-27 — embedded native download acceptance and launch fixes
+
+- Fixed native-title platform incompatibilities: kernel-device entropy,
+  descriptor clone fallback in isolated Rust std, console DNS bridge, portable
+  AWS-LC crypto (PS5 code pages are execute-only), and Playden volume-space query.
+- Backend commits: 330e76f (fd/std fingerprint), 4292d21 (DNS/crypto),
+  09ce01a (host capacity). Playden commits: 4fed1ef, a1bf8a2.
+- A Game About Digging A Hole (9NGLST31DG26) downloaded directly **inside Playden**,
+  without a Mac transfer or separate downloader title. Native job started 10:56:04Z,
+  reached 15% at 10:56:21Z, and completed 10:57:41Z. This is download acceptance;
+  no throughput number was captured and launch acceptance is separate.
+- Automatic preparation initially ran out of allocation space reading complete
+  Xbox DLLs into multiple vectors. 16e9a63 streams/validates them in 16 KiB chunks,
+  uses managed temporary files, verifies before atomic replacement and retains
+  the Wine builtin-marker correction. Resume finished setup at 11:03:32Z.
+- Play button handed off successfully to new title FAKE78001; game displayed
+  CreateProcess returned 32 from its Unreal bootstrap. Native Win64 detection
+  missed Xbox's WinGDK layout. Fix and stopped-title migration are being tested.
+- Full suite caught an uninstall snapshot race; 2801e6c removes the deleted game
+  from the prepared snapshot before publishing cleaned. No user games were
+  deleted during this work. The old bulk deletion request remains revoked.
+- PS5 DevTools is currently running (port 9113), capturing crash stacks. Stop
+  with its `quit` command, never kill it. Remote Play remains off. Virtual pad
+  must be closed after testing; repeated open/close while Playden stays running
+  did not reliably restore its input, so a single test session is being used.
+- Main remaining acceptance: successful game launch/gameplay, fresh sign-in UX,
+  package selection, and home-screen icon0/pic0 from Xbox artwork. Current title
+  still received the generic icon, despite its catalogue cover being available.
