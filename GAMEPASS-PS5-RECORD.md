@@ -447,3 +447,21 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   app should own sign-in, catalogue, download/progress/cancel, compatibility setup
   and title registration; Playden need not be a runtime launcher dependency.
   No standalone app extraction or upstream PR has been performed yet.
+
+## 2026-10-27 — native downloader deployed; manual uninstall fixes
+
+- Native Xbox engine is now compiled into Playden and deployed; it boots. Native
+  download/launch acceptance and actual PS5 speed measurements remain outstanding.
+- Playden 8457593 added Xbox uninstall: remove runtime title first, then durable
+  manifest removal and managed content deletion, preserving saves.
+- Gary stopped the bulk deletion request and will delete games himself. Do not
+  resume it. Only the old imported Minishoot entry/title FAKE78002 was removed;
+  its source files remain. No further game deletion is authorized as bulk cleanup.
+- Gary reported startup restoring titles and Uninstall saying “Game is not
+  installed”. Playden ba8bb8c fixes Xbox manifest locations being excluded from
+  the installed check, retains Xbox Uninstall rather than local-import removal,
+  and queues title preparation only for new native download completions rather
+  than every startup inventory. Existing games use explicit Setup/Play.
+- Questions and status requests do not stop ongoing authorized work. This is
+  also saved in Gary's global AGENTS.md. Remote Play remains off; virtual pad
+  stays closed while Gary uses his controller.
