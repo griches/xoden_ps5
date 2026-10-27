@@ -9,8 +9,11 @@ test evidence; this page tracks outstanding functionality.
   licensing and game authorisation. The PS5 performs the original browser
   broker exchange through a paired local computer page and saves one session;
   library loading follows automatically. The separate phone/computer choice
-  has been removed. Live browser approval reaches Xbox verification, which
-  still needs acceptance; in-game authentication remains unverified.
+  has been removed. Fresh approval, Xbox identity verification, session save
+  and automatic library refresh passed on the PS5 at 23:33Z. A private inactive
+  approval cache avoids repeating browser login after failed verification.
+  In-game authentication remains unverified; Call of the Elder Gods is running
+  for Gary's acceptance check.
 - [ ] Verify sign-in persistence, expiry, account changes and game runtime end
   to end. Earlier device-code login proved library, subscription and PC licence
   access but not MIO's game grant. It is not the user-facing sign-in route.
@@ -43,6 +46,8 @@ test evidence; this page tracks outstanding functionality.
 - Generated icon0/pic0 artwork and bounded owned-title disk-cache updates.
 - Game Pass startup/settings no longer restore or display the Steam account.
 - Controller reconnection after virtual-pad handover.
+- Unified Microsoft browser approval, verified session persistence and automatic
+  Xbox library loading accepted on the actual PS5.
 - Native account reset retains installed games, saves and registered device identity.
 - Phone sign-in QR display and safe cancellation accepted on the actual PS5.
 - Normal game exit returns to PS5 Home; MIO's in-game 3840x2160 option verified.
