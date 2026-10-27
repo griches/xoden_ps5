@@ -40,6 +40,7 @@ int main() {
     // Orphan partials remain manageable even after a newer job finishes.
     Put(store,"prepared-games.json","{\"schema\":1,\"games\":[]}");
     const auto partial = root/"games/xbox-9np1p1wfs0lb";
+    const auto quarantine = root/"games/.delete-xbox-9np1p1wfs0lb";
     std::filesystem::create_directories(partial/"nested");
     Storage partial_store(partial.string());
     Put(partial_store,".nexus-streaming-v1.jsonl","resume");
@@ -62,7 +63,8 @@ int main() {
         stores::xbox::Jobs cleanup(config); Wait(cleanup,"idle");
         assert(cleanup.Discard(GameId::Xbox("9NP1P1WFS0LB"))); Wait(cleanup,"failed");
         assert(std::filesystem::exists(root/"keep.txt"));
-        assert(std::filesystem::exists(partial/".nexus-streaming-v1.jsonl"));
+        assert(std::filesystem::exists(quarantine/".nexus-streaming-v1.jsonl"));
+        assert(!std::filesystem::exists(partial));
     }
     // Prepared and corrupt manifests both prevent cleanup admission.
     Put(store,"prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9NP1P1WFS0LB\",\"folder\":\"xbox-9np1p1wfs0lb\"}]}");
@@ -77,7 +79,23 @@ int main() {
         assert(cleanup.Snapshot()->partials.empty());
         assert(!cleanup.Discard(GameId::Xbox("9NP1P1WFS0LB")));
     }
-    std::filesystem::remove(partial/"link");
+    std::filesystem::remove(quarantine/"link");
+    // Simulate a crash after the final content/marker deletion. The empty
+    // quarantine is sufficient to resume; a new install must not race it.
+    std::filesystem::remove(quarantine/".nexus-streaming-v1.jsonl");
+    Put(store,"prepared-games.json",R"({"schema":1,"games":[]})");
+    {
+        stores::xbox::Jobs cleanup(config); Wait(cleanup,"idle");
+        assert(cleanup.Snapshot()->partials.size() == 1);
+        assert(cleanup.Install(GameId::Xbox("9NP1P1WFS0LB"),std::string(64,'a'),"GB")); Wait(cleanup,"failed");
+        cleanup.Shutdown();
+    }
+    {
+        stores::xbox::Jobs cleanup(config); Wait(cleanup,"idle");
+        assert(cleanup.Discard(GameId::Xbox("9NP1P1WFS0LB"))); Wait(cleanup,"cleaned");
+        assert(!std::filesystem::exists(quarantine));
+    }
+    std::filesystem::create_directories(partial);
     std::filesystem::remove(root/"prepared-games.json");
     Put(store,"job-request.json",R"({"schema":1,"requestId":"11111111-1111-1111-1111-111111111111","operation":"install","productId":"9NP1P1WFS0LB"})");
     Put(store,"job-result.json",R"({"schema":1,"requestId":"11111111-1111-1111-1111-111111111111","productId":"9NP1P1WFS0LB","status":"downloading"})");

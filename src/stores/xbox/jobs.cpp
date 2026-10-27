@@ -100,7 +100,7 @@ std::vector<GameId> PartialGames(Storage& storage, const std::string& root) {
             Text(*request,"requestId") != Text(*result,"requestId") ||
             Text(*request,"productId") != Text(*result,"productId")) return {};
         const auto phase = Text(*result,"status");
-        if (phase != "downloading" && phase != "failed") return {};
+        if (phase != "downloading" && phase != "failed" && phase != "cancelled") return {};
         const auto game = GameId::Xbox(Text(*request,"productId"));
         if (!game.valid()) return {};
         first_download = game;
@@ -112,15 +112,18 @@ std::vector<GameId> PartialGames(Storage& storage, const std::string& root) {
     std::vector<GameId> games;
     while (const auto* entry = readdir(listing)) {
         const std::string name = entry->d_name;
-        const auto game = ParseInstallId(name);
-        if (!game || game->store != Store::kXbox || ToInstallId(*game) != name || prepared.count(*game) ||
+        const bool deleting = name.rfind(".delete-xbox-",0) == 0;
+        const auto game = ParseInstallId(deleting ? name.substr(8) : name);
+        if (!game || game->store != Store::kXbox || ToInstallId(*game) != (deleting ? name.substr(8) : name) || prepared.count(*game) ||
             (first_download && *first_download != *game)) continue;
         auto child = parent->OpenChild(name,platform::DirectoryPolicy::kApprovedTree);
         struct stat marker{};
-        if (child && ((child->InspectChild(".nexus-streaming-v1.jsonl", &marker) && S_ISREG(marker.st_mode)) ||
+        if (child && (deleting || (child->InspectChild(".nexus-streaming-v1.jsonl", &marker) && S_ISREG(marker.st_mode)) ||
                       (child->InspectChild(".xodus-streaming-tmp.msixvc", &marker) && S_ISREG(marker.st_mode)))) games.push_back(*game);
     }
     closedir(listing);
+    std::sort(games.begin(),games.end());
+    games.erase(std::unique(games.begin(),games.end()),games.end());
     return games;
 }
 }  // namespace
@@ -158,8 +161,25 @@ void Jobs::ExecuteDiscard(GameId game) {
         Publish("failed","This download can no longer be safely removed."); return;
     }
     auto parent = platform::ManagedDirectory::Open(config_.games_root,platform::DirectoryPolicy::kApprovedTree);
-    auto child = parent ? parent->OpenChild(ToInstallId(game),platform::DirectoryPolicy::kApprovedTree) : std::nullopt;
-    if (!child || !RemovePartial(*child) || !parent->RemoveEmptyDirectory(ToInstallId(game)) || !parent->Sync()) {
+    if (!parent) { Publish("failed","The download folder could not be opened."); return; }
+    const auto folder = ToInstallId(game);
+    const auto quarantine = ".delete-" + folder;
+    auto child = parent->OpenChild(quarantine,platform::DirectoryPolicy::kApprovedTree);
+    if (child) {
+        struct stat current{};
+        if (parent->InspectChild(folder,&current) || errno != ENOENT) {
+            Publish("failed","Both a new download and an unfinished deletion exist. Files were kept."); return;
+        }
+    }
+    if (!child) {
+        if (errno != ENOENT || !parent->RenameChild(folder,*parent,quarantine,false) || !parent->Sync()) {
+            Publish("failed","The partial download could not be set aside for deletion."); return;
+        }
+        child = parent->OpenChild(quarantine,platform::DirectoryPolicy::kApprovedTree);
+    }
+    // The canonical quarantine name persists even after the last resume marker
+    // has gone. A restart can retry cleanup without ever touching a new install.
+    if (!child || !RemovePartial(*child)) {
         Publish("failed","Some download files could not be deleted. Try again."); return;
     }
     const auto request = Read(storage_,"job-request.json",4096);
@@ -175,6 +195,9 @@ void Jobs::ExecuteDiscard(GameId game) {
                 Publish("failed","Download files deleted, but the cancellation status could not be saved."); return;
             }
         }
+    }
+    if (!parent->RemoveEmptyDirectory(quarantine) || !parent->Sync()) {
+        Publish("failed","Download files deleted; retry to finish the folder cleanup."); return;
     }
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -219,6 +242,11 @@ void Jobs::Load() {
 }
 void Jobs::Execute(const Request& request) {
     auto identity = config_.hold_effective_uid ? config_.hold_effective_uid() : std::shared_ptr<void>{};
+    struct stat pending{};
+    const auto quarantine = config_.games_root + "/.delete-" + ToInstallId(request.game);
+    if (lstat(quarantine.c_str(),&pending) == 0 || errno != ENOENT) {
+        Publish("failed","Finish deleting this game's partial download before installing it again."); return;
+    }
     Publish("starting", "Starting the Xbox download service");
     const auto id = RandomUuid();
     if (!id) { Publish("failed","A download request could not be created."); return; }

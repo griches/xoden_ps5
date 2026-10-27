@@ -125,3 +125,35 @@ size/crop/encode them to the existing title publisher's required formats. This
 requirement applies to our current Playden branch and any later standalone app.
 Implementation and console verification remain outstanding; Gary requested that
 it be recorded while download/cleanup work continues.
+
+## Deployment incident and cleanup recovery follow-up
+
+The 2026-10-27 deployment attempt lost contact during the UID helper raw backup
+read. FTP, ELF loader, status and DevLoop endpoints subsequently stopped
+responding, and Gary reported a crashed console. The traceback is in
+`/tmp/playden-xbox-cleanup-deploy.log`; the requested backup directory was never
+created. Source control flow puts all package replacement after the backup scan,
+so the failed attempt did not reach that replacement loop. Directory creation or
+mode checks preceded it. Root cause is unknown; the backup helper is the last
+observed operation, not a proven cause. Do not retry payload deployment or run
+native probes until the incident has been investigated. Console operations were
+stopped; local development continues.
+
+Cleanup recovery now renames an admitted partial to `.delete-xbox-<product>` and
+syncs the parent before deleting its contents. This canonical quarantine remains
+discoverable after the last marker is removed. Cancellation state is persisted
+before removing the empty quarantine. New installs refuse a pending deletion;
+cleanup refuses a collision with a new canonical download. Prepared-game and
+manifest-validation guards remain in place. A restart fixture covers retrying
+an empty quarantine after interruption.
+
+Recovery follow-up: Gary rebooted the console. Read-only probes found FTP2121
+and ELF loader9021 responding; helpers9111/9112 were absent after reboot. FTP
+listing shows the existing eboot (31,382,124 listed bytes, Oct 27 06:27), with no
+staged/old eboot beside it. Last uidcp command was the first raw eboot backup read;
+no uidcp log or deploy-raw file was listed after reboot. No new payload or launch
+command was sent during these checks. File content/version is not yet verified.
+
+Recovery change validation: 151/151 host tests pass in 135.18 s; native PS5 build
+passes. Logs: `/tmp/playden-cleanup-recovery-tests.log` and
+`/tmp/playden-cleanup-recovery-ps5.log`. These changes have not been deployed.
