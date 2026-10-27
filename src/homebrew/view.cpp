@@ -2813,9 +2813,18 @@ class Render::Impl
         const gfx::Rect hero{0.0F, 0.0F, kWidth, 620.0F};
         const bool live_art = !state.simulation_mode && live_artwork_ &&
             (id.store == Store::kXbox || !state.account().id.empty()) && id.valid();
+        std::uint32_t hero_width=0, hero_height=0;
         const std::uint32_t hero_texture = state.simulation_mode ? hero_ :
-            live_art && game ? store_texture(id, HeroUrl(*game)) : 0;
-        if (hero_texture != 0)
+            live_art && game ? store_texture(id, HeroUrl(*game),&hero_width,&hero_height) : 0;
+        if (hero_texture != 0 && id.store == Store::kXbox && hero_width && hero_height) {
+            // A Microsoft catalogue poster keeps its proportions. Present it
+            // on the right over the game's colour, leaving a clear title area.
+            scene_.gradient_rect(hero,0.0F,id_color(id),kBackground);
+            const float height=hero.h-40.0F;
+            const float width=height*static_cast<float>(hero_width)/hero_height;
+            const gfx::Rect poster{kWidth-width-160.0F,20.0F,width,height};
+            scene_.image(hero_texture,poster,gfx::kFullUv,kText,12.0F);
+        } else if (hero_texture != 0)
             scene_.image(hero_texture, hero, gfx::kFullUv, kText);
         else
             scene_.gradient_rect(hero, 0.0F, id_color(id), kBackground);

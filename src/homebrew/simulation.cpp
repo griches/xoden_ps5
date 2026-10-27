@@ -4847,7 +4847,7 @@ void Simulation::rebuild_view() {
                             : enabled ? "runtime-play" : "");
                         play.value = value.awaiting_registration ? "Quits to Home"
                             : !value.play_status.empty() ? value.play_status
-                            : prepares_first ? (kit_update ? "Kit update first" : value.status == "Needs repair" ? "Repairs first" : "Sets up first")
+                            : prepares_first ? (kit_update ? (state_.gamepass_only ? "Updates setup first" : "Kit update first") : value.status == "Needs repair" ? "Repairs first" : "Sets up first")
                             : value.status == "Preparing" ? value.detail
                             : value.status == "Checking" || value.status == "Removing" || value.status == "Unavailable" ? value.status
                             : std::string{};
@@ -5014,7 +5014,7 @@ void Simulation::rebuild_view() {
                 }
             }
             auto& setup = row("details-setup", RowKind::Status, "Setup", "");
-            setup.value = waiting ? "Waiting for the PS5" : kit_update ? "Kit update available"
+            setup.value = waiting ? "Waiting for the PS5" : kit_update ? (state_.gamepass_only ? "Setup update available" : "Kit update available")
                 : status == "Not prepared" ? "Not set up" : status == "Needs recovery" ? "Interrupted"
                 : status == "Registration pending" ? "Not confirmed" : status == "Removal incomplete" ? "Removing"
                 : status == "Preparing" && runtime && !runtime->detail.empty() ? runtime->detail : status;
