@@ -18,3 +18,6 @@ console-subscriber = "0.5"
 
 [patch.crates-io]
 ntfs = { git = "https://github.com/xodus-gaming/ntfs.git" }
+
+[patch."https://github.com/xodus-gaming/xal-rs"]
+xal = { path = "third_party/xal-rs" }

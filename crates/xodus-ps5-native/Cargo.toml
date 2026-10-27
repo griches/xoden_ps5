@@ -10,3 +10,8 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 msixvc = { path = "../msixvc" }
 msixvc-common = { path = "../msixvc-common" }
+
+xodus-cli = { path = "../xodus-cli", default-features = false, optional = true }
+
+[features]
+job-engine = ["dep:xodus-cli"]

@@ -155,7 +155,7 @@ impl State {
     }
 }
 
-pub(super) async fn report(mut events: mpsc::Receiver<ProgressEvent>) {
+pub(super) async fn report(mut events: mpsc::Receiver<ProgressEvent>, observer: Option<crate::job_observer::Observer>) {
     let mut state = State {
         phase: "initializing",
         ..Default::default()
@@ -163,7 +163,7 @@ pub(super) async fn report(mut events: mpsc::Receiver<ProgressEvent>) {
     let mut sequence = 0;
     let mut last = Instant::now();
     let mut previous = 0;
-    emit(&state, sequence, 0);
+    emit(&state, sequence, 0, observer.as_deref());
     while let Some(event) = events.recv().await {
         let transition = state.apply(event);
         let elapsed = last.elapsed();
@@ -175,7 +175,7 @@ pub(super) async fn report(mut events: mpsc::Receiver<ProgressEvent>) {
                     as u64
             };
             sequence += 1;
-            emit(&state, sequence, rate);
+            emit(&state, sequence, rate, observer.as_deref());
             last = Instant::now();
             previous = state.completed;
         }
@@ -185,7 +185,14 @@ pub(super) async fn report(mut events: mpsc::Receiver<ProgressEvent>) {
     }
 }
 
-fn emit(state: &State, sequence: u64, rate: u64) {
+fn emit(state: &State, sequence: u64, rate: u64, observer: Option<&dyn crate::job_observer::JobObserver>) {
+    if let Some(observer) = observer {
+        observer.progress(crate::job_observer::DownloadProgress {
+            sequence, phase: state.phase, paused: state.paused,
+            completed_bytes: state.completed, total_bytes: state.total, bytes_per_second: rate,
+        });
+        return;
+    }
     #[cfg(windows)]
     crate::ps5_worker::progress(&state.record(sequence, rate));
     let stdout = std::io::stdout();
@@ -241,4 +248,32 @@ mod tests {
         assert_eq!(state.record(2, 0)["phase"], "failed");
         assert_eq!(state.completed, 30);
     }
+}
+
+#[cfg(test)]
+#[tokio::test]
+async fn embedded_observer_receives_bounded_progress_without_private_names() {
+    use crate::job_observer::{DownloadProgress, JobObserver};
+    use std::sync::{Arc, Mutex};
+    #[derive(Default)]
+    struct Capture(Mutex<Vec<DownloadProgress>>);
+    impl JobObserver for Capture {
+        fn progress(&self, progress: DownloadProgress) { self.0.lock().unwrap().push(progress); }
+    }
+    let capture = Arc::new(Capture::default());
+    let (tx, rx) = mpsc::channel(8);
+    tx.send(ProgressEvent::UpdateRemaining { name: "private-package-url".into(), total: 100 }).await.unwrap();
+    tx.send(ProgressEvent::Started { id: 1, name: "private-file-path".into(), total: 100 }).await.unwrap();
+    tx.send(ProgressEvent::Advanced { id: 1, delta: 40 }).await.unwrap();
+    tx.send(ProgressEvent::Paused { paused: true }).await.unwrap();
+    tx.send(ProgressEvent::Completed { success: false }).await.unwrap();
+    drop(tx);
+    report(rx,Some(capture.clone())).await;
+    let records = capture.0.lock().unwrap();
+    assert_eq!(records.first().unwrap().phase,"initializing");
+    assert_eq!(records.last().unwrap().phase,"failed");
+    assert_eq!(records.last().unwrap().completed_bytes,40);
+    assert_eq!(records.last().unwrap().total_bytes,Some(100));
+    assert!(records.iter().all(|record| !record.phase.contains("private")));
+    assert!(records.windows(2).all(|pair| pair[0].sequence < pair[1].sequence));
 }

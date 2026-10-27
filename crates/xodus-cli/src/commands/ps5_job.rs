@@ -9,7 +9,7 @@ const PLANS: &[&str] = &["CFQ7TTC0KGQ8", "CFQ7TTC0KHS0", "CFQ7TTC0P85B", "CFQ7TT
 const PC_PLANS: &[&str] = &["CFQ7TTC0KGQ8", "CFQ7TTC0KHS0"];
 type Result<T> = std::result::Result<T, &'static str>;
 
-struct Request { id: String, operation: String, market: String, account: Option<String>, product: Option<String>, content: Option<String> }
+struct Request { id: String, operation: String, market: String, account: Option<String>, product: Option<String>, content: Option<String>, observer: Option<crate::job_observer::Observer> }
 fn product_id(s: &str) -> bool { s.len() == 12 && s.bytes().all(|b| b.is_ascii_uppercase() || b.is_ascii_digit()) }
 fn hash(s: &str) -> bool { s.len() == 64 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) }
 fn parse(bytes: &[u8]) -> Result<Request> {
@@ -29,7 +29,7 @@ fn parse(bytes: &[u8]) -> Result<Request> {
         || content.as_deref().is_some_and(|s| uuid::Uuid::parse_str(s).map(|u| u.to_string()).ok().as_deref() != Some(s)) { return Err("request-identity"); }
     if operation == "install" && (account.is_none() || product.is_none()) { return Err("request-install-identity"); }
     if operation == "refresh" && (product.is_some() || content.is_some()) { return Err("request-refresh-fields"); }
-    Ok(Request { id: id.into(), operation: operation.into(), market: market.into(), account, product, content })
+    Ok(Request { id: id.into(), operation: operation.into(), market: market.into(), account, product, content, observer: None })
 }
 
 fn read(path: &Path, max: u64) -> Result<Vec<u8>> {
@@ -53,7 +53,9 @@ fn state(root: &Path, request: &Request, status: &str, detail: Value) -> Result<
     #[cfg(windows)]
     crate::ps5_worker::phase(status);
     publish(root, "job-result.json", &json!({"schema":1,"requestId":request.id,"operation":request.operation,
-        "productId":request.product,"status":status,"updatedAt":chrono::Utc::now().to_rfc3339(),"detail":detail}))
+        "productId":request.product,"status":status,"updatedAt":chrono::Utc::now().to_rfc3339(),"detail":detail}))?;
+    if let Some(observer) = &request.observer { observer.phase(status); }
+    Ok(())
 }
 
 // Apply the same provenance rules as Nexus, rejecting unresolved parents rather
@@ -222,7 +224,7 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
     let destination = games.join(&folder);
     std::fs::create_dir_all(&destination).map_err(|_| "download-directory")?;
     state(root, req, "downloading", json!({"contentId":content}))?;
-    if super::streaming::run(client,tokens,product.into(),destination.to_string_lossy().into(),false,None,Some(req.market.clone()),true,false,Some(content.clone())).await != ExitCode::SUCCESS { return Err("download-failed"); }
+    if super::streaming::run_observed(client,tokens,product.into(),destination.to_string_lossy().into(),false,None,Some(req.market.clone()),true,false,Some(content.clone()),req.observer.clone()).await != ExitCode::SUCCESS { return Err("download-failed"); }
     state(root, req, "preparing", json!({"contentId":content}))?;
     if super::prepare_ps5::run(client,tokens,destination.to_string_lossy().into(),Some(req.market.clone())).await != ExitCode::SUCCESS { return Err("preparation-failed"); }
     if tokens.get_user().map_err(|_| "account-changed")?.username != account { return Err("account-changed"); }
@@ -234,11 +236,16 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
 }
 
 pub async fn run(client: &reqwest::Client, tokens: &TokenManager, root: &Path, games: &Path) -> ExitCode {
+    run_observed(client,tokens,root,games,None).await
+}
+
+pub async fn run_observed(client: &reqwest::Client, tokens: &TokenManager, root: &Path, games: &Path, observer: Option<crate::job_observer::Observer>) -> ExitCode {
     // Native Playden provisions this private directory; never create a fallback
     // location or use a request-supplied path. Hold the lock through publication.
     let lock = match OpenOptions::new().create(true).truncate(false).write(true).open(root.join("job.lock")) { Ok(f) => f, Err(_) => return ExitCode::FAILURE };
     if lock.try_lock_exclusive().is_err() { return ExitCode::FAILURE; }
-    let request = match read(&root.join("job-request.json"),4096).and_then(|b|parse(&b)) { Ok(r) => r, Err(stage) => { eprintln!("PS5_JOB_ERROR {stage}"); return ExitCode::FAILURE; } };
+    let mut request = match read(&root.join("job-request.json"),4096).and_then(|b|parse(&b)) { Ok(r) => r, Err(stage) => { eprintln!("PS5_JOB_ERROR {stage}"); return ExitCode::FAILURE; } };
+    request.observer = observer;
     match execute(client,tokens,root,games,&request).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(stage) => { let _ = state(root,&request,"failed",json!({"code":stage})); eprintln!("PS5_JOB_ERROR {stage}"); ExitCode::FAILURE }
@@ -289,4 +296,27 @@ mod tests {
             br#"<!DOCTYPE Game><Game><ExecutableList><Executable Name="Game.exe"/></ExecutableList></Game>"#,
             br#"<Game><Unexpected><Executable Name="Game.exe"/></Unexpected></Game>"#] { assert!(declared_program(xml).is_err()); }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn embedded_phase_is_emitted_only_after_durable_publication() {
+    use crate::job_observer::JobObserver;
+    use std::sync::{Arc, Mutex};
+    struct Capture { root: std::path::PathBuf, phases: Mutex<Vec<String>> }
+    impl JobObserver for Capture {
+        fn phase(&self, phase: &str) {
+            let record: Value = serde_json::from_slice(&std::fs::read(self.root.join("job-result.json")).unwrap()).unwrap();
+            assert_eq!(record["status"],phase);
+            self.phases.lock().unwrap().push(phase.into());
+        }
+    }
+    let root = tempfile::tempdir().unwrap();
+    let capture = Arc::new(Capture { root: root.path().into(), phases: Mutex::new(Vec::new()) });
+    let mut request = parse(br#"{"schema":1,"requestId":"11111111-1111-1111-1111-111111111111","operation":"refresh","market":"GB"}"#).unwrap();
+    request.observer = Some(capture.clone());
+    state(root.path(),&request,"refreshing",json!({"private":"not part of callback"})).unwrap();
+    assert_eq!(*capture.phases.lock().unwrap(),vec!["refreshing"]);
+    assert!(state(&root.path().join("missing"),&request,"complete",json!({})).is_err());
+    assert_eq!(capture.phases.lock().unwrap().len(),1);
 }

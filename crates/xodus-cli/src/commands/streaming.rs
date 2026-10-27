@@ -82,6 +82,23 @@ pub async fn run(
     control_stdin: bool,
     selected_content_id: Option<String>,
 ) -> ExitCode {
+    run_observed(client,tokens,source,destination,try_skip_ntfs,parallel,market,
+        progress_json,control_stdin,selected_content_id,None).await
+}
+
+pub async fn run_observed(
+    client: &reqwest::Client,
+    tokens: &TokenManager,
+    source: String,
+    destination: String,
+    try_skip_ntfs: bool,
+    parallel: Option<usize>,
+    market: Option<String>,
+    progress_json: bool,
+    control_stdin: bool,
+    selected_content_id: Option<String>,
+    observer: Option<crate::job_observer::Observer>,
+) -> ExitCode {
     if selected_content_id.is_some() && (Uuid::try_parse(&source).is_ok() || source.contains("://")) {
         eprintln!("Package selection requires a Store product ID");
         return ExitCode::FAILURE;
@@ -118,6 +135,7 @@ pub async fn run(
             rx,
             progress_json,
             pause,
+            observer,
         )
         .await;
     } else {
@@ -206,6 +224,7 @@ pub async fn run(
             rx,
             progress_json,
             pause,
+            observer,
         )
         .await;
     }
@@ -225,13 +244,14 @@ async fn run_cli_reader<Reader>(
     mut rx: Receiver<ProgressEvent>,
     progress_json: bool,
     pause: tokio::sync::watch::Receiver<bool>,
+    observer: Option<crate::job_observer::Observer>,
 ) -> ExitCode
 where
     Reader: AsyncRead + Unpin,
 {
     let reporter = tokio::spawn(async move {
-        if progress_json {
-            progress::report(rx).await;
+        if progress_json || observer.is_some() {
+            progress::report(rx, observer).await;
             return;
         }
         let multi_progress = MultiProgress::new();

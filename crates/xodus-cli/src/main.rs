@@ -1,3 +1,4 @@
+mod job_observer;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};

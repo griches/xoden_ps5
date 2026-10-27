@@ -62,3 +62,20 @@ account refresh, package extraction, bounded progress, cooperative cancellation,
 and native Playden job integration remain unfinished. Keep using the existing
 worker until those requirements have been implemented and tested; do not claim
 this probe is a working native downloader.
+
+## Embedded engine checkpoint
+
+The optional `job-engine` feature now embeds the existing CLI job modules as a
+library, without CLI startup, GUI creation or signal handlers. The host supplies
+the client, token manager and private roots. Subscription and entitlement checks
+remain in the shared job runner. Typed progress callbacks omit paths, URLs and
+credentials; phase callbacks follow successful durable job-result publication.
+The default C interface remains header-only; no C job lifecycle is exposed yet.
+
+Verification: 73 shared-library tests pass. The CLI suite passes 125 tests with
+one existing case-sensitive-path test failing on this Mac; that same test also
+fails in a detached worktree at the previous commit (`c72ef04`). The optional
+engine cross-compiles for the adapted PS5 target, but has not been linked into
+Playden or executed on the console. A locally vendored, pinned XAL dependency
+uses Rustls on FreeBSD to avoid requiring OpenSSL; other targets retain their
+previous TLS selection. See `third_party/xal-rs/PS5-PATCH.md`.

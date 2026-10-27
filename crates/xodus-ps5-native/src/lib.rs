@@ -1,5 +1,10 @@
 //! Bounded C interface for the native Playden Xbox downloader.
 //! This first boundary inspects a package header only; it performs no IO.
+// The engine is opt-in while its PS5 IO/network/runtime adapters are audited.
+// Reuse the same account/entitlement logic as the proven worker.
+#[cfg(feature = "job-engine")]
+pub use xodus_cli::{Client, TokenManager, init_file_secrets, run_playden_job, run_playden_job_observed, DownloadProgress, JobObserver, Observer};
+
 use msixvc::models::xvd::XvdHeader;
 use msixvc_common::parse::BinaryTryParse;
 
