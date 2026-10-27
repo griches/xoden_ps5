@@ -215,7 +215,19 @@ bool Jobs::TestPhoneSignIn(GameId game, std::string market) {
     next->active=true; next->active_game={}; next->phone_test=true; next->cancelling=false;
     next->sign_in_code.clear();next->sign_in_url.clear();next->phase="checking-sign-in";
     next->message="Preparing phone sign-in without changing your current account…";
-    state_=std::move(next);busy_=true;pending_=Request{game,{},std::move(market),false,false,{},false,true};wake_.notify_one();return true;
+    std::string content;
+    for(const auto& prepared:state_->prepared) if(prepared.game==game) content=prepared.content_id;
+    state_=std::move(next);busy_=true;pending_=Request{game,{},std::move(market),false,false,std::move(content),false,true};wake_.notify_one();return true;
+}
+bool Jobs::SignOut(std::string market) {
+    if (market.size()!=2 || !std::all_of(market.begin(),market.end(),[](char c){return c>='A'&&c<='Z';})) return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!config_.native_run || stopping_ || busy_ || state_->phase=="loading") return false;
+    cancel_requested_=pause_requested_=false;
+    auto next=std::make_shared<JobSnapshot>(*state_);++next->revision;
+    next->active=true;next->active_game={};next->phone_test=false;next->sign_in_code.clear();next->sign_in_url.clear();
+    next->phase="signing-out";next->message="Clearing the saved account…";state_=std::move(next);
+    busy_=true;pending_=Request{{},{},std::move(market),false,false,{},false,false,true};wake_.notify_one();return true;
 }
 bool Jobs::Pause(GameId game) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -345,11 +357,11 @@ void Jobs::Load() {
             bool valid = true;
             for (const auto& row : rows->array()) {
                 const auto game = GameId::Xbox(Text(row,"productId")); const auto account = Text(row,"accountKey");
-                const auto program = Text(row,"executable"); const auto folder = Text(row,"folder");
+                const auto program = Text(row,"executable"); const auto folder = Text(row,"folder");const auto content=Text(row,"contentId");
                 if (!game.valid() || !Hash(account) || !Program(program) || folder != ToInstallId(game) || !seen.insert(game).second) { valid = false; break; }
                 const auto root = config_.games_root + "/" + folder;
                 struct stat st{};
-                if (lstat(root.c_str(),&st) == 0 && S_ISDIR(st.st_mode)) next->prepared.push_back({game,account,program,root});
+                if (lstat(root.c_str(),&st) == 0 && S_ISDIR(st.st_mode)) next->prepared.push_back({game,account,program,root,ContentId(content)?content:std::string{}});
             }
             if (!valid) { next->prepared.clear(); next->message = "Xbox's prepared-game list could not be read."; }
         }
@@ -378,6 +390,9 @@ void Jobs::Load() {
                     code=="phone-pc-license"?"Phone sign-in did not obtain this game's PC license. Your current account is unchanged.":
                     "Phone sign-in did not finish. Your current account is unchanged; try again.";
             }
+        } else if (phase=="signed-out" && Text(*request,"operation")=="signout") {
+            next->active_game={};next->request_id=Text(*request,"requestId");next->phase="signed-out";
+            next->message="Signed out. The saved account and cached library were cleared. Installed games and saves are kept.";
         } else if (phase == "failed") {
             next->phase = "failed"; next->message = "The Xbox download did not finish. Resume to retry; downloaded files were kept.";
             const auto* detail = result->Find("detail");
@@ -425,11 +440,17 @@ void Jobs::Load() {
 }
 void Jobs::Execute(const Request& request) {
     auto identity = config_.hold_effective_uid ? config_.hold_effective_uid() : std::shared_ptr<void>{};
+    if (request.signout) {
+        const auto id=RandomUuid();if(!id){Publish("failed","A sign-out request could not be created.");return;}
+        const auto text="{\"schema\":1,\"requestId\":\""+*id+"\",\"operation\":\"signout\",\"market\":\""+request.market+"\"}";
+        if(!storage_.WriteAtomicPrivate("job-request.json",Bytes(text.begin(),text.end())).ok()){Publish("failed","The sign-out request could not be saved.");return;}
+        ExecuteNative({},*id);return;
+    }
     if (request.phone_test) {
         const auto id=RandomUuid();
         if (!id) {Publish("failed","A phone sign-in request could not be created.");return;}
         const auto text="{\"schema\":1,\"requestId\":\""+*id+"\",\"operation\":\"signin-test\",\"market\":\""+request.market+
-            "\",\"productId\":\""+request.game.value+"\"}";
+            "\",\"productId\":\""+request.game.value+"\""+(request.content.empty()?"":",\"contentId\":\""+request.content+"\"")+"}";
         if (!storage_.WriteAtomicPrivate("job-request.json",Bytes(text.begin(),text.end())).ok()) {
             Publish("failed","The phone sign-in request could not be saved.");return;
         }

@@ -36,6 +36,7 @@ std::string Message(const std::string& phase) {
     if (phase == "refreshing") return "Refreshing Xbox library…";
     if (phase == "checking-account") return "Checking Xbox access…";
     if (phase == "checking-sign-in") return "Preparing phone sign-in…";
+    if (phase == "signing-out") return "Clearing the saved account…";
     if (phase == "sign-in-code") return "Enter the code on your phone to sign in.";
     if (phase == "checking-game-access") return "Checking phone sign-in and PC game access…";
     if (phase == "resolving") return "Finding the PC download…";
