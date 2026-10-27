@@ -258,5 +258,62 @@ int main() {
         assert(snapshot->choice_game == GameId::Xbox("9N5PKH0KW2L1"));
         assert(snapshot->choices.size() == 1 && snapshot->choices[0].download_bytes == 1234);
     }
+    // Phone sign-in is an account operation, never a download. Only a code
+    // bound to this request and Microsoft's verification page can reach UI.
+    std::filesystem::remove(root/"job-request.json");std::filesystem::remove(root/"job-result.json");
+    std::atomic<int> phone_stage{0};std::atomic<bool> phone_finish{false};
+    auto phone_config=config;
+    phone_config.native_run=[&](const auto& report,const auto&) {
+        const auto bytes=store.Read("job-request.json");assert(bytes.ok());
+        const auto request=steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));assert(request);
+        assert(request->Find("operation")->text()=="signin-test" && !request->Find("accountKey"));
+        const auto id=request->Find("requestId")->text();
+        const auto code=[&](const std::string& uri) {Put(store,"job-result.json","{\"schema\":1,\"requestId\":\""+id+
+            "\",\"operation\":\"signin-test\",\"status\":\"sign-in-code\",\"detail\":{\"userCode\":\"TEST-CODE\",\"verificationUri\":\""+uri+"\"}}");};
+        code("https://foreign.invalid/link");report(stores::xbox::NativeProgress{"sign-in-code","Waiting for phone"});
+        phone_stage=1;while(phone_stage<2)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        code("https://www.microsoft.com/link");report(stores::xbox::NativeProgress{"sign-in-code","Waiting for phone"});
+        phone_stage=3;while(!phone_finish)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Put(store,"job-result.json","{\"schema\":1,\"requestId\":\""+id+
+            "\",\"operation\":\"signin-test\",\"status\":\"phone-sign-in-verified\",\"detail\":{\"pcLicenseVerified\":true,\"runtimeVerified\":false,\"activeAccountReplaced\":false}}");
+        return stores::xbox::NativeResult::Complete;
+    };
+    {
+        stores::xbox::Jobs phone(phone_config);Wait(phone,"idle");
+        const auto prepared=phone.Snapshot()->prepared.size();
+        assert(!phone.TestPhoneSignIn(GameId::Steam(42),"GB"));
+        assert(phone.TestPhoneSignIn(GameId::Xbox("9N5PKH0KW2L1"),"GB"));
+        while(phone_stage<1)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(phone.Snapshot()->sign_in_code.empty() && phone.Snapshot()->sign_in_url.empty());
+        phone_stage=2;while(phone_stage<3)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        const auto code=phone.Snapshot();
+        assert(code->sign_in_code=="TEST-CODE" && code->sign_in_url=="https://www.microsoft.com/link");
+        assert(code->active && code->phone_test && !code->active_game.valid());
+        phone_finish=true;Wait(phone,"phone-sign-in-verified");
+        const auto verified=phone.Snapshot();
+        assert(!verified->active && !verified->completed_game.valid() && verified->sign_in_code.empty());
+        assert(verified->prepared.size()==prepared);
+    }
+    // Cancelling drains the native runner, clears the code immediately, and
+    // never calls the partial-download cleanup path.
+    std::atomic<bool> phone_cancel_seen{false},phone_drain{false};
+    phone_config.native_run=[&](const auto& report,const auto& cancelled) {
+        report(stores::xbox::NativeProgress{"checking-sign-in","Preparing phone"});
+        while(!cancelled())std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        phone_cancel_seen=true;while(!phone_drain)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        const auto bytes=store.Read("job-request.json");assert(bytes.ok());
+        const auto request=steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));assert(request);
+        Put(store,"job-result.json","{\"schema\":1,\"requestId\":\""+request->Find("requestId")->text()+"\",\"operation\":\"signin-test\",\"status\":\"cancelled\"}");
+        return stores::xbox::NativeResult::Cancelled;
+    };
+    {
+        stores::xbox::Jobs phone(phone_config);Wait(phone,"phone-sign-in-verified");
+        assert(phone.TestPhoneSignIn(GameId::Xbox("9N5PKH0KW2L1"),"GB"));
+        Wait(phone,"checking-sign-in");assert(phone.Cancel({}));
+        while(!phone_cancel_seen)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(phone.Snapshot()->active && phone.Snapshot()->sign_in_code.empty());
+        phone_drain=true;Wait(phone,"cancelled");
+        assert(phone.Snapshot()->message.find("Phone sign-in cancelled")!=std::string::npos);
+    }
     std::filesystem::remove_all(root);
 }

@@ -177,6 +177,7 @@ bool Jobs::Install(GameId game, std::string account_key, std::string market, std
     if (config_.native_run) {
         auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
         next->choices.clear(); next->choice_game = {};
+        next->phone_test=false;next->sign_in_code.clear();next->sign_in_url.clear();
         next->active = true; next->cancelling = false; next->active_game = game;
         next->done_bytes = next->total_bytes = next->bytes_per_second = 0;
         next->phase = "starting"; next->message = "Starting Xbox download…"; state_ = std::move(next);
@@ -189,6 +190,7 @@ bool Jobs::Refresh(std::string market) {
     if (!config_.native_run || stopping_ || busy_ || state_->phase == "loading") return false;
     cancel_requested_ = pause_requested_ = false;
     auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
+    next->phone_test=false;next->sign_in_code.clear();next->sign_in_url.clear();
     next->active = true; next->active_game = {}; next->phase = "refreshing";
     next->message = "Checking Xbox account and refreshing library…"; state_ = std::move(next);
     busy_ = true; pending_ = Request{{},{},std::move(market),false,false,{},true}; wake_.notify_one(); return true;
@@ -198,8 +200,22 @@ bool Jobs::Cancel(GameId game) {
     if (!config_.native_run || !busy_ || !state_->active || state_->active_game != game || cancel_requested_ || pause_requested_) return false;
     cancel_requested_ = true;
     auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
-    next->cancelling = true; next->phase = "stopping"; next->message = "Stopping download before deleting files…";
+    next->cancelling = true; next->phase = "stopping";
+    next->sign_in_code.clear(); next->sign_in_url.clear();
+    next->message = next->phone_test ? "Cancelling phone sign-in…" : "Stopping download before deleting files…";
     state_ = std::move(next); return true;
+}
+bool Jobs::TestPhoneSignIn(GameId game, std::string market) {
+    if (!game.valid() || game.store != Store::kXbox || market.size()!=2 ||
+        !std::all_of(market.begin(),market.end(),[](char c) {return c>='A' && c<='Z';})) return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!config_.native_run || stopping_ || busy_ || state_->phase == "loading") return false;
+    cancel_requested_ = pause_requested_ = false;
+    auto next=std::make_shared<JobSnapshot>(*state_); ++next->revision;
+    next->active=true; next->active_game={}; next->phone_test=true; next->cancelling=false;
+    next->sign_in_code.clear();next->sign_in_url.clear();next->phase="checking-sign-in";
+    next->message="Preparing phone sign-in without changing your current account…";
+    state_=std::move(next);busy_=true;pending_=Request{game,{},std::move(market),false,false,{},false,true};wake_.notify_one();return true;
 }
 bool Jobs::Pause(GameId game) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -344,7 +360,25 @@ void Jobs::Load() {
     if (request && result && Schema(*request) && Schema(*result) && Text(*request,"requestId") == Text(*result,"requestId")) {
         const auto phase = Text(*result,"status");
         next->active_game = GameId::Xbox(Text(*request,"productId"));
-        if (phase == "failed") {
+        next->phone_test = Text(*request,"operation") == "signin-test";
+        if (next->phone_test) {
+            next->active_game={}; next->request_id=Text(*request,"requestId");
+            const auto* detail=result->Find("detail");
+            const auto* licensed=detail?detail->Find("pcLicenseVerified"):nullptr;
+            const auto* replaced=detail?detail->Find("activeAccountReplaced"):nullptr;
+            if (phase=="phone-sign-in-verified" && licensed && licensed->is_bool() && licensed->boolean() &&
+                replaced && replaced->is_bool() && !replaced->boolean()) {
+                next->phase=phase; next->message="Phone sign-in and PC license verified. Your current account is unchanged. Game sign-in is still being tested.";
+            } else {
+                next->phase=phase=="cancelled"?"cancelled":"failed";
+                const auto code=detail?Text(*detail,"code"):std::string{};
+                next->message=phase=="cancelled"?"Phone sign-in cancelled. Your current account is unchanged.":
+                    code=="phone-code-expired"?"The sign-in code expired. Request a new code.":
+                    code=="phone-sign-in-denied"?"Microsoft sign-in was declined. Your current account is unchanged.":
+                    code=="phone-pc-license"?"Phone sign-in did not obtain this game's PC license. Your current account is unchanged.":
+                    "Phone sign-in did not finish. Your current account is unchanged; try again.";
+            }
+        } else if (phase == "failed") {
             next->phase = "failed"; next->message = "The Xbox download did not finish. Resume to retry; downloaded files were kept.";
             const auto* detail = result->Find("detail");
             const auto code = detail ? Text(*detail,"code") : std::string{};
@@ -391,6 +425,16 @@ void Jobs::Load() {
 }
 void Jobs::Execute(const Request& request) {
     auto identity = config_.hold_effective_uid ? config_.hold_effective_uid() : std::shared_ptr<void>{};
+    if (request.phone_test) {
+        const auto id=RandomUuid();
+        if (!id) {Publish("failed","A phone sign-in request could not be created.");return;}
+        const auto text="{\"schema\":1,\"requestId\":\""+*id+"\",\"operation\":\"signin-test\",\"market\":\""+request.market+
+            "\",\"productId\":\""+request.game.value+"\"}";
+        if (!storage_.WriteAtomicPrivate("job-request.json",Bytes(text.begin(),text.end())).ok()) {
+            Publish("failed","The phone sign-in request could not be saved.");return;
+        }
+        ExecuteNative({},*id);return;
+    }
     if (request.refresh) {
         const auto id = RandomUuid();
         if (!id) { Publish("failed","An Xbox account request could not be created."); return; }
@@ -434,10 +478,22 @@ void Jobs::Execute(const Request& request) {
     }
 }
 void Jobs::ExecuteNative(GameId game, const std::string& request_id) {
-    const auto result = config_.native_run([this](const NativeProgress& progress) {
+    const auto result = config_.native_run([this,&request_id](const NativeProgress& progress) {
+        std::string code,url;
+        if (progress.phase=="sign-in-code") {
+            const auto record=Read(storage_,"job-result.json",8192);
+            const auto* detail=record?record->Find("detail"):nullptr;
+            if (record && Schema(*record) && Text(*record,"requestId")==request_id && Text(*record,"operation")=="signin-test" &&
+                Text(*record,"status")=="sign-in-code" && detail) {
+                const auto c=Text(*detail,"userCode"),u=Text(*detail,"verificationUri");
+                if (!c.empty() && c.size()<=32 && std::all_of(c.begin(),c.end(),[](unsigned char ch){return (ch>='A'&&ch<='Z')||(ch>='a'&&ch<='z')||(ch>='0'&&ch<='9')||ch=='-';}) &&
+                    (u=="https://www.microsoft.com/link" || u=="https://microsoft.com/link")) {code=c;url=u;}
+            }
+        }
         std::lock_guard<std::mutex> lock(mutex_);
         auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
         if (!next->cancelling) { next->phase = progress.phase; next->message = progress.message; }
+        if (!next->cancelling) { next->sign_in_code=std::move(code);next->sign_in_url=std::move(url); }
         next->done_bytes = progress.done_bytes; next->total_bytes = progress.total_bytes;
         next->bytes_per_second = progress.bytes_per_second; state_ = std::move(next);
     },[this] { std::lock_guard<std::mutex> lock(mutex_); return stopping_ || cancel_requested_ || pause_requested_; });
@@ -453,6 +509,11 @@ void Jobs::ExecuteNative(GameId game, const std::string& request_id) {
     }
     Load();
     const auto loaded = Snapshot();
+    if (loaded->phone_test) {
+        if (discard || result==NativeResult::Cancelled) Publish("cancelled","Phone sign-in cancelled. Your current account is unchanged.");
+        else if (result!=NativeResult::Complete && loaded->phase!="failed") Publish("failed","Phone sign-in did not finish. Your current account is unchanged.");
+        return;
+    }
     if (std::find(loaded->partials.begin(),loaded->partials.end(),game) != loaded->partials.end()) {
         std::lock_guard<std::mutex> lock(mutex_);
         auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;

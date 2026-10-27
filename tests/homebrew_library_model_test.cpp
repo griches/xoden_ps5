@@ -3224,9 +3224,32 @@ void xbox_account_help_is_visible_without_authenticating() {
     check(model.TakeXboxRefresh(), "account refresh can be requested without starting interactive login");
 }
 
+void xbox_phone_signin_code_is_transient_and_closing_requests_cancellation() {
+    auto model=make_live();
+    model.UpdateXboxAccount("Working account","Saved account",false);
+    for(int i=0;i<4;++i) model.action("r1");
+    activate(model,"settings-xbox-account");activate(model,"xbox-phone-test");
+    check(model.TakeXboxPhoneTest() && !model.TakeXboxPhoneTest(),"phone sign-in sends one request");
+    model.UpdateXboxPhoneSignIn("Waiting","TEST-CODE","https://www.microsoft.com/link",true);
+    check(model.view().subtitle.find("TEST-CODE")!=std::string::npos && model.view().subtitle.find("microsoft.com/link")!=std::string::npos,
+          "validated short code and Microsoft link reach the native sheet");
+    model.UpdateXboxPhoneSignIn("Invalid code hidden","SECRET-CODE","https://foreign.invalid/link",true);
+    check(model.view().subtitle.find("SECRET-CODE")==std::string::npos && model.view().subtitle.find("foreign.invalid")==std::string::npos,
+          "foreign verification links never display");
+    model.action("circle");
+    check(model.TakeXboxPhoneCancel() && !model.TakeXboxPhoneCancel(),"closing a live phone sheet cancels the worker once");
+    model.UpdateXboxPhoneSignIn("Cancelled",{},{},false);
+    activate(model,"settings-xbox-account");activate(model,"xbox-phone-test");
+    model.TakeXboxPhoneTest();
+    model.UpdateXboxPhoneSignIn("PC license verified; current account unchanged",{},{},false);
+    activate(model,"xbox-phone-done");
+    check(!model.TakeXboxPhoneCancel(),"closing a finished phone test does not cancel or alter an account");
+}
+
 int main() {
     gamepass_mode_migrates_the_old_xbox_category();
     xbox_account_help_is_visible_without_authenticating();
+    xbox_phone_signin_code_is_transient_and_closing_requests_cancellation();
     xbox_install_does_not_wait_for_steam();
     xbox_search_covers_the_complete_catalog();
     live_import_sheet_sends_requests();
