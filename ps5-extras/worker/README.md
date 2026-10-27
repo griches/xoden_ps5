@@ -60,6 +60,14 @@ packaged handoff helper waits for Playden to close, launches the worker, then
 returns to Playden when the worker exits. It does not close an unrelated title.
 The worker displays a progress window while the job runs.
 
-Still required: end-to-end native Install/return/automatic-runtime acceptance,
-visual progress acceptance and on-console sign-in UX. Do not describe this
-binary as an independently working PS5 store until those checks pass.
+Console acceptance now includes native Xbox browsing/search across 669 games,
+Microsoft artwork, Install submission, visible worker progress, automatic return,
+fresh native bottle preparation, signed-in Minishoot launch and actual movement
+through its tutorial level. The install acceptance resumed an earlier direct
+console download; a previous complete direct download was verified separately.
+No Mac game-data relay is needed. Required renderer/Xbox DLL setup is automatic.
+
+Still required: reliable native Play-button handoff acceptance (fix in progress),
+fresh on-console sign-in UX, and broader game compatibility. Current tests reuse
+the existing authenticated console account. Shooting/full-game completion have
+not been tested. Do not describe all Game Pass games as compatible.
