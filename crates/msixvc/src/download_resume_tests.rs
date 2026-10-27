@@ -121,3 +121,44 @@ async fn streaming_resume_preserves_bytes_across_pause_and_process_restart_offse
         assert_eq!(output, payload);
     }
 }
+
+#[tokio::test]
+async fn streaming_batches_page_writes_and_flushes_tail_before_checkpoint() {
+    use std::sync::{Arc, Mutex};
+    struct Sink(Arc<Mutex<(Vec<u8>, usize)>>);
+    impl tokio::io::AsyncWrite for Sink {
+        fn poll_write(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>, bytes: &[u8]) -> std::task::Poll<std::io::Result<usize>> {
+            let mut state = self.0.lock().unwrap();
+            state.0.extend_from_slice(bytes); state.1 += 1;
+            std::task::Poll::Ready(Ok(bytes.len()))
+        }
+        fn poll_flush(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> { std::task::Poll::Ready(Ok(())) }
+        fn poll_shutdown(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> { std::task::Poll::Ready(Ok(())) }
+    }
+    let length = 1024 * 1024 + 123;
+    let payload: Vec<u8> = (0..1024*1024+4096).map(|n| (n%251) as u8).collect();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let body = payload.clone();
+    let server = tokio::spawn(async move {
+        let (mut socket,_) = listener.accept().await.unwrap();
+        let mut request = Vec::new();
+        while !request.ends_with(b"\r\n\r\n") { request.push(socket.read_u8().await.unwrap()); }
+        socket.write_all(format!("HTTP/1.1 206 Test\r\nContent-Length: {}\r\nContent-Range: bytes 0-{}/{}\r\nConnection: close\r\n\r\n",body.len(),body.len()-1,body.len()).as_bytes()).await.unwrap();
+        socket.write_all(&body).await.unwrap();
+    });
+    let state = Arc::new(Mutex::new((Vec::new(),0)));
+    let mut output = Sink(state.clone());
+    let client = reqwest::Client::new();
+    let file = SegmentFile { offset:0, length:length as u64, data_hashs:vec![], keep_encrypted:false };
+    let mut checkpoints = Vec::new();
+    XvdFile::download_segment_http(&[],&client,&format!("http://{address}/package"),&mut output,&file,[0;32],|_,_|{},None,0,|position| {
+        assert_eq!(state.lock().unwrap().0.len() as u64,position);
+        checkpoints.push(position); Ok(())
+    }).await.unwrap();
+    server.await.unwrap();
+    let actual = state.lock().unwrap();
+    assert_eq!(actual.0,&payload[..length]);
+    assert_eq!(actual.1,5); // Four 256 KiB writes plus the exact 123-byte tail.
+    assert_eq!(checkpoints,vec![length as u64]);
+}

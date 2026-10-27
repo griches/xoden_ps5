@@ -846,6 +846,13 @@ impl XvdFile {
             return Ok(());
         }
 
+        // XVD decryption remains page-sized, but issuing a filesystem write
+        // for every 4 KiB page is expensive on console/Wine. Batch at most
+        // 256 KiB per active file. Every checkpoint below flushes this buffer
+        // before recording its offset; dropping a cancelled operation never
+        // promotes its unflushed bytes into the durable resume journal.
+        let mut out = tokio::io::BufWriter::with_capacity(256 * 1024, out);
+
         let s = &sections.iter().find(|s| {
             sfile.offset >= s.section_offset && sfile.offset < s.section_offset + s.section_length
         });
