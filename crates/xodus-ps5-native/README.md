@@ -111,7 +111,7 @@ script never deploys or runs it.
 
 ## Native title DNS and execute-only code
 
-The job-engine feature enables `xodus-cli/ps5-native-dns` on FreeBSD. Link
+The job-engine feature enables `xodus-cli/ps5-native-platform` on FreeBSD. Link
 `tools/ps5_dns.c` with SceNet; the embedding title must already own network
 initialization. DNS runs on the blocking pool with a five-second resolver timeout;
 job cancellation drains it before releasing the lease. Output is four network-order
@@ -124,3 +124,9 @@ from text and faults during TLS key generation. `build_probe.py` selects the
 supported portable implementation with `AWS_LC_SYS_NO_ASM=1`, the cc builder,
 and optimization level 2 for aws-lc-sys only. This keeps system toolchains and
 normal desktop builds untouched. TLS/certificate checks are not disabled.
+
+The native title must also implement `xodus_ps5_available_space(path, bytes)`.
+Playden delegates to its existing validated volume query, which preserves its
+console-space reserve and mount validation. Failure is an error, never unlimited
+space. The link-only probe supplies a failing placeholder; it must not be used
+as a downloader. `XODUS_NATIVE_TITLE` excludes that placeholder in Playden.

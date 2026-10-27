@@ -39,7 +39,7 @@ tokio = { workspace = true, features = ["full"] }
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
 
 [features]
-ps5-native-dns = []
+ps5-native-platform = []
 default = ["native-webview", "eappx-extraction"]
 eappx-extraction = ["dep:eappx"]
 native-webview = ["dep:tao", "dep:wry"]

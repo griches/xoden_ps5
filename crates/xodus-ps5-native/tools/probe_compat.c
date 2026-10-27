@@ -40,3 +40,12 @@ int xodus_probe_kevent(int queue, const struct kevent *changes, int nchanges,
 __asm__(".symver xodus_probe_lstat,lstat@FBSD_1.0");
 __asm__(".symver xodus_probe_readdir,readdir@FBSD_1.0");
 __asm__(".symver xodus_probe_kevent,kevent@FBSD_1.0");
+
+#ifndef XODUS_NATIVE_TITLE
+/* The link-only payload probe has no title volume policy. Fail honestly;
+ * Playden supplies its validated volume query in the actual native title. */
+#include <stdint.h>
+int xodus_ps5_available_space(const char *path, uint64_t *bytes) {
+    (void)path; (void)bytes; return -1;
+}
+#endif

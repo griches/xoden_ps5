@@ -3,7 +3,22 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::vec;
 
+#[cfg(not(all(target_os = "freebsd", feature = "ps5-native-platform")))]
 use fs2::available_space;
+
+#[cfg(all(target_os = "freebsd", feature = "ps5-native-platform"))]
+fn available_space(path: impl AsRef<Path>) -> std::io::Result<u64> {
+    use std::{ffi::CString, os::unix::ffi::OsStrExt};
+    unsafe extern "C" {
+        fn xodus_ps5_available_space(path: *const std::ffi::c_char, bytes: *mut u64) -> i32;
+    }
+    let path = CString::new(path.as_ref().as_os_str().as_bytes())?;
+    let mut bytes = 0;
+    if unsafe { xodus_ps5_available_space(path.as_ptr(), &mut bytes) } != 0 {
+        return Err(std::io::Error::other("console storage space unavailable"));
+    }
+    Ok(bytes)
+}
 use futures_util::{StreamExt, stream};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use msixvc::streaming;

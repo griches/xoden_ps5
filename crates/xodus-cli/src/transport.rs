@@ -24,7 +24,7 @@ pub fn configure(pem: &[u8]) -> Result<(), &'static str> {
 }
 pub fn builder() -> Result<reqwest::ClientBuilder, &'static str> {
     let builder = reqwest::Client::builder();
-    #[cfg(all(target_os = "freebsd", feature = "ps5-native-dns"))]
+    #[cfg(all(target_os = "freebsd", feature = "ps5-native-platform"))]
     let builder = builder.dns_resolver(std::sync::Arc::new(ps5_dns::Resolver));
     match TRUST.get() {
         Some((_, certificates)) => Ok(builder.tls_certs_only(certificates.clone())),
@@ -48,7 +48,7 @@ mod tests {
 
 // The PS5 title has no libc getaddrinfo export. Keep the original hostname in
 // the request (including TLS verification/SNI); replace only DNS resolution.
-#[cfg(all(target_os = "freebsd", feature = "ps5-native-dns"))]
+#[cfg(all(target_os = "freebsd", feature = "ps5-native-platform"))]
 mod ps5_dns {
     use reqwest::dns::{Addrs, Name, Resolve, Resolving};
     use std::{ffi::CString, io, net::{Ipv4Addr, SocketAddr}};
