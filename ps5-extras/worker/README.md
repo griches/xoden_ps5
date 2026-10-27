@@ -67,7 +67,9 @@ through its tutorial level. The install acceptance resumed an earlier direct
 console download; a previous complete direct download was verified separately.
 No Mac game-data relay is needed. Required renderer/Xbox DLL setup is automatic.
 
-Still required: reliable native Play-button handoff acceptance (fix in progress),
-fresh on-console sign-in UX, and broader game compatibility. Current tests reuse
+Native Play-button launch, saved-progress reload and automatic return to Playden
+also passed on-console with Playden commit 59412d1.
+
+Still required: fresh on-console sign-in UX and broader game compatibility. Current tests reuse
 the existing authenticated console account. Shooting/full-game completion have
 not been tested. Do not describe all Game Pass games as compatible.
