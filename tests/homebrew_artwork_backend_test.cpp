@@ -3,6 +3,9 @@
 #include <atomic>
 #include <cassert>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <unistd.h>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -162,6 +165,29 @@ void InvalidHttpIdentityIsRejectedWithoutTransport() {
   assert(!backend.Load({1, SteamId(42), "https://cdn.cloudflare.steamstatic.com/steam/apps/42/header.jpg"}, cancel));
 }
 
+void PersistentCacheSurvivesRestartAndRepairsCorruption() {
+  char temp[] = "/tmp/playden-art-cache-XXXXXX"; assert(mkdtemp(temp));
+  const auto parent = std::filesystem::canonical(temp);
+  const auto root = (parent / "artwork-cache").string();
+  std::atomic<bool> cancel{false}; int requests = 0;
+  ArtworkKey key{1,playden::GameId::Xbox("9N5PKH0KW2L1"),"https://store-images.s-microsoft.com/image/apps/test?w=600"};
+  auto fetch = [&](const auto&,const auto&) -> std::optional<std::vector<std::uint8_t>> { ++requests; return SmallPng(); };
+  { HttpArtworkBackend backend("unused",root,fetch); assert(backend.Load(key,cancel)); }
+  key.account_generation = 2;
+  { HttpArtworkBackend backend("unused",root,fetch); assert(backend.Load(key,cancel)); }
+  assert(requests == 1);
+  for (const auto& file : std::filesystem::directory_iterator(root)) { std::ofstream stream(file.path()); stream << "broken"; }
+  { HttpArtworkBackend backend("unused",root,fetch); assert(backend.Load(key,cancel)); }
+  assert(requests == 2);
+  key.source += "&version=2";
+  { HttpArtworkBackend backend("unused",root,fetch); assert(backend.Load(key,cancel)); }
+  assert(requests == 3);
+  cancel = true;
+  { HttpArtworkBackend backend("unused",root,fetch); assert(!backend.Load(key,cancel)); }
+  assert(requests == 3);
+  std::filesystem::remove_all(parent);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -183,4 +209,5 @@ int main(int argc, char** argv) {
   RejectsEmptyCorruptAndTransferOverflow();
   RejectsOversizedPngDimensionsBeforePixelAllocation();
   InvalidHttpIdentityIsRejectedWithoutTransport();
+  PersistentCacheSurvivesRestartAndRepairsCorruption();
 }

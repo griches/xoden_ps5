@@ -1,6 +1,10 @@
 #include "homebrew/artwork_backend.hpp"
 
 #include "steam/backend/http_client.h"
+#include "platform/managed_directory.h"
+#include "platform/storage.h"
+#include <mbedtls/sha256.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <climits>
@@ -185,8 +189,8 @@ std::optional<ArtworkImage> DecodeArtwork(
       encoded, kMaxArtworkDecodeAllocationBytes);
 }
 
-HttpArtworkBackend::HttpArtworkBackend(std::string ca_bundle)
-    : ca_bundle_(std::move(ca_bundle)) {}
+HttpArtworkBackend::HttpArtworkBackend(std::string ca_bundle, std::string cache_root, Fetch fetch)
+    : ca_bundle_(std::move(ca_bundle)), cache_root_(std::move(cache_root)), fetch_(std::move(fetch)) {}
 
 HttpArtworkBackend::~HttpArtworkBackend() = default;
 
@@ -194,16 +198,84 @@ std::optional<ArtworkImage> HttpArtworkBackend::Load(
     const ArtworkKey& key, const std::atomic<bool>& cancel) {
   if (!CanonicalKey(key) || cancel.load(std::memory_order_acquire))
     return std::nullopt;
-  if (!http_) http_ = std::make_unique<steam::HttpClient>(ca_bundle_);
-
-  steam::HttpRequest request;
-  request.method = steam::HttpMethod::kGet;
-  request.url = key.source;
-  request.timeout_ms = kArtworkTimeoutMs;
-  request.max_response_bytes = kMaxArtworkTransferBytes;
-  auto response = http_->Perform(request, cancel);
-  if (!response.ok() || response.status_code != 200) return std::nullopt;
-  return DecodeArtwork(response.body);
+  // Public CDN images are shared across account generations. The full source
+  // URL is the version key, so changed artwork/resolutions cannot reuse old bytes.
+  unsigned char digest[32]{};
+  mbedtls_sha256(reinterpret_cast<const unsigned char*>(key.source.data()),key.source.size(),digest,0);
+  std::string name; const char* hex = "0123456789abcdef";
+  for (const auto byte : digest) { name += hex[byte >> 4]; name += hex[byte & 15]; }
+  name += ".image";
+  std::optional<platform::ManagedDirectory> directory;
+  if (!cache_root_.empty()) {
+    const std::filesystem::path path(cache_root_);
+    auto parent = platform::ManagedDirectory::Open(path.parent_path(),platform::DirectoryPolicy::kApprovedTree);
+    if (parent) directory = parent->OpenChild(path.filename().string(),platform::DirectoryPolicy::kPrivate,true);
+  }
+  const auto read_cached = [&]() -> std::optional<ArtworkImage> {
+    if (!directory) return std::nullopt;
+    const int fd = directory->OpenRegularFile(name,true,0600);
+    if (fd < 0) return std::nullopt;
+    struct stat info{}; std::vector<std::uint8_t> bytes;
+    if (fstat(fd,&info) == 0 && info.st_size > 0 && info.st_size <= static_cast<off_t>(kMaxArtworkTransferBytes)) {
+      bytes.resize(static_cast<std::size_t>(info.st_size)); std::size_t at = 0;
+      while (at < bytes.size()) {
+        const auto count = read(fd,bytes.data()+at,bytes.size()-at);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) { bytes.clear(); break; } at += static_cast<std::size_t>(count);
+      }
+    }
+    close(fd);
+    return cancel.load() ? std::nullopt : DecodeArtwork(bytes);
+  };
+  if (auto cached = read_cached()) return cached;
+  if (cancel.load()) return std::nullopt;
+  std::optional<std::vector<std::uint8_t>> encoded;
+  if (fetch_) encoded = fetch_(key,cancel);
+  else {
+    if (!http_) http_ = std::make_unique<steam::HttpClient>(ca_bundle_);
+    steam::HttpRequest request;
+    request.method = steam::HttpMethod::kGet; request.url = key.source;
+    request.timeout_ms = kArtworkTimeoutMs; request.max_response_bytes = kMaxArtworkTransferBytes;
+    auto response = http_->Perform(request,cancel);
+    if (response.ok() && response.status_code == 200) encoded = std::move(response.body);
+  }
+  if (!encoded || cancel.load()) return std::nullopt;
+  auto image = DecodeArtwork(*encoded);
+  if (!image || !directory) return image;
+  // Cap this disposable cache at 128 MiB and 2048 entries. Failed cache IO
+  // never prevents viewing a successfully downloaded image.
+  Storage storage(cache_root_); auto listed = storage.ListFiles();
+  if (!listed.ok()) return image;
+  auto files = std::move(listed.value());
+  std::sort(files.begin(),files.end(),[](const auto& a,const auto& b) { return a.modified_ns < b.modified_ns; });
+  std::uint64_t total = 0; std::size_t count = 0;
+  for (const auto& file : files) {
+    struct stat info{};
+    if (file.name.ends_with(".image") && directory->InspectChild(file.name,&info) && S_ISREG(info.st_mode)) { total += info.st_size; ++count; }
+  }
+  for (const auto& file : files) {
+    if (total + encoded->size() <= 128 * 1024 * 1024 && count < 2048) break;
+    struct stat info{};
+    if (file.name.ends_with(".image") && directory->InspectChild(file.name,&info) && S_ISREG(info.st_mode) && directory->RemoveRegularFile(file.name)) {
+      total -= info.st_size; --count;
+    }
+  }
+  if (total + encoded->size() > 128 * 1024 * 1024 || count >= 2048) return image;
+  const auto temp = name + ".tmp";
+  directory->RemoveRegularFile(temp);
+  const int fd = directory->CreateExclusiveFile(temp,0600);
+  if (fd >= 0) {
+    std::size_t at = 0;
+    while (at < encoded->size()) {
+      const auto written = write(fd,encoded->data()+at,encoded->size()-at);
+      if (written < 0 && errno == EINTR) continue;
+      if (written <= 0) break; at += static_cast<std::size_t>(written);
+    }
+    const bool ready = at == encoded->size() && fsync(fd) == 0; close(fd);
+    if (ready && directory->RenameChild(temp,*directory,name)) directory->Sync();
+    else directory->RemoveRegularFile(temp);
+  }
+  return image;
 }
 
 }  // namespace playden::homebrew

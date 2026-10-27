@@ -791,7 +791,7 @@ int main() {
 #if PLAYDEN_UI_SIMULATION
         playden::homebrew::Render renderer(paths.assets_root);
 #else
-        playden::homebrew::HttpArtworkBackend artwork_backend(paths.trust_store);
+        playden::homebrew::HttpArtworkBackend artwork_backend(paths.trust_store, user_root + "/artwork-cache");
         playden::homebrew::ArtworkService artwork(artwork_backend);
         playden::homebrew::Render renderer(paths.assets_root, &artwork);
 #endif

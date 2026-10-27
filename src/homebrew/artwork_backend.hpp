@@ -3,6 +3,7 @@
 #include "homebrew/artwork.hpp"
 
 #include <memory>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -29,7 +30,8 @@ std::optional<ArtworkImage> DecodeArtworkWithAllocationBudget(
 
 class HttpArtworkBackend final : public ArtworkBackend {
  public:
-  explicit HttpArtworkBackend(std::string ca_bundle);
+  using Fetch = std::function<std::optional<std::vector<std::uint8_t>>(const ArtworkKey&, const std::atomic<bool>&)>;
+  explicit HttpArtworkBackend(std::string ca_bundle, std::string cache_root = {}, Fetch fetch = {});
   ~HttpArtworkBackend() override;
   HttpArtworkBackend(const HttpArtworkBackend&) = delete;
   HttpArtworkBackend& operator=(const HttpArtworkBackend&) = delete;
@@ -38,7 +40,8 @@ class HttpArtworkBackend final : public ArtworkBackend {
       const ArtworkKey&, const std::atomic<bool>& cancel) override;
 
  private:
-  std::string ca_bundle_;
+  std::string ca_bundle_, cache_root_;
+  Fetch fetch_;
   std::unique_ptr<steam::HttpClient> http_;
 };
 
