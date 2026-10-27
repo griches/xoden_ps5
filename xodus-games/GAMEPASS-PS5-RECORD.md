@@ -1348,3 +1348,25 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   uncertain. No reboot was triggered by this session.
 - Virtual pad remains closed. The local page server remains available on Mac
   localhost port 47832; its last attempt is failed, with no active auth job.
+
+
+#### Latest retry: prepared verification fix installed
+
+- Gary requested another retry after restarting/jailbreaking. FTP and ELF loader
+  were available on the new boot; loaded ps5vkctl only and confirmed idle.
+  Did NOT reload DevLoop after this boot, leaving Gary's physical pad available.
+- Successfully deployed prepared app 0244bdb9af7556d28919d11e7b01b347487d635c5ed9facfae6d54bfafa2be66
+  at approximately 23:17Z. Backup:
+  playden-ps5/console-backups/20261027-signin-verification-formats.
+  Read-back verified and FAKE77031 launch acknowledged by the control service.
+- Asked Gary to choose Settings > Xbox account > Sign in with Microsoft and
+  approve again on Mac localhost:47832. No successful new sign-in or game
+  acceptance yet. The page's previous failed status remains until a new attempt
+  starts. No Mac credential-copy path was run.
+- Final app suite status is 152/153 checks accepted across the full run and
+  focused reruns; installed-locations still times out. Both tests referencing
+  the removed phone option were updated and now pass. No further full suite
+  runs are needed while diagnosing the live provider response.
+- Combined gamepass-ps5 now contains all component source changes via local
+  subtree merges, with a corrected single-flow roadmap. Everything is local;
+  nothing was pushed or released.
