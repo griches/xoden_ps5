@@ -129,6 +129,11 @@ bool CheckedImageBytes(int width, int height, std::size_t& bytes) {
 bool CanonicalKey(const ArtworkKey& key) {
   if (key.account_generation == 0 || !key.game_id.valid() ||
       key.source.size() > kMaxArtworkSourceBytes) return false;
+  if (key.game_id.store == Store::kXbox) {
+    constexpr std::string_view origin = "https://store-images.s-microsoft.com/";
+    return key.source.compare(0, origin.size(), origin) == 0 &&
+           std::none_of(key.source.begin(), key.source.end(), [](unsigned char c) { return c < 32 || c == 127; });
+  }
   const std::string base = "https://cdn.cloudflare.steamstatic.com/steam/apps/" +
                            ToKey(key.game_id) + "/";
   for (const char* name : {"library_600x900.jpg", "library_hero.jpg", "logo.png"})

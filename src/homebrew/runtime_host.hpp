@@ -83,6 +83,7 @@ struct RuntimeHostConfig {
   std::string runtime_dir;
   // gbe_fork's steam_api DLLs; empty: <runtime_dir>/steamworks.
   std::string steamworks_dir;
+  std::string xbox_runtime_dir;
   // The player's saved settings for a game; nothing means Playden defaults.
   std::function<std::optional<runtime::GameSettingsRecord>(const GameId& game)> settings_record;
   // Canonical lower-case UUID for a publication transaction, or nothing when no

@@ -36,6 +36,9 @@ void XboxLibrarySource::Invalidate(std::uint64_t generation) {
 std::optional<Catalog> XboxLibrarySource::Snapshot() const {
     std::lock_guard<std::mutex> lock(mutex_); return snapshot_;
 }
+std::string XboxLibrarySource::AccountKey() const {
+    std::lock_guard<std::mutex> lock(mutex_); return snapshot_ ? snapshot_->account_key : std::string{};
+}
 std::vector<LibraryEvent> XboxLibrarySource::Pump(std::size_t max_events) {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<LibraryEvent> result;

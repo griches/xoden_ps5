@@ -22,6 +22,7 @@ public:
     void Shutdown() override;
     std::vector<LibraryEvent> Pump(std::size_t max_events) override;
     std::optional<Catalog> Snapshot() const;
+    std::string AccountKey() const;
 private:
     struct Job { std::uint64_t request, account, generation, epoch; bool clear; };
     std::uint64_t Submit(std::uint64_t account, std::uint64_t generation, bool clear);

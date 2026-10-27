@@ -2754,6 +2754,11 @@ void store_art_follows_the_store() {
     check(CoverUrl(steam) == "https://cdn.cloudflare.steamstatic.com/steam/apps/440/library_600x900.jpg", "Steam cover");
     check(HeroUrl(steam) == "https://cdn.cloudflare.steamstatic.com/steam/apps/440/library_hero.jpg", "Steam hero");
     check(LogoUrl(steam) == "https://cdn.cloudflare.steamstatic.com/steam/apps/440/logo.png", "Steam logo");
+    Game xbox;
+    xbox.id = playden::GameId::Xbox("9N5PKH0KW2L1");
+    xbox.artwork_source = "https://store-images.s-microsoft.com/image/apps/example?w=4000";
+    check(CoverUrl(xbox) == "https://store-images.s-microsoft.com/image/apps/example?w=600&h=900&q=85", "Xbox covers fit the bounded decoder");
+    check(HeroUrl(xbox).empty() && LogoUrl(xbox).empty(), "Xbox does not borrow Steam artwork");
     Game local;
     local.id = playden::GameId::Local("0f8fad5b-d9cb-469f-a165-70867728950e");
     check(CoverUrl(local).empty() && HeroUrl(local).empty() && LogoUrl(local).empty(), "imported games have no store art");

@@ -1859,6 +1859,16 @@ void Simulation::open_release_notes(bool after_update) {
     open_modal(std::move(notes));
 }
 
+bool Simulation::CanHandoffXbox() const {
+    return !state_.quit_requested && std::none_of(state_.runtime_games.begin(),state_.runtime_games.end(),[](const auto& entry) {
+        return entry.second.status == "Preparing" || !entry.second.uninstall_status.empty() || entry.second.maintenance_running;
+    });
+}
+bool Simulation::HandoffXbox() {
+    if (!CanHandoffXbox()) return false;
+    state_.quit_requested = true; return true;
+}
+
 void Simulation::request_self_update_restart(const std::string& request) {
     const bool busy = std::any_of(state_.runtime_games.begin(), state_.runtime_games.end(), [](const auto& entry) {
         const auto& game = entry.second;

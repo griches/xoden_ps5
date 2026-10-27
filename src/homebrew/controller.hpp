@@ -14,6 +14,8 @@
 #include "stores/registry.h"
 #include "stores/steam.h"
 #include "stores/local/library_source.h"
+#include "stores/xbox/library_source.h"
+#include "stores/xbox/jobs.h"
 #include "steam/download_rate.h"
 #include "update/update_service.h"
 #include <chrono>
@@ -76,6 +78,7 @@ class Controller {
   // model's import requests (look for games, add, remove) go to it, and removing an imported game
   // removes its PS5 title first, keeping its bottle as kept data. Set before the first Tick.
   void SetLocalLibrary(stores::local::LocalLibrarySource* local) { local_ = local; }
+  void SetXboxJobs(stores::xbox::Jobs* jobs, stores::xbox::XboxLibrarySource* library) { xbox_jobs_ = jobs; xbox_library_ = library; }
   // Tests: how long a Play or preparation waits for a drop-folder game's files to be opened.
   void SetDropFolderOpenTimeout(std::chrono::milliseconds timeout) { drop_folder_open_timeout_ = timeout; }
   Controller(const Controller&) = delete;
@@ -107,6 +110,13 @@ class Controller {
   steam::StoreDetailsService* store_details_ = nullptr;
   std::optional<GameId> requested_store_detail_;
   void TickInstalls();
+  void TickXboxJobs();
+  stores::xbox::Jobs* xbox_jobs_ = nullptr;
+  stores::xbox::XboxLibrarySource* xbox_library_ = nullptr;
+  std::uint64_t xbox_revision_ = ~0ull;
+  std::string xbox_account_key_;
+  std::vector<installs::InstalledLocation> xbox_locations_;
+  std::map<GameId, std::string> xbox_programs_;
   void TickSelfUpdate();
   void TickLicenseChanges();
   std::function<void(const std::string&)> shutdown_log_;

@@ -72,6 +72,7 @@ add_library(playden_steam_cm_codec STATIC
     "${CMAKE_SOURCE_DIR}/src/runtime/msi_package.cpp"
     "${CMAKE_SOURCE_DIR}/src/runtime/burn_bundle.cpp"
     "${CMAKE_SOURCE_DIR}/src/runtime/redist_install.cpp"
+    "${CMAKE_SOURCE_DIR}/src/runtime/xbox_runtime.cpp"
     "${CMAKE_SOURCE_DIR}/src/runtime/game_probe.cpp")
 target_include_directories(playden_steam_cm_codec PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(playden_steam_cm_codec PRIVATE "${PLAYDEN_STB_IMAGE_INCLUDE_DIR}")
@@ -542,6 +543,9 @@ if(BUILD_TESTING)
     target_link_libraries(runtime_redist_test PRIVATE playden_steam_cm_codec)
     target_compile_features(runtime_redist_test PRIVATE cxx_std_20)
     add_test(NAME runtime_redist COMMAND runtime_redist_test)
+    add_executable(xbox_runtime_test tests/xbox_runtime_test.cpp)
+    target_link_libraries(xbox_runtime_test PRIVATE playden_steam_cm_codec playden_storage)
+    add_test(NAME xbox_runtime COMMAND xbox_runtime_test)
     add_executable(runtime_steamworks_test tests/runtime_steamworks_test.cpp)
     target_link_libraries(runtime_steamworks_test PRIVATE playden_runtime_steamworks)
     add_test(NAME runtime_steamworks COMMAND runtime_steamworks_test "${CMAKE_SOURCE_DIR}/runtime/steamworks")

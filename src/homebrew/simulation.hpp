@@ -794,6 +794,8 @@ public:
     void UpdateRuntimeProblem(const std::string& raw);
     // Live mode: a one-line note from startup's data layout move (a step held back this start).
     void ShowLayoutNotice(const std::string& text);
+    bool CanHandoffXbox() const;
+    bool HandoffXbox();
     // Live mode: startup got no root grant (raw: NativeAccessResult::error). Shows only the
     // "Root access is missing" screen; its one action quits to Home (quit_requested).
     // granted: the grant succeeded but Playden can't use /data/playden (other words, same screen).

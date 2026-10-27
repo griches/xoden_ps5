@@ -13,6 +13,7 @@ lapy_helper=${PLAYDEN_LAPY_HELPER_ELF:-"$helper_build/lapy.elf"}
 lapy_manifest=${PLAYDEN_LAPY_HELPER_MANIFEST:-"$helper_build/lapy-manifest.json"}
 title_remover=${PLAYDEN_TITLE_REMOVER_ELF:-"$root/build/title-remover/title-remover.elf"}
 relaunch=${PLAYDEN_RELAUNCH_ELF:-"$root/build/self-update-relaunch/self-update-relaunch.elf"}
+xbox_handoff="$root/build/xbox-handoff/xbox-handoff.elf"
 case "$simulation" in
  ON|on|1|true) simulation=ON ;;
  OFF|off|0|false|'') simulation=OFF ;;
@@ -33,6 +34,9 @@ fi
 if [[ $native_access == ON && -z ${PLAYDEN_RELAUNCH_ELF:-} ]]; then
  "$root/scripts/build-self-update-relaunch.sh"
 fi
+if [[ $native_access == ON ]]; then
+ bash "$root/scripts/build-xbox-handoff.sh"
+fi
 if [[ ! -f "$root/scripts/network-deps/.deps/ps5/lib/libcurl.a" ]]; then
  "$root/scripts/network-deps/prepare-ps5-deps.sh"
 fi
@@ -43,6 +47,7 @@ bash "$environment" bash -c 'exec "$PS5_PAYLOAD_SDK/bin/prospero-cmake" "$@"' ba
  -DPLAYDEN_NATIVE_RUNTIME_ACCESS="$native_access" -DPLAYDEN_PROSPERO_SOURCE_DIR="$prospero_source" \
  -DPLAYDEN_LAPY_HELPER_ELF="$lapy_helper" -DPLAYDEN_LAPY_HELPER_MANIFEST="$lapy_manifest" \
  -DPLAYDEN_TITLE_REMOVER_ELF="$title_remover" -DPLAYDEN_RELAUNCH_ELF="$relaunch" \
+ -DPLAYDEN_XBOX_HANDOFF_ELF="$xbox_handoff" \
  -DPLAYDEN_PS5_DEPS_DIR="$deps" -DPLAYDEN_HUI_SOURCE_DIR="$hui"
 bash "$environment" cmake --build "$root/build/homebrew-ps5" --target playden-homebrew-ps5-package
 echo "Selected Hui package (not deployed): $root/build/homebrew-ps5/dist/FAKE77031"

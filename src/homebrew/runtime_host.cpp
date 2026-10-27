@@ -18,6 +18,7 @@
 #include "runtime/steam_stub.h"
 #include "runtime/steamworks.h"
 #include "runtime/writable_folders.h"
+#include "runtime/xbox_runtime.h"
 #include "platform/managed_file_lock.h"
 #include "steam/backend/cloud_mapping.h"
 #include "steam/backend/json.h"
@@ -1078,6 +1079,11 @@ std::string RuntimeHost::ApplyPreparationSteps(Composition& c, const rt::Runtime
       ? std::filesystem::path(record.install_path)
       : config_.host_namespace_prefix / std::filesystem::path(record.install_path).relative_path();
   files.prefix = (HostPath(record.data_root) / "library/prefixes/game").string();
+  if (GameOf(record).store == Store::kXbox) {
+    std::string reason;
+    if (config_.xbox_runtime_dir.empty() || !rt::InstallXboxRuntime(config_.xbox_runtime_dir,files.prefix,config_.unix_time(),&reason))
+      return reason.empty() ? "The Xbox runtime has not been installed on this console." : reason;
+  }
   for (const auto& entry : files.recipe->launch_entries) {
     auto program = entry.executable;
     std::replace(program.begin(), program.end(), '\\', '/');

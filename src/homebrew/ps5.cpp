@@ -151,6 +151,24 @@ struct UsbKeyboard {
 
 std::string title_root = "/app0";
 std::string log_root = "/app0/logs";
+bool start_xbox_handoff(const std::string& request_id, const std::string& worker,
+                        const std::string& package_root, std::string* error) {
+    playden::Storage storage("/data/playden/xbox"), package(package_root);
+    const auto elf = package.Read("xbox-handoff.elf", 1024 * 1024);
+    if (!elf.ok()) { *error = "The Xbox handoff helper is missing from Playden."; return false; }
+    const auto text = request_id + "\n" + worker + "\n" PLAYDEN_PS5_TITLE_ID "\n";
+    if (!storage.WriteAtomicPrivate("handoff-request.txt", playden::Bytes(text.begin(),text.end())).ok()) {
+        *error = "The Xbox handoff request could not be saved."; return false;
+    }
+    if (!playden::ps5::SendToPayloadLoader(std::string(elf.value().begin(),elf.value().end()),error)) return false;
+    const auto expected = request_id + " armed\n";
+    for (int poll = 0; poll < 40; ++poll) {
+        const auto bytes = storage.Read("handoff-status.txt",256);
+        if (bytes.ok() && std::string(bytes.value().begin(),bytes.value().end()) == expected) return true;
+        usleep(250000);
+    }
+    *error = "The Xbox handoff helper did not acknowledge this download. Try again."; return false;
+}
 // Explicit developer request only; the dedicated capture folder is cleaned by
 // DevLoop after retrieval. Never write to the console's media gallery directly.
 void capture_devloop(playden::homebrew::Render& renderer, int width, int height) {
@@ -586,6 +604,7 @@ int main() {
             // An any-title kit's helper serves the game titles listed here (root-owned).
             config.write_title_allow_list = playden::ps5::WriteTitleAllowList;
             config.hold_effective_uid = playden::ps5::HoldEffectiveUid;
+            config.xbox_runtime_dir = "/data/playden/xbox/runtime";
             config.try_hold_effective_uid = [](bool* busy) {
                 auto held = playden::ps5::TryHoldEffectiveUid();
                 *busy = !held;
@@ -702,7 +721,9 @@ int main() {
         playden::stores::Registry stores;
         stores.Add(std::make_unique<playden::stores::SteamAccount>(auth, sessions, auth_log));
         stores.Add(std::make_unique<playden::stores::SteamLibrarySource>(library_service));
-        stores.Add(std::make_unique<playden::stores::xbox::XboxLibrarySource>("/data/playden/xbox"));
+        auto xbox_source = std::make_unique<playden::stores::xbox::XboxLibrarySource>("/data/playden/xbox");
+        auto* xbox_library = xbox_source.get();
+        stores.Add(std::move(xbox_source));
         stores.Add(std::make_unique<playden::stores::SteamDetailsSource>(app_details));
         // Imported games: imports.json next to installs.json in the runtime state folder; their
         // folders in /data/playden-import and playden/import on each drive (a drive counts while mounted).
@@ -731,7 +752,15 @@ int main() {
             copy_runner->SetChanged([local_library] { local_library->Reload(); });
             stores.Add(std::move(source));
         }
+        playden::stores::xbox::JobConfig xbox_config;
+        xbox_config.root = "/data/playden/xbox"; xbox_config.games_root = "/data/playden-games";
+        xbox_config.hold_effective_uid = playden::ps5::HoldEffectiveUid;
+        xbox_config.handoff = [package_root = paths.title_root](const std::string& request,const std::string& worker,std::string* error) {
+            return start_xbox_handoff(request,worker,package_root,error);
+        };
+        playden::stores::xbox::Jobs xbox_jobs(std::move(xbox_config));
         playden::homebrew::Controller services(simulation, stores, &persistence, &installs, &cloud, runtime_host.get(), auth_log);
+        services.SetXboxJobs(&xbox_jobs,xbox_library);
         services.SetLocalLibrary(local_library);
         playden::steam::StoreDetailsService store_details(playden::homebrew::StoreFetch(paths.trust_store));
         services.SetStoreDetails(&store_details);

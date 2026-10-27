@@ -363,6 +363,7 @@ void Controller::Tick() {
   TickStoreDetails();
   lap(4);
   TickImports();
+  TickXboxJobs();
   TickInstalls();
   TickSelfUpdate();
   lap(5);
@@ -1539,6 +1540,7 @@ void Controller::TickUninstalls() {
 }
 void Controller::ProjectLocations(const std::vector<steam::InstalledGame>& managed) {
   auto external = external_locations_ ? external_locations_() : std::vector<installs::InstalledLocation>{};
+  external.insert(external.end(), xbox_locations_.begin(), xbox_locations_.end());
   if (local_)
     for (auto& location : local_->Locations()) external.push_back(std::move(location));
   auto locations = installs::ProjectInstalledLocations(managed, external);
@@ -1772,12 +1774,52 @@ const installs::InstalledLocation* Controller::LocationOf(GameId id) const {
     if (location.game == id) return &location;
   return nullptr;
 }
+void Controller::TickXboxJobs() {
+  if (!xbox_jobs_ || !xbox_library_) return;
+  const auto state = xbox_jobs_->Snapshot();
+  const auto account = xbox_library_->AccountKey();
+  if (state->phase == "handoff") { model_.HandoffXbox(); return; }
+  if (state->revision == xbox_revision_ && account == xbox_account_key_) return;
+  if (runtime_ && runtime_->Shared()->status == RuntimeHostStatus::kStarting) return;
+  xbox_revision_ = state->revision; xbox_account_key_ = account;
+  if (!state->message.empty() && state->phase == "failed") model_.ShowLayoutNotice(state->message);
+  xbox_locations_.clear(); xbox_programs_.clear();
+  for (const auto& game : state->prepared) {
+    if (game.account_key != account) continue;
+    xbox_locations_.push_back({game.game,game.root,"internal",true,installs::InstalledLocation::Ownership::kExternal,{}});
+    xbox_programs_[game.game] = game.executable;
+    if (runtime_) {
+      const auto runtime = runtime_->Shared();
+      const bool known = std::any_of(runtime->installs.begin(),runtime->installs.end(),[&](const auto& entry) { return entry.game == game.game; });
+      if (!known && std::find(auto_prepare_.begin(),auto_prepare_.end(),game.game) == auto_prepare_.end()) auto_prepare_.push_back(game.game);
+    }
+  }
+}
+
 void Controller::TickInstalls() {
   if (!installs_) {
     ProjectLocations({});
     return;
   }
   for (const auto& request : model_.TakeInstallRequests()) {
+    if (request.game_id.store == Store::kXbox) {
+      if (request.kind != InstallRequestKind::Install || !xbox_jobs_ || !xbox_library_ || !runtime_) {
+        model_.ShowLayoutNotice("The Xbox download service is unavailable for this action."); continue;
+      }
+      if (!model_.CanHandoffXbox()) { model_.ShowLayoutNotice("Wait for the current game setup to finish before installing an Xbox game."); continue; }
+      const auto catalog = xbox_library_->Snapshot();
+      const auto job = xbox_jobs_->Snapshot();
+      const auto runtime = runtime_->Shared();
+      const bool worker_ready = std::any_of(runtime->installs.begin(),runtime->installs.end(),[&](const auto& entry) {
+        return entry.install_id == job->worker_install_id && entry.title_id == job->worker_title &&
+               entry.state == runtime::PreparationState::kReady && !entry.recovery_pending;
+      });
+      if (!worker_ready) { model_.ShowLayoutNotice("The Xbox download worker needs to be set up before installing games."); continue; }
+      if (!catalog || !xbox_jobs_->Install(request.game_id,catalog->account_key,catalog->market))
+        model_.ShowLayoutNotice("An Xbox download is already starting, or the Xbox account needs refreshing.");
+      else model_.ShowLayoutNotice("Opening the Xbox download screen. Playden will return when it finishes.");
+      continue;
+    }
     switch (request.kind) {
       case InstallRequestKind::Install: {
         const auto& games = model_.state().games;
@@ -1958,7 +2000,10 @@ void Controller::SubmitPrepare(GameId id, bool announce) {
   // Steam's launch options and app details are for Steam games only: another store's game starts the
   // program the player picks in Game settings.
   const bool steam = id.store == Store::kSteam;
-  if (!steam)
+  if (id.store == Store::kXbox && xbox_programs_.count(id)) {
+    request.launches = {{"xbox",request.title_name,xbox_programs_.at(id),""}};
+    request.launch_reason.clear();
+  } else if (!steam)
     request.launch_reason = "Choose the program that starts this game in Game settings.";
   else if (const auto reason = launch_options_reason_.find(id); reason != launch_options_reason_.end())
     request.launch_reason = "Playden could not read how to start this game from Steam: " + reason->second;
