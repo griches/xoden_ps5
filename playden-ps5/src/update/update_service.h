@@ -39,6 +39,8 @@ struct UpdateConfig {
   std::string layout_journal;
   Version current;
   bool include_betas = false;
+  // Forks can retain pinned kit downloads without accepting upstream app swaps.
+  bool app_updates_enabled = true;
   Fetch fetch;
   std::function<std::optional<std::string>(const std::string& path)> hash_file;
   // The verified kit's manifest SHA-256, or nullopt when the folder is not a complete kit.

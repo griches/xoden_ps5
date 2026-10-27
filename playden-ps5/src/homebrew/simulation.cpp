@@ -5335,7 +5335,7 @@ void Simulation::rebuild_view() {
             controller.subtitle = "Test the buttons and sticks";
         }
         section = "Updates";
-        if (live()) {
+        if (live() && !state_.gamepass_only) {
             auto& beta = add("settings-beta-updates", RowKind::Toggle, "Beta updates", "toggle-beta-updates");
             beta.selected = state_.beta_updates;
             beta.subtitle = "Get test versions before they are released. They can have new bugs.";
@@ -5363,7 +5363,7 @@ void Simulation::rebuild_view() {
                                                               : "Version " + update.current;
             }
         }
-        if (live() && !state_.beta_updates && state_.self_update.current.find("-beta.") != std::string::npos) {
+        if (live() && !state_.gamepass_only && !state_.beta_updates && state_.self_update.current.find("-beta.") != std::string::npos) {
             auto& note = add("settings-beta-wait", RowKind::Status, "You have a beta", "");
             note.subtitle = "Playden moves to the next stable version when it is out.";
             note.enabled = false;
@@ -5394,13 +5394,13 @@ void Simulation::rebuild_view() {
                 }
             }
         }
-        if (kOfferGoBack && live() && !state_.self_update.previous.empty() &&
+        if (kOfferGoBack && live() && !state_.gamepass_only && !state_.self_update.previous.empty() &&
             state_.self_update.phase != "downloading" && state_.self_update.phase != "unpacking") {
             auto& back = add("settings-update-back", RowKind::Action, "Go back to Playden " + state_.self_update.previous,
                              "self-update-back");
             back.subtitle = "Put the previous version and its runtime kit back";
         }
-        if (live() && !state_.self_update.current_notes_url.empty()) {
+        if (live() && !state_.gamepass_only && !state_.self_update.current_notes_url.empty()) {
             auto& notes = add("settings-release-notes", RowKind::Action, "Release notes", "self-update-notes");
             notes.subtitle = "What changed in Playden " + state_.self_update.current;
         }
@@ -5408,7 +5408,8 @@ void Simulation::rebuild_view() {
         add("settings-about", RowKind::Action, "About", "about").subtitle = "Playden for PlayStation 5";
         auto& logs = add("settings-logs", RowKind::Action, "Logs", live() ? "logs-pick" : "logs");
         if (live()) {
-            logs.subtitle = "Install, Cloud saves, sign-in and launch diagnostics";
+            logs.subtitle = state_.gamepass_only ? "Install, sign-in and launch diagnostics"
+                                                : "Install, Cloud saves, sign-in and launch diagnostics";
             if (log_directory_.empty()) { logs.kind = RowKind::Status; logs.action.clear(); logs.enabled = false; logs.subtitle = "No logs on this device"; }
         }
         if (!state_.notices.empty()) add("settings-notices", RowKind::Action, "Warnings", "notices").value = std::to_string(state_.notices.size());

@@ -447,6 +447,7 @@ int main() {
         update_config.layout_journal = "/data/playden/runtime-state/layout-0.6.json";
         update_config.current = playden::update::CurrentVersion();
         update_config.include_betas = preferences.Load().preferences.beta_updates;
+        update_config.app_updates_enabled = !simulation.state().gamepass_only;
         update_config.fetch = [&update_http](const playden::steam::HttpRequest& request, const std::atomic<bool>& cancel) {
             return update_http.Perform(request, cancel);
         };
