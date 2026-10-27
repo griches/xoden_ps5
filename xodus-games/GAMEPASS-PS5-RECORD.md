@@ -1013,3 +1013,45 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   cancellation, actual native phone approval and durable candidate pending.
   Native first-time provisioning, candidate adoption and game-runtime bridge
   acceptance are still unfinished; keep Gary's existing session intact.
+
+### Full account reset and fresh native login follow-up (19:26Z)
+
+- Gary explicitly requested a complete account clear and fresh login. This
+  supersedes the earlier instruction to preserve the active user session. Do
+  not restore an old session from a backup or Mac credentials.
+- Backend 4bd3c18 adds native signout; frontend d5763ef exposes it and binds a
+  fresh phone check to an installed PC package even after catalog removal.
+- The first reset stalled before its first credential write: the Rust callback
+  tried to reacquire the parent's global UID lock from a different thread.
+  Frontend 95063fe shares the existing owner-held lease with the callback. A
+  real parent/child write regression and full 153/153 host tests passed
+  (152.63 s); PS5 build passed. Deployed binary SHA256
+  67ca4d830ccbee42added0eab4bdd88a0c94fc7d5b1af3e3ef10288e8e8b8fa9.
+  Backup console-backups/20261027-native-credential-lease.
+- A guarded kill refused to interrupt Gary's other foreground title. After
+  that title closed, deployment and normal app launch proceeded.
+- Actual console signout ran 19:18:31Z to 19:18:32Z, terminal success. UI shows
+  Not connected and confirms saved user credentials and cached library cleared.
+  Registered device identity, installed games and saves were retained.
+- The fresh native signin-test at 19:18:54Z FAILED before showing a phone code.
+  Screenshot /tmp/gamepass-fresh-native-signin-code.png shows failure, NOT a
+  valid code. No approval request is pending. Existing host logging omitted
+  this static failure stage; adding its observer notification to diagnose the
+  exact cause without reading/exporting credential files.
+- Normal native account activation and game-runtime acceptance are still
+  unfinished. No account was restored or adopted after reset. Virtual pad
+  CLOSED; Remote Play remains OFF at Gary's request.
+
+- Backend b5a2979 reports static failure stages through the native observer.
+  Console retry at 19:25:11Z identified device-refresh, before code issuance.
+- Backend 493e23c scopes device renewal locks to their credential store:
+  isolated memory managers share an async lock only among clones; host-file
+  managers use a private sibling session-lock directory instead of global temp.
+  Credential tests 31/31, CLI tests 79/79, native PS5 cross-build and app build
+  passed. Deployed SHA256
+  8f27b888af4dc54d0b175337e0bcbf95e0e1d249dd04a716b6b94fd467cc5450,
+  backup console-backups/20261027-scoped-device-renewal.
+- Actual PS5 retry at 19:27:32Z now renews the device and DISPLAYS a fresh phone
+  code. Screenshot /tmp/gamepass-scoped-renewal-login.png. Requested Gary's
+  approval; no active account adoption claimed. Pad CLOSED immediately after
+  starting the test. Remote Play remains OFF.
