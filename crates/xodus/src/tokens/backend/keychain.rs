@@ -9,13 +9,13 @@ use crate::tokens::store::{TokenBackend, TokenStoreError};
 // selected keyring or its security policy. This is encoding, not encryption.
 const ENVELOPE: &[u8] = b"XODUS_KEYRING_BASE64_V1:";
 
-fn encode_secret(value: &[u8]) -> Vec<u8> {
+pub(super) fn encode_secret(value: &[u8]) -> Vec<u8> {
     let mut encoded = ENVELOPE.to_vec();
     encoded.extend_from_slice(STANDARD.encode(value).as_bytes());
     encoded
 }
 
-fn decode_secret(bytes: Vec<u8>) -> Result<Vec<u8>, TokenStoreError> {
+pub(super) fn decode_secret(bytes: Vec<u8>) -> Result<Vec<u8>, TokenStoreError> {
     match bytes.strip_prefix(ENVELOPE) {
         Some(encoded) => STANDARD.decode(encoded).map_err(|_| {
             std::io::Error::new(

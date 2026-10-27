@@ -97,6 +97,10 @@ impl TokenManager {
         )
     }
 
+    pub fn with_host_file(path:&std::path::Path,commit:Arc<dyn Fn(&[u8])->bool+Send+Sync>)->Result<Self,TokenStoreError> {
+        Ok(Self::new(Arc::new(super::backend::HostFileBackend::open(path,commit)?),Arc::new(MemoryBackend::default())))
+    }
+
     pub fn remove_persistent(&self) -> Result<(), TokenStoreError> {
         self.remove_phone_candidate()?;
         self.persistent.remove(keys::DEVICE_TOKENS)?;

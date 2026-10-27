@@ -48,4 +48,9 @@ __asm__(".symver xodus_probe_kevent,kevent@FBSD_1.0");
 int xodus_ps5_available_space(const char *path, uint64_t *bytes) {
     (void)path; (void)bytes; return -1;
 }
+/* The link-only payload never writes account credentials. The actual title
+ * supplies its existing policy-checked atomic private-file writer. */
+int xodus_ps5_commit_keyring(const uint8_t *bytes, size_t size) {
+    (void)bytes; (void)size; return -1;
+}
 #endif
