@@ -424,3 +424,26 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - On console selected the native Xbox Minishoot card, then Play. Without any external launch command, Playden closed, FAKE78004 opened and reached its signed-in menu (/tmp/xbox-native-play-button.png). Second test save reloaded past the crystal escape (/tmp/xbox-native-save-reload.png), proving progress persisted. Save & Quit, then Quit closed the game and helper reopened FAKE77031 automatically. Wrapper session reports origin=playden, phase=exited; no exit code supplied. Handoff reports returned.
 - Left Playden on Library > Xbox, cleared Mini search so all 669 catalog games are visible. Virtual controller closed; Remote Play remained off. User can reconnect their pad.
 - Current acceptance: native full-catalog browse/search, direct console download/resume with membership check and visible worker progress, automatic native runtime preparation, Play-button launch, gameplay movement/collision/damage, save/reload and automatic return. Current account is the existing authenticated console account. Fresh sign-in UX, package-choice UI and broader compatibility remain unfinished; no claim that every Game Pass game works. Shooting/full-game completion not tested.
+
+## 2026-10-27 — Halo partial cleanup and app direction
+
+- User explicitly requested deletion of cancelled Halo Infinite (9NP1P1WFS0LB).
+- Removed `/data/playden-games/xbox-9np1p1wfs0lb` as uid 1; helper reported
+  4,433,450,039 regular-file bytes removed. Verified folder absent.
+- A newer job (9MXND4PQLK3W) was already prepared; retained its request/result,
+  both prepared-game records and the running title. No restart or pad takeover.
+- Added `ps5-extras/ps5_xbox.py --host HOST discard-partial PRODUCT_ID`:
+  refuses active downloader/unknown status and prepared games; older orphaned
+  folders require a streaming resume marker; current matching jobs are marked
+  cancelled only after deletion. Does not overwrite newer job status.
+- UID helper adds canonical Xbox-root-only recursive deletion without following
+  directory symlinks. Build passed with warnings as errors; four Python guard/
+  state tests passed; actual Halo deletion verified on console.
+- This is a maintenance command, NOT automatic cancellation or a console UI.
+  Future download manager must expose Resume / Cancel and delete, retain crash
+  recovery separately, and bind cleanup to a per-product/per-request record.
+- User favours a separate Xbox/Game Pass app instead of folding all changes into
+  upstream Playden. Installed games launch from PS5 home-screen tiles. A separate
+  app should own sign-in, catalogue, download/progress/cancel, compatibility setup
+  and title registration; Playden need not be a runtime launcher dependency.
+  No standalone app extraction or upstream PR has been performed yet.

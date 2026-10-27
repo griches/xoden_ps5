@@ -14,6 +14,8 @@ console's ELF loader on port 9021. The console-wide sign-in lives at
 import argparse
 import ftplib
 import io
+import json
+from datetime import datetime, timezone
 import os
 import re
 import hashlib
@@ -238,6 +240,57 @@ def setup(args):
     doctor(args)
 
 
+def discard_partial(args):
+    """Discard an unprepared Xbox download, including older orphaned partials."""
+    product = args.product.upper()
+    if not re.fullmatch(r"[A-Z0-9]{12}", product):
+        raise ValueError("invalid Xbox product id")
+    status = running(args.host)
+    # Fail closed when status is unavailable or the downloader is running.
+    if not status.startswith("ok ") or "title=FAKE78001" in status:
+        raise RuntimeError("Download worker must be stopped before discarding files")
+    c = Console(args.host)
+    try:
+        request = json.loads(c.get(XBOX + "/job-request.json"))
+        result = json.loads(c.get(XBOX + "/job-result.json"))
+        prepared = json.loads(c.get(XBOX + "/prepared-games.json"))
+        if (request.get("schema") != 1 or result.get("schema") != 1 or
+                prepared.get("schema") != 1 or not isinstance(prepared.get("games"), list)):
+            raise RuntimeError("Download records could not be validated")
+        matching = (request.get("operation") == "install" and request.get("productId") == product and
+                    result.get("productId") == product and bool(request.get("requestId")) and
+                    request.get("requestId") == result.get("requestId"))
+        if (matching and result.get("status") in ("prepared", "complete")) or any(
+                row.get("productId", "").upper() == product for row in prepared["games"]):
+            raise RuntimeError("Refusing to discard an installed/prepared game")
+        path = "/data/playden-games/xbox-" + product.lower()
+        listing = c.uid([("ls", path)])
+        if not matching and ".nexus-streaming-v1.jsonl" not in listing:
+            raise RuntimeError("Orphan folder has no download resume marker; refusing removal")
+        if running(args.host) != status:
+            raise RuntimeError("Console activity changed; retry when the worker is stopped")
+        path = "/data/playden-games/xbox-" + product.lower()
+        log = c.uid([("rm-xbox-partial", path)])
+        match = re.search(r"removed-tree bytes=(\d+)", log)
+        if not match:
+            raise RuntimeError("Cleanup did not complete: " + log)
+        if matching:
+            # Publish terminal state only after successful deletion. Retrying is safe.
+            result.update(status="cancelled", detail="Partial download deleted",
+                          updatedAt=datetime.now(timezone.utc).isoformat())
+            c.put(json.dumps(result).encode(), "cancelled-result.json")
+            published = c.uid([("cp-private", DROP + "/cancelled-result.json", XBOX + "/job-result.json")])
+            c.delete("cancelled-result.json")
+            if "published " not in published:
+                raise RuntimeError("Files removed but cancellation state could not be saved")
+        check = c.uid([("ls", path)])
+        if "opendir: No such file or directory" not in check:
+            raise RuntimeError("Cleanup could not be verified: " + check)
+        print(f"Deleted {product} partial download: {int(match.group(1)):,} bytes. Verified folder absent.")
+    finally:
+        c.ftp.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--host", default=os.environ.get("PS5_HOST"), required=os.environ.get("PS5_HOST") is None)
@@ -250,11 +303,13 @@ def main():
     s = sub.add_parser("doctor")
     s.add_argument("install", type=install_id)
     sub.add_parser("status")
+    s = sub.add_parser("discard-partial", help="delete an interrupted Xbox download; preserves completed games")
+    s.add_argument("product")
     args = parser.parse_args()
     if args.command == "status":
         print(running(args.host))
     else:
-        {"signin": signin, "bottles": bottles, "setup": setup, "doctor": doctor}[args.command](args)
+        {"discard-partial": discard_partial, "signin": signin, "bottles": bottles, "setup": setup, "doctor": doctor}[args.command](args)
 
 
 if __name__ == "__main__":

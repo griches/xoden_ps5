@@ -13,6 +13,7 @@
  *   get-raw <src> <name>  as get, with a 13-byte XODUS-RAW-V1 newline prefix
  *   mkdir <dir>        dir must be under /data/playden/ (mode 0700)
  *   rm <path>          path must be under /data/playden/
+ *   rm-xbox-partial <root> canonical Xbox content root; caller checks job state
  */
 #include <dirent.h>
 #include <errno.h>
@@ -171,6 +172,53 @@ static void do_rm(const char *path)
         say("  unlink: %s", strerror(errno));
 }
 
+/* Only canonical Xbox content roots; never traverse a symlink. */
+static int remove_tree(const char *path, long long *bytes)
+{
+    struct stat st;
+    if (lstat(path, &st) != 0) return errno == ENOENT ? 0 : -1;
+    if (!S_ISDIR(st.st_mode)) {
+        if (unlink(path) != 0) return -1;
+        if (S_ISREG(st.st_mode)) *bytes += st.st_size;
+        return 0;
+    }
+    DIR *dir = opendir(path);
+    if (!dir) return -1;
+    struct dirent *entry;
+    int result = 0;
+    while ((entry = readdir(dir))) {
+        if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) continue;
+        char child[4096];
+        int n = snprintf(child, sizeof child, "%s/%s", path, entry->d_name);
+        if (n < 0 || (size_t)n >= sizeof child || remove_tree(child, bytes) != 0) {
+            result = -1; break;
+        }
+    }
+    closedir(dir);
+    return result == 0 ? rmdir(path) : result;
+}
+
+static void do_rm_xbox_partial(const char *path)
+{
+    const char *prefix = "/data/playden-games/xbox-";
+    size_t n = strlen(prefix);
+    if (strlen(path) != n + 12 || strncmp(path, prefix, n)) {
+        say("  refused: expected canonical Xbox content root"); return;
+    }
+    for (size_t i = n; i < n + 12; ++i) {
+        if (!((path[i] >= 'a' && path[i] <= 'z') || (path[i] >= '0' && path[i] <= '9'))) {
+            say("  refused: invalid product id"); return;
+        }
+    }
+    struct stat st;
+    if (lstat("/data/playden-games", &st) != 0 || !S_ISDIR(st.st_mode)) {
+        say("  refused: invalid content parent"); return;
+    }
+    long long bytes = 0;
+    if (remove_tree(path, &bytes) != 0) say("  removal failed: %s", strerror(errno));
+    else say("  removed-tree bytes=%lld", bytes);
+}
+
 static int copy_file(const char *src, const char *dst, mode_t mode)
 {
     return copy_file_mode(src, dst, mode, 0);
@@ -230,6 +278,8 @@ int main(void)
             do_get(a, b, 1);
         else if (!strcmp(cmd, "mkdir") && a)
             do_mkdir(a);
+        else if (!strcmp(cmd, "rm-xbox-partial") && a)
+            do_rm_xbox_partial(a);
         else if (!strcmp(cmd, "rm") && a)
             do_rm(a);
         else
