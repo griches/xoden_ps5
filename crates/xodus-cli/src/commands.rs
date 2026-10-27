@@ -18,5 +18,6 @@ pub mod run;
 pub mod splicense;
 pub mod streaming;
 mod durable_file;
+pub mod ps5_job;
 
 pub mod prepare_ps5;

@@ -158,7 +158,7 @@ fn valid_store_ticket(ticket: String) -> Option<String> {
     (ticket.len() > 2 && ticket.starts_with("t=") && !ticket.contains(char::is_whitespace)).then_some(ticket)
 }
 
-async fn query(tokens: &TokenManager, account: &str) -> Result<(Value, i64), &'static str> {
+pub(super) async fn query(tokens: &TokenManager, account: &str) -> Result<(Value, i64), &'static str> {
     let (client, ticket) = store_session(tokens, account).await?;
     let cv = format!(
         "{}.0",

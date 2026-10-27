@@ -20,6 +20,9 @@ mod webview;
 
 #[derive(Subcommand)]
 enum SubCommand {
+    #[cfg(windows)]
+    #[command(about = "Execute the private Playden Xbox job on this console")]
+    Ps5Job,
     #[command(about = "Prepare licensed game images for the PS5 Wine runtime, preserving encrypted originals")]
     PreparePs5 {
         source: String,
@@ -330,6 +333,13 @@ async fn main() -> ExitCode {
     }
 
     let code = match args.command {
+        #[cfg(windows)]
+        SubCommand::Ps5Job => {
+            if !args.ps5_worker { return ExitCode::FAILURE; }
+            commands::ps5_job::run(&client, &tokens,
+                std::path::Path::new(r"Z:\data\playden\xbox"),
+                std::path::Path::new(r"Z:\data\playden-games")).await
+        }
         SubCommand::PreparePs5 { source, market } => commands::prepare_ps5::run(&client, &tokens, source, market).await,
         #[cfg(target_os = "linux")]
         SubCommand::KeyringSessionStop { .. } => unreachable!(),

@@ -99,7 +99,7 @@ fn diagnostic(stage: &'static str, status: u16, count: usize) {
     eprintln!("NEXUS_LIBRARY_DIAGNOSTIC_V1 {stage} {status} {count}");
 }
 
-async fn query(tokens: &TokenManager, market: &str) -> Result<Value, &'static str> {
+pub(super) async fn query(tokens: &TokenManager, market: &str) -> Result<Value, &'static str> {
     if market.len() != 2 || !market.bytes().all(|b| b.is_ascii_uppercase()) {
         return Err("market");
     }

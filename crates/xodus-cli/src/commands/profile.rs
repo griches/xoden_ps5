@@ -72,7 +72,7 @@ pub(super) async fn xbox_session(tokens: &TokenManager) -> Result<(reqwest::Clie
     Ok((client, authorization, account))
 }
 
-async fn profile(tokens: &TokenManager) -> Result<Value, &'static str> {
+pub(super) async fn profile(tokens: &TokenManager) -> Result<Value, &'static str> {
     let (client, authorization, account) = xbox_session(tokens).await?;
     let response = client.get(PROFILE).header("Authorization", authorization)
         .header("x-xbl-contract-version", "2").send().await.map_err(|_| "profile-request")?;
