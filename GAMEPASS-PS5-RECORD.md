@@ -495,3 +495,22 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Main remaining acceptance: successful game launch/gameplay, fresh sign-in UX,
   package selection, and home-screen icon0/pic0 from Xbox artwork. Current title
   still received the generic icon, despite its catalogue cover being available.
+
+
+## 2026-10-27 — gameplay proof and account/download UI work
+
+- Playden 9781d18 automatically selects the Unreal WinGDK shipping program.
+  A Game About Digging A Hole reached its menu and actual 3D gameplay; movement,
+  looking and digging were verified. Save/reload is still untested.
+- The controller incident was the virtual test pad not being handed back after
+  stopping, not a demonstrated game compatibility problem. Pad now closed;
+  DevTools quit cleanly. Leave the console and physical controller to Gary.
+- Gary's selected priorities: sign-in, install choices and download management.
+- New code adds native Xbox account/library refresh from Settings, distinct
+  access errors, a PC package picker, per-game/account/market package recovery,
+  pause/resume and download ETA. Cancel still drains native writes before cleanup.
+- Fresh Microsoft login is still unfinished: Xodus uses a hosted Microsoft
+  webview and TokenBroker exchange, which Playden does not provide. The computer
+  sign-in remains required; account refresh must not be presented as fresh login.
+- New package builds successfully but is not deployed or console-accepted yet.
+  No user games were deleted, no live downloads restarted, no virtual pad opened.
