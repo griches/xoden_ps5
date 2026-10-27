@@ -13,15 +13,28 @@ struct PreparedGame {
     GameId game;
     std::string account_key, executable, root;
 };
+struct NativeProgress {
+    std::string phase, message;
+    std::uint64_t done_bytes = 0, total_bytes = 0, bytes_per_second = 0;
+};
+enum class NativeResult { Complete, Failed, Cancelled };
+using NativeRunner = std::function<NativeResult(
+    const std::function<void(const NativeProgress&)>&,
+    const std::function<bool()>&)>;
 struct JobSnapshot {
     std::uint64_t revision = 0;
     std::string phase = "loading", message, request_id;
     std::string worker_install_id, worker_title;
+    bool native = false, active = false, cancelling = false;
+    GameId active_game;
+    std::uint64_t done_bytes = 0, total_bytes = 0, bytes_per_second = 0;
     std::vector<PreparedGame> prepared;
     std::vector<GameId> partials;
 };
 struct JobConfig {
     std::string root, games_root;
+    // Synchronous service-worker call. Returns only after all IO has drained.
+    NativeRunner native_run;
     // Runs on this service's worker, after the private request is committed.
     // Success means the console handoff helper acknowledged this request ID.
     std::function<bool(const std::string& request, const std::string& worker_title, std::string* error)> handoff;
@@ -32,6 +45,7 @@ public:
     explicit Jobs(JobConfig config);
     ~Jobs();
     bool Discard(GameId game);
+    bool Cancel(GameId game);
     bool Install(GameId game, std::string account_key, std::string market);
     std::shared_ptr<const JobSnapshot> Snapshot() const;
     void Shutdown();
@@ -41,6 +55,7 @@ private:
     void Load();
     void Execute(const Request& request);
     void ExecuteDiscard(GameId game);
+    void ExecuteNative(GameId game);
     void Publish(std::string phase, std::string message = {});
     JobConfig config_;
     Storage storage_;
@@ -48,7 +63,7 @@ private:
     std::condition_variable wake_;
     std::optional<Request> pending_;
     std::shared_ptr<JobSnapshot> state_;
-    bool stopping_ = false, busy_ = false;
+    bool stopping_ = false, busy_ = false, cancel_requested_ = false;
     std::thread worker_;
 };
 }  // namespace playden::stores::xbox

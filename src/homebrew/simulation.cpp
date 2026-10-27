@@ -183,6 +183,7 @@ std::string job_state_name(JobState state) {
 
 // job_state_name, but an imported game's copy says "copying".
 std::string job_state_value(const Job& job) {
+    if (job.game_id.store == Store::kXbox && !job.state_text.empty()) return job.state_text;
     if (job.state == JobState::Downloading && job.game_id.store == Store::kLocal) return "copying";
     return job_state_name(job.state);
 }
@@ -1863,6 +1864,18 @@ void Simulation::UpdateXboxPartials(std::vector<GameId> games, bool busy) {
     xbox_partials_ = std::move(games); xbox_cleanup_busy_ = busy; rebuild_view();
 }
 
+void Simulation::UpdateXboxDownload(std::optional<LiveInstallJob> live_job, std::string message) {
+    xbox_native_job_.reset();
+    std::erase_if(state_.jobs,[](const auto& job) { return job.game_id.store == Store::kXbox; });
+    if (live_job) {
+        Job job; job.id = ToKey(live_job->game_id); job.game_id = live_job->game_id;
+        job.state = live_job->state; job.completed_bytes = live_job->done_bytes; job.total_bytes = live_job->total_bytes;
+        job.bytes_per_second = live_job->bytes_per_second; job.volume_id = "internal"; job.state_text = std::move(message);
+        xbox_native_job_ = job; state_.jobs.push_back(std::move(job));
+    }
+    rebuild_view();
+}
+
 bool Simulation::CanHandoffXbox() const {
     return !state_.quit_requested && std::none_of(state_.runtime_games.begin(),state_.runtime_games.end(),[](const auto& entry) {
         return entry.second.status == "Preparing" || !entry.second.uninstall_status.empty() || entry.second.maintenance_running;
@@ -2130,6 +2143,7 @@ void Simulation::UpdateInstalls(const std::vector<LiveInstallJob>& jobs, const s
     for (const auto& game : installed)
         installations.push_back({game.game_id, game.volume_id, game.install_bytes, game.available,
                                  state_.runtime_games.count(game.game_id) && state_.runtime_games.at(game.game_id).ready, false});
+    if (xbox_native_job_) projected.push_back(*xbox_native_job_);
     state_.jobs = std::move(projected);
     sync_self_update_job();
     state_.installations = std::move(installations);
@@ -6500,7 +6514,7 @@ void Simulation::activate() {
         const auto id = selected.key.substr(4);
         const auto* job = find_job(state_, id);
         std::vector<std::string> actions;
-        if (job && (job->state == JobState::Downloading || job->state == JobState::Verifying)) actions.push_back("job-pause-" + id);
+        if (job && job->game_id.store != Store::kXbox && (job->state == JobState::Downloading || job->state == JobState::Verifying)) actions.push_back("job-pause-" + id);
         if (job && (job->state == JobState::Paused || job->state == JobState::Interrupted)) actions.push_back("job-resume-" + id);
         const auto waiting = std::count_if(state_.jobs.begin(), state_.jobs.end(), [](const Job& other) {
             return other.state == JobState::Paused || other.state == JobState::Interrupted;
@@ -6520,7 +6534,7 @@ void Simulation::activate() {
             const auto finished = std::count_if(state_.jobs.begin(), state_.jobs.end(), [](const Job& other) { return other.state == JobState::Downloaded; });
             if (finished > 1) actions.push_back("job-clear-completed");
         }
-        else if (job && job->state != JobState::Cancelled) actions.push_back("job-cancel-" + id);
+        else if (job && job->state != JobState::Cancelled && !(job->game_id.store == Store::kXbox && job->state == JobState::Pausing)) actions.push_back("job-cancel-" + id);
         actions.push_back("logs"); actions.push_back("cancel");
         open_modal({"job-actions", "Download actions", selected.key, std::move(actions), 0, false});
     } else if (action_name == "details-prepare-next") {

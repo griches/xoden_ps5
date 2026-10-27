@@ -152,7 +152,7 @@ function(playden_add_homebrew_ps5_title)
 		COMMAND "${sdk}/bin/prospero-lld" -T "${gl_source}/native-app/ps5-pie.ld" --eh-frame-hdr
 			--wrap=malloc --wrap=calloc --wrap=realloc --wrap=free --wrap=posix_memalign --wrap=malloc_usable_size
 			--version-script "${gl_source}/native-app/app-symbols.map" -e _start --gc-sections --build-id=sha1
-			-L "${out}/stubs" -L "${sdk}/target/lib" -u ps5_agc_gate2_run ${shim_wraps} -o "${pie}"
+			-L "${out}/stubs" -L "${sdk}/target/lib" -u ps5_agc_gate2_run ${shim_wraps} ${PLAYDEN_XBOX_NATIVE_LINK_OPTIONS} -o "${pie}"
 			$<TARGET_OBJECTS:playden_ps5_runtime> $<TARGET_OBJECTS:playden_ps5_shims>
 			$<TARGET_OBJECTS:playden_ps5_app>
 			--start-group "${gl_sdk}/lib/libPS5OpenGL.a" "${sdk}/target/lib/libunwind.a"
@@ -165,7 +165,7 @@ function(playden_add_homebrew_ps5_title)
 			$<TARGET_FILE:playden_steam_auth>
 			$<TARGET_FILE:playden_steam_core> $<TARGET_FILE:playden_diagnostic_log> $<TARGET_FILE:playden_storage>
 			$<TARGET_FILE:playden_library> $<TARGET_FILE:playden_native_access> $<TARGET_FILE:playden_managed_directory> $<TARGET_FILE:playden_runtime_steamworks> $<TARGET_FILE:playden_runtime_artifact_hash> $<TARGET_FILE:playden_runtime_settings_storage> $<TARGET_FILE:playden_runtime_private_directories> $<TARGET_FILE:playden_runtime_session_reconciler> $<TARGET_FILE:playden_runtime_launch_service> $<TARGET_FILE:playden_runtime_install_service> $<TARGET_FILE:playden_runtime_installs> $<TARGET_FILE:playden_runtime_layout_migration> $<TARGET_FILE:playden_game_paths>
-			${PLAYDEN_STEAM_LINK_ARCHIVES} ${title_database_archives}
+			${PLAYDEN_STEAM_LINK_ARCHIVES} ${PLAYDEN_XBOX_NATIVE_LIBRARY} ${title_database_archives}
 			--end-group --as-needed ${link_stubs}
 		WORKING_DIRECTORY "${out}/link"
 		DEPENDS "${common_dialog_stub}" playden_ps5_runtime playden_ps5_shims playden_ps5_app playden_hui playden_homebrew_ui playden_homebrew_model ${title_database_targets}
@@ -183,7 +183,7 @@ function(playden_add_homebrew_ps5_title)
 			$<TARGET_FILE:playden_local_session_repository> $<TARGET_FILE:playden_auth_diagnostics> $<TARGET_FILE:playden_local_store> $<TARGET_FILE:playden_local_copy>
 			"${gl_source}/native-app/ps5-pie.ld" "${gl_source}/native-app/app-symbols.map"
 			"${gl_sdk}/lib/libPS5OpenGL.a" "${sdk_deps}/compiler-rt/libclang_rt.builtins-x86_64.a"
-			${PLAYDEN_STEAM_LINK_ARCHIVES}
+			${PLAYDEN_STEAM_LINK_ARCHIVES} ${PLAYDEN_XBOX_NATIVE_LIBRARY}
 		COMMAND_EXPAND_LISTS VERBATIM)
 
 	set(stamp "${app}/.packaged")

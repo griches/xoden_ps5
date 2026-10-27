@@ -235,3 +235,56 @@ this new crate yet. Installed downloads still use the existing Windows worker.
   not exercised in this run; power-loss recovery remains host-fixture evidence.
 - Virtual pad was closed successfully after the check. Playden remains open on
   the test game's details. Remote Play was not used. No test download remains.
+
+## Native in-app engine integration (built, not deployed)
+
+The Xbox service now has an optional native runner. In this mode Install stays
+in Playden, progress appears in the existing Downloads page and game details,
+and Cancel uses the existing confirmation. It asks the native engine to stop,
+waits for its runtime/file IO to drain, then reloads partial/prepared admission
+and performs the existing managed cleanup. A late cancel never deletes a game
+that has already reached the prepared manifest. Shutdown preserves resumable
+partials. Unsupported pause controls are omitted for native Xbox jobs. Steam
+snapshot refreshes preserve the active Xbox download row.
+
+The backend is in sibling xodus-ps5-backend on ps5-account-backend:
+870141a shared engine/callbacks, cf18b1b IO-draining lifecycle, 8cf3838 C polling
+ABI/TLS/platform adapters, 67e2073 batched download writes. The native engine
+keeps existing subscription/entitlement checks and uses the existing private
+console credential store. Internal HTTP clients use Playden's packaged CA
+bundle with certificate verification enabled. New sign-in UI is not implemented.
+
+Build the backend with its isolated build_probe.py --job-engine, then set both
+PLAYDEN_XBOX_NATIVE_SOURCE (absolute crate directory) and
+PLAYDEN_XBOX_NATIVE_LIBRARY (absolute adapted static archive) when running
+scripts/build-homebrew-ps5.sh. Ordinary builds retain the existing worker.
+The build script clears these options when the environment variables are absent,
+so an old CMake cache cannot silently enable experimental native downloads.
+
+The full native PS5 package builds locally: eboot.bin 46871649 bytes, SHA256
+57289e5467215a8450e5cf46feea8441f8cddb51a044644be6aa04e828121ec8. Host suite
+152/152 passed (137.99 seconds), including a simulated cancellation that keeps
+partial content until the runner acknowledges drained writes. The added UI test
+also passes: progress survives a Steam refresh and cancel requires confirmation.
+The C lifecycle test passes on the host; native console runtime/download
+acceptance remains outstanding. No new package or Rust probe was deployed.
+
+Native-title linking additionally supplies SDK-compatible dirfd and reports
+minherit as unavailable; AWS-LC handles that optional fork-detection failure.
+The five optional AWS-LC allocator hooks are explicitly resolved to null,
+preserving its normal allocator and zeroization, rather than importing nonexistent
+SDK hooks. Existing runtime kit, libc, compiler-rt and submodule pins are intact.
+
+Gary reported 1-9 MB/s on wired gigabit internet. Inspection found no default
+bandwidth cap and four concurrent files. The transfer loop issued a write per
+4 KiB decrypted page. Backend 67e2073 batches these into 256 KiB writes, while
+flushing before every durable checkpoint. A 1 MiB plus 123-byte fixture uses
+5 writes instead of 257, preserves exact content and checks that the tail is
+written before its checkpoint. Transfer tests: 49 pass, 2 pre-existing ignored;
+shared engine: 74 pass; native lifecycle/boundary: 5 pass. This is not a measured
+console speed gain, and the active download was not restarted to apply it.
+A wired connection's negotiated link rate has not been verified.
+
+Console observation during this work changed from worker FAKE78001 to running
+game FAKE78005. The game, virtual pad and Remote Play were left untouched.
+Wait for the console to be available before controlled native acceptance.

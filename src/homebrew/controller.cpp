@@ -1783,7 +1783,16 @@ void Controller::TickXboxJobs() {
   if (state->revision == xbox_revision_ && account == xbox_account_key_) return;
   if (runtime_ && runtime_->Shared()->status == RuntimeHostStatus::kStarting) return;
   xbox_revision_ = state->revision; xbox_account_key_ = account;
-  model_.UpdateXboxPartials(state->partials,state->phase == "cleaning");
+  model_.UpdateXboxPartials(state->partials,state->phase == "cleaning" || state->active);
+  std::optional<LiveInstallJob> xbox_download;
+  if (state->native && state->active) {
+    LiveInstallJob job; job.game_id = state->active_game;
+    job.state = state->cancelling ? JobState::Pausing : JobState::Downloading;
+    job.done_bytes = state->done_bytes; job.total_bytes = state->total_bytes;
+    job.bytes_per_second = state->bytes_per_second; job.volume_id = "internal";
+    xbox_download = std::move(job);
+  }
+  model_.UpdateXboxDownload(std::move(xbox_download),state->message);
   if (!state->message.empty() && (state->phase == "failed" || state->phase == "cleaned")) model_.ShowLayoutNotice(state->message);
   xbox_locations_.clear(); xbox_programs_.clear();
   for (const auto& game : state->prepared) {
@@ -1806,7 +1815,7 @@ void Controller::TickInstalls() {
   for (const auto& request : model_.TakeInstallRequests()) {
     if (request.game_id.store == Store::kXbox) {
       if (request.kind == InstallRequestKind::Cancel && xbox_jobs_) {
-        if (!model_.CanHandoffXbox() || !xbox_jobs_->Discard(request.game_id))
+        if (!xbox_jobs_->Cancel(request.game_id) && (!model_.CanHandoffXbox() || !xbox_jobs_->Discard(request.game_id)))
           model_.ShowLayoutNotice("This partial download cannot be removed right now.");
         continue;
       }
@@ -1817,14 +1826,14 @@ void Controller::TickInstalls() {
       const auto catalog = xbox_library_->Snapshot();
       const auto job = xbox_jobs_->Snapshot();
       const auto runtime = runtime_->Shared();
-      const bool worker_ready = std::any_of(runtime->installs.begin(),runtime->installs.end(),[&](const auto& entry) {
+      const bool worker_ready = job->native || std::any_of(runtime->installs.begin(),runtime->installs.end(),[&](const auto& entry) {
         return entry.install_id == job->worker_install_id && entry.title_id == job->worker_title &&
                entry.state == runtime::PreparationState::kReady && !entry.recovery_pending;
       });
       if (!worker_ready) { model_.ShowLayoutNotice("The Xbox download worker needs to be set up before installing games."); continue; }
       if (!catalog || !xbox_jobs_->Install(request.game_id,catalog->account_key,catalog->market))
         model_.ShowLayoutNotice("An Xbox download is already starting, or the Xbox account needs refreshing.");
-      else model_.ShowLayoutNotice("Opening the Xbox download screen. Playden will return when it finishes.");
+      else model_.ShowLayoutNotice(job->native ? "Xbox download started. View progress in Downloads." : "Opening the Xbox download screen. Playden will return when it finishes.");
       continue;
     }
     switch (request.kind) {

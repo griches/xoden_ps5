@@ -57,6 +57,7 @@ add_library(playden_library_service STATIC
 target_include_directories(playden_library_service PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(playden_library_service PUBLIC cxx_std_17)
 target_link_libraries(playden_library_service PUBLIC playden_steam_core)
+include("${CMAKE_SOURCE_DIR}/cmake/XboxNative.cmake")
 
 add_library(playden_diagnostic_log STATIC "${CMAKE_SOURCE_DIR}/src/app/diagnostic_log.cpp")
 target_include_directories(playden_diagnostic_log PUBLIC "${CMAKE_SOURCE_DIR}/src")

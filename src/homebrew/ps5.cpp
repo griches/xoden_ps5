@@ -2,6 +2,9 @@
 // Copyright (c) 2026 Playden contributors
 // SPDX-License-Identifier: MIT
 #include "homebrew/render.hpp"
+#ifdef PLAYDEN_XBOX_NATIVE
+#include "stores/xbox/native_engine.h"
+#endif
 #include "homebrew/artwork_backend.hpp"
 #include "homebrew/simulation.hpp"
 #include "homebrew/store_art.hpp"
@@ -760,6 +763,9 @@ int main() {
         playden::stores::xbox::JobConfig xbox_config;
         xbox_config.root = "/data/playden/xbox"; xbox_config.games_root = "/data/playden-games";
         xbox_config.hold_effective_uid = playden::ps5::HoldEffectiveUid;
+#ifdef PLAYDEN_XBOX_NATIVE
+        xbox_config.native_run = playden::stores::xbox::NativeEngine(xbox_config.root,xbox_config.games_root,paths.trust_store);
+#endif
         xbox_config.handoff = [package_root = paths.title_root](const std::string& request,const std::string& worker,std::string* error) {
             return start_xbox_handoff(request,worker,package_root,error);
         };

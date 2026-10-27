@@ -795,6 +795,7 @@ public:
     // Live mode: a one-line note from startup's data layout move (a step held back this start).
     void ShowLayoutNotice(const std::string& text);
     void UpdateXboxPartials(std::vector<GameId> games, bool busy);
+    void UpdateXboxDownload(std::optional<LiveInstallJob> job, std::string message);
     bool CanHandoffXbox() const;
     bool HandoffXbox();
     // Live mode: startup got no root grant (raw: NativeAccessResult::error). Shows only the
@@ -887,6 +888,7 @@ private:
     std::vector<GameId> xbox_partials_;
     GameId xbox_discard_game_;
     bool xbox_cleanup_busy_ = false;
+    std::optional<Job> xbox_native_job_;
     std::filesystem::path fixture_directory_;
     std::filesystem::path profile_path_;
     ModelMode mode_ = ModelMode::Simulation;

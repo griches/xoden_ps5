@@ -3133,6 +3133,24 @@ void xbox_install_does_not_wait_for_steam() {
           "cleanup prevents a competing install");
     model.UpdateXboxPartials({},false);
     check(!has_row(model,"details-xbox-discard"),"completed cleanup removes its action");
+    playden::homebrew::LiveInstallJob native; native.game_id = id; native.state = playden::homebrew::JobState::Downloading;
+    native.done_bytes = 40; native.total_bytes = 100; native.bytes_per_second = 9;
+    model.UpdateXboxDownload(native,"Downloading Xbox game");
+    check(has_row(model,"details-download") && !has_row(model,"details-install"),"native progress replaces Install while downloading");
+    model.UpdateInstalls({},{});
+    check(model.state().jobs.size() == 1 && model.state().jobs.front().game_id == id &&
+          model.state().jobs.front().completed_bytes == 40,"Steam refresh preserves native Xbox progress");
+    activate(model,"details-download");
+    activate(model,"job-xbox-9n5pkh0kw2l1");
+    check(!has_row(model,"job-pause-xbox-9n5pkh0kw2l1"),"Xbox does not offer unsupported pause controls");
+    activate(model,"job-cancel-xbox-9n5pkh0kw2l1");
+    check(model.TakeInstallRequests().empty(),"native cancel requires confirmation");
+    activate(model,"confirm-destructive");
+    const auto cancel = model.TakeInstallRequests();
+    check(cancel.size() == 1 && cancel.front().game_id == id && cancel.front().kind == playden::homebrew::InstallRequestKind::Cancel,
+          "native cancellation uses the existing Downloads confirmation");
+    model.UpdateXboxDownload(std::nullopt,{});
+    check(model.state().jobs.empty(),"drained native job leaves Downloads");
 }
 
 void xbox_search_covers_the_complete_catalog() {

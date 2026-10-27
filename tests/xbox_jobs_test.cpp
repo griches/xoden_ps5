@@ -2,6 +2,7 @@
 #include "stores/xbox/jobs.h"
 #include "steam/backend/json.h"
 #include <cassert>
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <thread>
@@ -111,5 +112,40 @@ int main() {
         assert(result && result->Find("status")->text() == "cancelled");
     }
     { stores::xbox::Jobs reload(config); Wait(reload,"idle"); assert(reload.Snapshot()->partials.empty()); }
+    // Native downloads remain in Playden, expose progress, and cannot delete
+    // content until the runner confirms that outstanding writes have drained.
+    std::filesystem::remove(root/"worker.json");
+    Put(store,"prepared-games.json",R"({"schema":1,"games":[]})");
+    std::atomic<bool> saw_cancel{false}, allow_drain{false};
+    auto native_config = config;
+    native_config.handoff = [&](const auto&, const auto&, auto*) { assert(false); return false; };
+    native_config.native_run = [&](const auto& report,const auto& cancelled) {
+        std::filesystem::create_directories(partial);
+        Put(partial_store,".nexus-streaming-v1.jsonl","resume");
+        Put(partial_store,"content.bin","partial content");
+        report(stores::xbox::NativeProgress{"downloading","Downloading Xbox game",40,100,9});
+        while (!cancelled()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        saw_cancel = true;
+        while (!allow_drain) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        return stores::xbox::NativeResult::Cancelled;
+    };
+    {
+        stores::xbox::Jobs native(native_config); Wait(native,"idle");
+        const auto game = GameId::Xbox("9NP1P1WFS0LB");
+        assert(native.Snapshot()->native && native.Snapshot()->worker_title.empty());
+        assert(native.Install(game,std::string(64,'a'),"GB")); Wait(native,"downloading");
+        assert(native.Snapshot()->active && native.Snapshot()->active_game == game);
+        assert(native.Snapshot()->done_bytes == 40 && native.Snapshot()->total_bytes == 100);
+        assert(!native.Discard(game));
+        assert(!native.Install(GameId::Xbox("9N5PKH0KW2L1"),std::string(64,'a'),"GB"));
+        assert(native.Cancel(game));
+        for (int i=0;i<2000 && !saw_cancel;++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(saw_cancel && native.Snapshot()->cancelling);
+        assert(std::filesystem::exists(partial/"content.bin"));
+        assert(!std::filesystem::exists(quarantine));
+        allow_drain = true; Wait(native,"cleaned");
+        assert(!std::filesystem::exists(partial) && !std::filesystem::exists(quarantine));
+        assert(native.Snapshot()->partials.empty());
+    }
     std::filesystem::remove_all(root);
 }
