@@ -181,6 +181,8 @@ class FilesystemPackageInstaller final : public PackageInstaller {
   // the kit's.
   PackageActionResult WriteTitleMetadata(const RuntimeInstall& record, const std::string& param_json,
                                          const std::optional<std::string>& icon_png) override;
+  PackageActionResult WriteTitleArtwork(const RuntimeInstall& record, const std::string& param_json,
+      const std::optional<std::string>& icon_png, const std::optional<std::string>& picture_dds) override;
   // The metadata was generated and the installed title carries it.
   bool TitleMetadataCurrent(const RuntimeInstall& record) override;
   PackageActionResult StageTitle(const RuntimeInstall& record) override;

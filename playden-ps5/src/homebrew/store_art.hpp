@@ -12,7 +12,8 @@ struct Game;
 
 // The store's art for a game: its cover (600x900), library hero and logo. Steam games get the
 // Steam CDN addresses (the artwork backend's CanonicalKey accepts exactly these); games from
-// other stores have none yet, and an empty address means no art (the tile shows the title).
+// Xbox artwork comes from the catalogue's Game record; an ID alone cannot
+// reconstruct a Microsoft asset URL. An empty address means no artwork.
 std::string CoverUrl(const GameId& game);
 std::string HeroUrl(const GameId& game);
 std::string LogoUrl(const GameId& game);

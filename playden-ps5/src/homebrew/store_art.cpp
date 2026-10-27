@@ -23,7 +23,11 @@ std::string CoverUrl(const Game& game) {
     return game.artwork_source.substr(0, game.artwork_source.find('?')) + "?w=600&h=900&q=85";
   return CoverUrl(game.id);
 }
-std::string HeroUrl(const Game& game) { return HeroUrl(game.id); }
+std::string HeroUrl(const Game& game) {
+  if (game.id.store == Store::kXbox && !game.artwork_source.empty())
+    return game.artwork_source.substr(0, game.artwork_source.find('?')) + "?w=1920&h=1080&q=85";
+  return HeroUrl(game.id);
+}
 std::string LogoUrl(const Game& game) { return LogoUrl(game.id); }
 
 }  // namespace playden::homebrew

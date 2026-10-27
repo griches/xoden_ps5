@@ -46,5 +46,21 @@ int main() {
   // Malformed images make no icon.
   CHECK(!MakeTitleIcon(ArtworkImage{}));
   CHECK(!MakeTitleIcon(ArtworkImage{10, 10, std::vector<std::uint8_t>(3)}));
+  const auto picture = playden::homebrew::MakeTitlePicture(cover);
+  CHECK(picture && picture->size() == 128 + 1920*1080/2 && picture->substr(0,4) == "DDS ");
+  const auto word = [&](std::size_t at) {
+    std::uint32_t n=0;for (unsigned b=0;b<4;++b) n |= std::uint32_t(static_cast<unsigned char>((*picture)[at+b]))<<(b*8);
+    return n;
+  };
+  CHECK(word(4)==124 && word(12)==1080 && word(16)==1920 && word(84)==0x31545844);
+  // Centre is the intact bright green cover; edges use the same cover darkened.
+  const auto green = [&](unsigned x,unsigned y) {
+    const auto block = 128+((y/4)*(1920/4)+x/4)*8;
+    const auto color=word(block)&0xffff;
+    return ((color>>5)&63)*255/63;
+  };
+  CHECK(green(960,540)>=250 && green(0,540)<100);
+  CHECK(!playden::homebrew::MakeTitlePicture(ArtworkImage{}));
+  CHECK(!playden::homebrew::MakeTitlePicture(ArtworkImage{10,10,std::vector<std::uint8_t>(3)}));
   std::puts("title icon tests passed");
 }

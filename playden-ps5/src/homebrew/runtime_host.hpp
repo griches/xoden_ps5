@@ -114,6 +114,7 @@ struct RuntimeHostConfig {
   // nothing (the kit's icon stays). Runs on the worker; may use the network.
   // Named by the game, so a runtime number never reaches a store's artwork.
   std::function<std::optional<std::string>(const GameId& game)> title_icon;
+  std::function<std::optional<std::string>(const GameId& game)> title_picture;
   // One ranged HTTPS GET for what Playden downloads for a game's bottle: Microsoft's Visual C++ redistributable,
   // for a game whose files import MFC (runtime/redist_install.h). Runs on the worker, only for work the player
   // started (Play, Prepare, maintenance), never at start-up; it should give up soon after cancel turns true

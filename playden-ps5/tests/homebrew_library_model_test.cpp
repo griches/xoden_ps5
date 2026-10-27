@@ -2758,11 +2758,29 @@ void store_art_follows_the_store() {
     xbox.id = playden::GameId::Xbox("9N5PKH0KW2L1");
     xbox.artwork_source = "https://store-images.s-microsoft.com/image/apps/example?w=4000";
     check(CoverUrl(xbox) == "https://store-images.s-microsoft.com/image/apps/example?w=600&h=900&q=85", "Xbox covers fit the bounded decoder");
-    check(HeroUrl(xbox).empty() && LogoUrl(xbox).empty(), "Xbox does not borrow Steam artwork");
+    check(HeroUrl(xbox) == "https://store-images.s-microsoft.com/image/apps/example?w=1920&h=1080&q=85" &&
+              LogoUrl(xbox).empty(), "Xbox details use catalogue artwork without borrowing a Steam logo");
     Game local;
     local.id = playden::GameId::Local("0f8fad5b-d9cb-469f-a165-70867728950e");
     check(CoverUrl(local).empty() && HeroUrl(local).empty() && LogoUrl(local).empty(), "imported games have no store art");
     check(CoverUrl(playden::GameId{}).empty(), "an invalid game has no art");
+}
+
+void gamepass_settings_exclude_steam_controls() {
+    auto model=make_live();
+    model.UpdateAccount({AuthState::SignedIn,"123","Synthetic",{},{},true});
+    model.SetGamePassOnly(true);
+    model.action("l1");
+    check(model.state().navigation.route==Route::Settings,"Game Pass Settings opens");
+    for (const auto& row:model.view().rows) {
+        check(row.title.find("Steam")==std::string::npos && row.subtitle.find("Steam")==std::string::npos,
+              "Game Pass settings never present a Steam service");
+    }
+    for (const auto* key:{"settings-account","settings-signout","settings-cloud-saves","settings-import",
+                          "settings-title-store","settings-downloads-slow"})
+        check(!has_row(model,key),"Steam-only settings are removed from Game Pass mode");
+    check(has_row(model,"settings-xbox-account") && has_row(model,"settings-storage") && has_row(model,"settings-motion"),
+          "Game Pass account, storage and display settings remain");
 }
 
 // A game of a store without Cloud saves (an imported game Playden copied in), with Steam signed in or
@@ -3213,6 +3231,7 @@ int main() {
     live_import_sheet_sends_requests();
     live_import_choice_and_details();
     store_art_follows_the_store();
+    gamepass_settings_exclude_steam_controls();
     non_canonical_game_keys_select_nothing();
     live_stay_signed_in_preference_loads();
     live_launch_failure_remains_visible_without_a_details_status_line();

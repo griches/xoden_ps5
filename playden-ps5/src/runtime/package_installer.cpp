@@ -49,7 +49,7 @@ struct FilesystemPackageInstaller::Mapping {
 namespace {
 // The title files a game replaces with its own metadata, and the marker that
 // says its metadata was generated.
-constexpr const char* kTitleMetadataFiles[] = {"sce_sys/param.json", "sce_sys/icon0.png"};
+constexpr const char* kTitleMetadataFiles[] = {"sce_sys/param.json", "sce_sys/icon0.png", "sce_sys/pic0.dds"};
 constexpr const char* kTitleMetadataMarker = ".generated";
 }  // namespace
 
@@ -664,6 +664,18 @@ FilesystemPackageInstaller::TitleMappings(const RuntimeInstall& record) const {
     if (variant->any_title && destination == kTitleMetadataFiles[0] && !mapping.owned) return {};
     mappings.push_back(std::move(mapping));
   }
+  // Older kits have no pic0 entry. A generated picture is still owned metadata,
+  // hashed and copied through exactly the same staging/refresh path.
+  const std::string picture = kTitleMetadataFiles[2];
+  const auto own = TitleMetadataPath(record,picture);
+  if (!destinations.count(picture) && !own.empty() && IsRegularNoSymlink(own)) {
+    std::error_code error;
+    const auto size = fs::file_size(own,error);
+    const auto digest = operations_.hash_file(own);
+    if (error || !digest) return {};
+    auto described = std::make_shared<KitFile>(KitFile{own.string(),size,*digest,0644});
+    mappings.push_back({described.get(),own.string(),picture,own,described});
+  }
   return mappings;
 }
 
@@ -676,7 +688,7 @@ std::filesystem::path FilesystemPackageInstaller::TitleMetadataPath(const Runtim
 
 bool FilesystemPackageInstaller::TitleMetadataCurrent(const RuntimeInstall& record) {
   const auto paths = Resolve(record);
-  if (!paths || !IsRegularNoSymlink(TitleMetadataPath(record, kTitleMetadataMarker))) return false;
+  if (!paths || ReadBounded(TitleMetadataPath(record, kTitleMetadataMarker),16) != std::optional<std::string>("2\n")) return false;
   for (const auto& mapping : TitleMappings(record)) {
     if (!mapping.owned) continue;
     const auto installed = paths->title / mapping.destination_relative;
@@ -689,6 +701,11 @@ bool FilesystemPackageInstaller::TitleMetadataCurrent(const RuntimeInstall& reco
 PackageActionResult FilesystemPackageInstaller::WriteTitleMetadata(const RuntimeInstall& record,
                                                                    const std::string& param_json,
                                                                    const std::optional<std::string>& icon_png) {
+  return WriteTitleArtwork(record,param_json,icon_png,std::nullopt);
+}
+PackageActionResult FilesystemPackageInstaller::WriteTitleArtwork(const RuntimeInstall& record,
+    const std::string& param_json, const std::optional<std::string>& icon_png,
+    const std::optional<std::string>& picture_dds) {
   const auto paths = Resolve(record);
   if (!paths) return Failed("kit-invalid", "record or verified kit view is invalid");
   // The parameters name this title, whichever kit title they were made from.
@@ -719,7 +736,10 @@ PackageActionResult FilesystemPackageInstaller::WriteTitleMetadata(const Runtime
   const auto icon = root / kTitleMetadataFiles[1];
   if (icon_png ? !replace(icon, *icon_png) : (::unlink(icon.c_str()) != 0 && errno != ENOENT))
     return Failed("title-metadata", "the game's title icon could not be written");
-  if (!replace(root / kTitleMetadataMarker, "1\n"))
+  const auto picture = root / kTitleMetadataFiles[2];
+  if (picture_dds ? !replace(picture,*picture_dds) : (::unlink(picture.c_str()) != 0 && errno != ENOENT))
+    return Failed("title-metadata", "the game's title background could not be written");
+  if (!replace(root / kTitleMetadataMarker, "2\n"))
     return Failed("title-metadata", "the game's title metadata could not be recorded");
   return Complete();
 }
