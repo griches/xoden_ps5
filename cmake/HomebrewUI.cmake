@@ -677,6 +677,7 @@ if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_test(NAME native_startup_order COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/test_native_startup_order.py")
     add_test(NAME console_kit_upload COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/test_console_kit_upload.py")
+    add_test(NAME console_title_deploy COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/test_console_title_deploy.py")
     add_test(NAME ui_comparison_fixture
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/verify_ui_comparison.py"
             "${CMAKE_SOURCE_DIR}/fixtures/ui-comparison")

@@ -29,6 +29,35 @@ SKIP_DIRS = {"logs"}
 WRITABLE_DIRS = ("logs", "playden-data")
 
 
+def configure_raw_transfers(ftp):
+    """Call once on a fresh connection, before reading or writing any package.
+
+    ps5-payload-dev/ftpsrv decodes SELF files by default. Its per-connection
+    SELF toggle disables that transformation, allowing exact-byte backups and
+    verification without executing a second console payload.
+    """
+    try:
+        features = ftp.sendcmd("FEAT")
+    except ftplib.error_perm as error:
+        if str(error).startswith(("500", "502")):
+            return  # Ordinary FTP servers transfer bytes without this extension.
+        raise
+    if "SELF" not in {line.strip().upper() for line in features.splitlines()}:
+        return
+    reply = ftp.sendcmd("SELF")
+    if reply.strip().lower() != "226 self transfer mode disabled":
+        raise RuntimeError("FTP raw executable mode was not confirmed; no files were changed")
+
+
+def delete_file(ftp, path):
+    try:
+        ftp.delete(path)
+    except ftplib.error_reply as error:
+        # ftpsrv acknowledges DELE with 226; ftplib expects 250 specifically.
+        if not str(error).startswith("226 "):
+            raise
+
+
 def listing(ftp, directory):
     entries, lines = {}, []
     try:
@@ -89,7 +118,7 @@ def replace(ftp, path, data, mode):
     if fetch(ftp, path) != data or octal_mode(entries[name]) != mode:
         raise RuntimeError(f"installed {path} did not verify; previous copy kept as {old}")
     if name in existing:
-        ftp.delete(old)
+        delete_file(ftp, old)
 
 
 def main():
@@ -111,6 +140,7 @@ def main():
     ftp = ftplib.FTP()
     ftp.connect(args.host, args.port, timeout=60)
     ftp.login()
+    configure_raw_transfers(ftp)
     if args.command == "restore":
         record = json.loads((args.backup / "backup.json").read_text())
         for path, entry in record["files"].items():

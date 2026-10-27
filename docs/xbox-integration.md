@@ -157,3 +157,22 @@ command was sent during these checks. File content/version is not yet verified.
 Recovery change validation: 151/151 host tests pass in 135.18 s; native PS5 build
 passes. Logs: `/tmp/playden-cleanup-recovery-tests.log` and
 `/tmp/playden-cleanup-recovery-ps5.log`. These changes have not been deployed.
+
+## FTP-only executable backup and verification
+
+Upstream ftpsrv documents a connection-local `SELF` toggle (default on):
+https://github.com/ps5-payload-dev/ftpsrv/blob/master/README.md . The recovered
+console advertises SELF; on a fresh FTP connection it replied
+`226 SELF transfer mode disabled`. Reading eboot then produced 30,810,283 raw
+bytes with SHA256
+`7beb1b2ac5cace748d20f9da6a2abaf430cd909636ef7a3c490f47bf5057544a`, exactly the
+previous verified deployed build. This verifies that executable was unchanged.
+No ELF payload was needed. Raw read saved as `/tmp/playden-recovered-eboot.bin`.
+
+`console_title_deploy.py` now negotiates raw transfers on its fresh connection
+before any package operations and refuses an unconfirmed SELF-mode reply. It
+also accepts ftpsrv's successful 226 DELE response. Five regression cases cover
+toggle confirmation, refusal, ordinary FTP, FEAT errors and delete responses;
+they are registered as `console_title_deploy` in ctest. Full suite passes 152/152.
+Use this path instead of the old `/tmp/deploy-playden-*.py` UID payload wrappers.
+Console publication and cleanup UI acceptance are still outstanding.
