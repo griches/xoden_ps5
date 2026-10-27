@@ -3495,6 +3495,7 @@ class Render::Impl
                               gfx::Color::rgb(0x000000, 0.58F * ease));
         const bool wide = view.surface.find("settings") != std::string::npos ||
                           view.surface.find("profile") != std::string::npos ||
+                          view.surface == "xbox-account" || view.surface == "compatibility" ||
                           view.surface == "choice-picker" || view.surface == "preset-picker" ||
                           view.surface == "button-mapping" || view.surface == "controller-tuning" ||
                           view.surface == "game-maintenance" ||
@@ -3521,7 +3522,7 @@ class Render::Impl
             ui::text(overlay_, fonts_.display, view.title, panel.x + 48.0F, 142.0F, 48.0F, kText);
         if (!view.subtitle.empty())
             ui::paragraph(overlay_, fonts_.regular, view.subtitle, panel.x + 48.0F, 190.0F + drop, 23.0F,
-                          panel.w - 96.0F, 32.0F, kSecondary, view.surface == "install" ? 6 : 3);
+                          panel.w - 96.0F, 32.0F, kSecondary, (view.surface == "install" || view.surface == "xbox-account") ? 6 : 3);
         if (view.surface == "storage")
             draw_storage_overlay_rows(view, {panel.x + 40.0F, 246.0F, panel.w - 80.0F, 710.0F});
         else if (view.surface == "import-storage")
@@ -3536,8 +3537,8 @@ class Render::Impl
         else if (view.surface == "installed-games")
             draw_installed_games_sheet(view, panel);
         else
-            draw_overlay_rows(view, {panel.x + 40.0F, (view.surface == "install" ? 414.0F : 292.0F) + drop,
-                                     panel.w - 80.0F, (view.surface == "install" ? 528.0F : 650.0F) - drop});
+            draw_overlay_rows(view, {panel.x + 40.0F, ((view.surface == "install" || view.surface == "xbox-account") ? 414.0F : 292.0F) + drop,
+                                     panel.w - 80.0F, ((view.surface == "install" || view.surface == "xbox-account") ? 528.0F : 650.0F) - drop});
         if (view.comparison)
             draw_preset_comparison(*view.comparison, {72.0F, 150.0F, panel.x - 144.0F, 760.0F}, ease);
         overlay_.pop_opacity();

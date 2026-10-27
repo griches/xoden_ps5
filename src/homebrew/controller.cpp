@@ -1797,7 +1797,12 @@ void Controller::TickXboxJobs() {
   if (runtime_ && runtime_->Shared()->status == RuntimeHostStatus::kStarting) return;
   xbox_revision_ = state->revision; xbox_account_key_ = account;
   const auto catalog = xbox_library_->Snapshot();
-  model_.UpdateXboxAccount(catalog ? catalog->gamertag : "",state->message,state->active);
+  const bool account_operation = !state->active_game.valid() && state->phase != "idle";
+  const std::string account_message = account_operation ? state->message : state->active
+      ? "An Xbox operation is running. Account refresh is available when it finishes."
+      : catalog ? "Saved Xbox account. Refresh to check your session and library."
+                : "No Xbox account is connected to this console.";
+  model_.UpdateXboxAccount(catalog ? catalog->gamertag : "",account_message,state->active);
   if (state->phase == "refreshed" && !state->request_id.empty() && state->request_id != xbox_refreshed_request_) {
     xbox_refreshed_request_ = state->request_id;
     if (library_) library_->Refresh(Store::kXbox);

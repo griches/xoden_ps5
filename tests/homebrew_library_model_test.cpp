@@ -3182,7 +3182,19 @@ void xbox_search_covers_the_complete_catalog() {
     check(std::find(scopes.begin(), scopes.end(), "xbox") != scopes.end(), "Xbox has its own library rail");
 }
 
+void xbox_account_help_is_visible_without_authenticating() {
+    auto model = make_live();
+    model.UpdateXboxAccount("", "No Xbox account is connected to this console.", false);
+    for (int i = 0; i < 4; ++i) model.action("r1");
+    activate(model,"settings-xbox-account");
+    check(model.view().subtitle.find("Microsoft sign-in") != std::string::npos,
+          "account sheet exposes the sign-in instructions to its renderer");
+    activate(model,"xbox-refresh");
+    check(model.TakeXboxRefresh(), "account refresh can be requested without starting interactive login");
+}
+
 int main() {
+    xbox_account_help_is_visible_without_authenticating();
     xbox_install_does_not_wait_for_steam();
     xbox_search_covers_the_complete_catalog();
     live_import_sheet_sends_requests();

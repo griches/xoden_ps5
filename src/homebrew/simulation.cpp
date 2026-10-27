@@ -3857,6 +3857,7 @@ void Simulation::rebuild_view() {
     } else if (!state_.navigation.modals.empty()) {
         const auto& modal = state_.navigation.modals.back();
         view_.title = modal.title;
+        if (modal.id == "xbox-account" || modal.id == "compatibility") view_.subtitle = modal.body;
         if (modal.id == "logs") {
             view_.subtitle = state_.log_context;
             if (state_.log_state == LogState::Loading) row("logs-loading", RowKind::Status, "Loading fixture logs…", "").enabled = false;
