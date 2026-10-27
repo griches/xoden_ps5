@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cstring>
 #include <thread>
+extern "C" int getentropy(void *, size_t);
+extern "C" int xodus_ps5_entropy_status(void);
 namespace playden::stores::xbox {
 namespace {
 std::string Message(const std::string& phase) {
@@ -16,15 +18,25 @@ std::string Message(const std::string& phase) {
     return "Starting Xbox download…";
 }
 }
-NativeRunner NativeEngine(std::string root, std::string games, std::string trust) {
-    return [root = std::move(root),games = std::move(games),trust = std::move(trust)](
+NativeRunner NativeEngine(std::string root, std::string games, std::string trust, std::function<void(const std::string&)> log) {
+    return [root = std::move(root),games = std::move(games),trust = std::move(trust), log = std::move(log)](
         const std::function<void(const NativeProgress&)>& progress,
         const std::function<bool()>& cancelled) {
+        // Load and verify the console entropy provider before Rust's infallible
+        // hash-seed API is reached. Missing modules become a failed job.
+        unsigned char entropy_probe;
+        if (getentropy(&entropy_probe,1) != 0) {
+            if (log) log("native entropy unavailable code=" + std::to_string(xodus_ps5_entropy_status()));
+            return NativeResult::Failed;
+        }
+        if (log) log("native entropy ready");
         XodusJobConfig config{reinterpret_cast<const uint8_t*>(root.data()),root.size(),
             reinterpret_cast<const uint8_t*>(games.data()),games.size(),
             reinterpret_cast<const uint8_t*>(trust.data()),trust.size()};
         std::uint64_t handle = 0;
-        if (xodus_job_start(&config,sizeof(config),XODUS_NATIVE_ABI,&handle) != 0) return NativeResult::Failed;
+        const int started = xodus_job_start(&config,sizeof(config),XODUS_NATIVE_ABI,&handle);
+        if (log) log("native job start code=" + std::to_string(started));
+        if (started != 0) return NativeResult::Failed;
         bool cancel_sent = false;
         for (;;) {
             if (!cancel_sent && cancelled()) cancel_sent = xodus_job_cancel(handle) == 0;
@@ -33,8 +45,11 @@ NativeRunner NativeEngine(std::string root, std::string games, std::string trust
                 if (state.state >= 4 && state.state <= 6) {
                     // Release succeeds only after the runtime and all file writes
                     // have drained. Never permit cleanup on a polling failure.
-                    if (xodus_job_release(handle) == 0)
+                    if (xodus_job_release(handle) == 0) {
+                        if (log) log("native job terminal state=" + std::to_string(state.state) + " error=" +
+                            std::string(state.error,strnlen(state.error,sizeof(state.error))));
                         return state.state == 4 ? NativeResult::Complete : state.state == 6 ? NativeResult::Cancelled : NativeResult::Failed;
+                    }
                 }
                 const std::string phase(state.phase,strnlen(state.phase,sizeof(state.phase)));
                 progress({phase,Message(phase),state.completed_bytes,(state.flags & 1) ? state.total_bytes : 0,state.bytes_per_second});

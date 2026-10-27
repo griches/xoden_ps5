@@ -764,7 +764,8 @@ int main() {
         xbox_config.root = "/data/playden/xbox"; xbox_config.games_root = "/data/playden-games";
         xbox_config.hold_effective_uid = playden::ps5::HoldEffectiveUid;
 #ifdef PLAYDEN_XBOX_NATIVE
-        xbox_config.native_run = playden::stores::xbox::NativeEngine(xbox_config.root,xbox_config.games_root,paths.trust_store);
+        xbox_config.native_run = playden::stores::xbox::NativeEngine(xbox_config.root,xbox_config.games_root,paths.trust_store,
+            [log_root](const std::string& line) { playden::app::AppendLogLine(log_root,"xbox-native.log",line); });
 #endif
         xbox_config.handoff = [package_root = paths.title_root](const std::string& request,const std::string& worker,std::string* error) {
             return start_xbox_handoff(request,worker,package_root,error);
