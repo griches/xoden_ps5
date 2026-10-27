@@ -398,3 +398,11 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Recreated the Xbox test bottle through UI (saves/settings retained). New title FAKE78004 launched and rendered Minishoot loading screen at 100%; stalled in Xbox initialization. Log shows windows.web native activation fails; profile needs explicit native DLL overrides, not just the registry entry installed before settings publication.
 - Current working change adds required windows.web/xgameruntime overrides to generated Xbox profile and refreshes Xbox derived profiles when stopped so updates apply without manual per-game edits. New native package ca94d45ec7c71459daa897de70a052d226937798be2add4a3bc1aa68996ddd11 deploying with backup 20261027-xbox-dll; host suite in progress.
 - Stopped the stuck test title; virtual pad closed. No main-menu/gameplay success claimed for the new native Xbox entry yet.
+
+### Native Xbox main-menu acceptance and input investigation
+
+- Playden 2a86371 fixes Xbox DLL native loading, clears the Wine builtin marker on the windows.web compatibility DLL (same conversion as the established importer), and refreshes derived Xbox profiles idempotently. Correct DXVK/vkd3d and required Xbox DLL overrides now apply automatically. Full 151/151 host tests pass; PS5 build and readback deployment pass. Backup: 20261027-xbox-idempotent.
+- Native Xbox Minishoot FAKE78004 reaches signed-in main menu, opens save selection, creates a test in the second empty slot, and renders the intro/tutorial. Existing first slot retained. Screens: /tmp/xbox-idempotent-game.png and /tmp/xbox-gameplay-ready.png.
+- Gameplay acceptance is NOT complete: tutorial MOVE prompt ignores analogue input. Menu D-pad/Cross and intro confirmation worked. Virtual analogue input moves the PS5 control-center selection, so the virtual-pad transport works. Unity Player.log says Using Windows.Gaming.Input.
+- Testing a reversible single-game profile override windows.gaming.input=d to exercise Unity's embedded XInput fallback. Original profile saved privately at /tmp/minishoot-profile-before-input-test. This is diagnostic only and not committed as an automatic default. Runtime kit pins unchanged.
+- Remote Play remains off. Virtual pad open for testing. Fresh account sign-in UI and full playable acceptance remain unfinished.
