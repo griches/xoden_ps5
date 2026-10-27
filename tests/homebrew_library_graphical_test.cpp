@@ -98,6 +98,18 @@ int main(int argc,char** argv) {
     };
     capture("home.png");
     {
+      Simulation phone({}, {}, ModelMode::Live);
+      phone.SetGamePassOnly(true);
+      phone.UpdateXboxAccount({},"Not connected",false);
+      for(int i=0;i<4;++i) assert(phone.action("r1"));
+      assert(phone.action("focus:settings-xbox-account") && phone.action("cross"));
+      assert(phone.action("focus:xbox-phone-test") && phone.action("cross"));
+      phone.UpdateXboxPhoneSignIn("Waiting","TEST-CODE","https://www.microsoft.com/link",true);
+      assert(phone.state().navigation.modals.back().link=="https://www.microsoft.com/link");
+      for(int i=0;i<16;++i) renderer.draw(phone,1920,1080);
+      assert(renderer.capture_png(output/"phone-signin-qr.png",1920,1080));
+    }
+    {
       Simulation missing({}, {}, ModelMode::Live);
       missing.ShowRootAccessMissing("native data grant failed (code 2); helper stage=request status=unavailable error=2");
       for(int i=0;i<16;++i) renderer.draw(missing,1920,1080);
