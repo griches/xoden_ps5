@@ -332,5 +332,30 @@ int main() {
         phone_drain=true;Wait(phone,"cancelled");
         assert(phone.Snapshot()->message.find("Phone sign-in cancelled")!=std::string::npos);
     }
+    // Cancelling catalogue loading is an account operation, even when unrelated
+    // partial downloads exist. It must not delete or report cancelling a game.
+    const auto untouched=root/"games/xbox-9zzzzzzzzzzz";
+    std::filesystem::create_directories(untouched);Storage retained(untouched.string());
+    Put(retained,".nexus-streaming-v1.jsonl","keep-checkpoint");
+    std::atomic<bool> account_cancel{false},account_drain{false};
+    phone_config.native_run=[&](const auto& report,const auto& cancelled) {
+        report(stores::xbox::NativeProgress{"refreshing","Loading library"});
+        while(!cancelled())std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        account_cancel=true;while(!account_drain)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        const auto bytes=store.Read("job-request.json");assert(bytes.ok());
+        const auto request=steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));assert(request);
+        Put(store,"job-result.json","{\"schema\":1,\"requestId\":\""+request->Find("requestId")->text()+"\",\"operation\":\"refresh\",\"status\":\"cancelled\"}");
+        return stores::xbox::NativeResult::Cancelled;
+    };
+    {
+        stores::xbox::Jobs account(phone_config);Wait(account,"cancelled");
+        assert(account.Refresh("GB"));Wait(account,"refreshing");assert(account.Cancel({}));
+        assert(account.Snapshot()->message.find("account operation")!=std::string::npos);
+        while(!account_cancel)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(account.Snapshot()->active);account_drain=true;Wait(account,"cancelled");
+        assert(account.Snapshot()->message.find("Account operation cancelled")!=std::string::npos);
+        assert(retained.Read(".nexus-streaming-v1.jsonl").ok());
+        assert(!account.Snapshot()->completed_game.valid());
+    }
     std::filesystem::remove_all(root);
 }

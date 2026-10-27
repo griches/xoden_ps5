@@ -1801,13 +1801,21 @@ void Controller::TickXboxJobs() {
     }
     if (!xbox_jobs_->TestPhoneSignIn(game,catalog?catalog->market:"GB"))
       model_.UpdateXboxPhoneSignIn("Select a PC game from your library and wait for the current operation to finish before testing phone sign-in.",{},{},false);
+    else { xbox_phone_load_library_=!catalog; xbox_phone_refresh_started_=false; }
   }
-  if (model_.TakeXboxPhoneCancel()) xbox_jobs_->Cancel({});
+  if (model_.TakeXboxPhoneCancel()) {
+    xbox_phone_load_library_=xbox_phone_refresh_started_=false;
+    xbox_jobs_->Cancel({});
+  }
   if (model_.TakeXboxRefresh()) {
     const auto catalog = xbox_library_->Snapshot();
     if (!xbox_jobs_->Refresh(catalog ? catalog->market : "GB")) model_.ShowLayoutNotice("Wait for the current Xbox operation to finish before refreshing.");
   }
   const auto state = xbox_jobs_->Snapshot();
+  if (xbox_phone_load_library_ && !xbox_phone_refresh_started_ && !state->active && state->phase=="phone-sign-in-verified") {
+    const auto catalog=xbox_library_->Snapshot();
+    if (xbox_jobs_->Refresh(catalog?catalog->market:"GB")) xbox_phone_refresh_started_=true;
+  }
   const auto account = xbox_library_->AccountKey();
   if (state->phase == "handoff") { model_.HandoffXbox(); return; }
   if (state->revision == xbox_revision_ && account == xbox_account_key_) return;
@@ -1821,6 +1829,13 @@ void Controller::TickXboxJobs() {
                 : "No Xbox account is connected to this console.";
   model_.UpdateXboxAccount(state->phase=="signed-out"?"":catalog ? catalog->gamertag : "",account_message,state->active);
   if (state->phone_test) model_.UpdateXboxPhoneSignIn(state->message,state->sign_in_code,state->sign_in_url,state->active);
+  if (xbox_phone_load_library_) {
+    const bool finished=!state->active && (state->phase=="refreshed" || state->phase=="failed" || state->phase=="cancelled");
+    const auto message=state->phase=="refreshed" ? "Signed in. Your library is ready. In-game sign-in is still being tested." :
+        finished ? state->message : xbox_phone_refresh_started_ ? "Signed in. Loading your library…" : state->message;
+    model_.UpdateXboxPhoneSignIn(message,state->sign_in_code,state->sign_in_url,!finished);
+    if(finished) xbox_phone_load_library_=xbox_phone_refresh_started_=false;
+  }
   if ((state->phase == "refreshed" || state->phase=="signed-out") && !state->request_id.empty() && state->request_id != xbox_refreshed_request_) {
     xbox_refreshed_request_ = state->request_id;
     if (library_) library_->Refresh(Store::kXbox);

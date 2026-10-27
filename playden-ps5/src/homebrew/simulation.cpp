@@ -498,7 +498,7 @@ std::string action_label(const std::string& key) {
         {"inject-logs-ready", "Inject ready logs"}, {"account-auth", "Authentication"},
         {"account-last-sync", "Last library sync"}, {"account-sync", "Sync now"},
         {"account-recover", "Reconnect account"}, {"account-switch", "Switch account"},
-        {"xbox-refresh", "Refresh Xbox library"}, {"xbox-phone-test", "Test phone sign-in"}, {"xbox-phone-done", "Done"}, {"xbox-signout", "Sign out"}, {"account-reauth", "Sign in again"}, {"job-resume-all", "Resume all"}, {"job-clear-completed", "Clear completed"},
+        {"xbox-refresh", "Refresh Xbox library"}, {"xbox-phone-test", "Phone sign-in"}, {"xbox-phone-done", "Done"}, {"xbox-signout", "Sign out"}, {"account-reauth", "Sign in again"}, {"job-resume-all", "Resume all"}, {"job-clear-completed", "Clear completed"},
         {"prep-clear-completed", "Clear completed"}, {"storage-close", "Close"}, {"collection-new", "New collection"}, {"collection-manage", "Manage collections"},
         {"about-version", "Version"}, {"self-update-install", "Download and install"},
         {"self-update-restart", "Restart Playden"}, {"self-update-cancel", "Cancel update"},
@@ -6877,12 +6877,12 @@ void Simulation::activate() {
         ModalEntry modal{"xbox-account","Xbox account",state_.navigation.focus_key,
             xbox_account_busy_ ? std::vector<std::string>{"cancel"} : std::vector<std::string>{"xbox-refresh","xbox-phone-test","xbox-signout","cancel"},0,false};
         modal.body = xbox_account_message_;
-        modal.body += " Microsoft sign-in is available as a phone test. It checks PC game access. Game sign-in is still being tested.";
+        modal.body += " Phone sign-in checks PC game access and loads your library when no account is connected. In-game sign-in is still being tested.";
         open_modal(std::move(modal));
     } else if (live() && action_name=="xbox-phone-test") {
         if (!xbox_account_busy_) {
             close_modal();xbox_phone_requested_=true;xbox_phone_busy_=true;
-            ModalEntry modal{"phone-sign-in","Phone sign-in test",state_.navigation.focus_key,{"cancel"},0,false};
+            ModalEntry modal{"phone-sign-in","Phone sign-in",state_.navigation.focus_key,{"cancel"},0,false};
             modal.body="Preparing a Microsoft sign-in code to verify PC game access.";
             open_modal(std::move(modal));
         }
