@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// One console job: wait for Playden to exit, run its Xbox worker or prepared game, then return.
+// Wait for Playden to exit, then launch its worker or prepared game. Only a
+// background worker returns to the launcher; games quit to the PS5 Home screen.
 // Never terminates a title and abandons the handoff if another game is started.
 #include <stdint.h>
 #include <stdio.h>
@@ -10,7 +11,9 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 
+#ifndef ROOT
 #define ROOT "/data/playden/xbox/"
+#endif
 typedef struct { uint32_t size, user_id, app_opt, pad; uint64_t crash_report, check_flag; } launch_params;
 int sceUserServiceInitialize(void*);
 int sceUserServiceGetForegroundUser(uint32_t*);
@@ -93,6 +96,7 @@ int main(void) {
     while ((state = current(title)) == 1 && !strcmp(title, home) && now() - start < 90) usleep(250000);
     if (state != 0) { report(id, "canceled"); close(lock); return 1; }
     if (!launch(worker, mode[0] ? id : NULL)) { report(id, "launch-failed"); close(lock); return 1; }
+    if (mode[0]) { report(id, "launched"); close(lock); return 0; }
     report(id, "starting"); start = now(); int seen = 0;
     while (now() - start < 24 * 60 * 60) {
         state = current(title);
