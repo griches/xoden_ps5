@@ -1,0 +1,11 @@
+LIBRARY xgameruntime.dll
+EXPORTS
+DllCanUnloadNow = xgameruntime_impl.DllCanUnloadNow
+InitializeApiImpl = xgameruntime_impl.InitializeApiImpl
+InitializeApiImplEx = xgameruntime_impl.InitializeApiImplEx
+InitializeApiImplEx2 = xgameruntime_impl.InitializeApiImplEx2
+QueryApiImpl = xgameruntime_impl.QueryApiImpl
+UninitializeApiImpl = xgameruntime_impl.UninitializeApiImpl
+NexusRegisterCloudShutdown = xgameruntime_impl.NexusRegisterCloudShutdown
+XErrorReport = xgameruntime_impl.XErrorReport
+XodusSaveFilesMonitor = xgameruntime_impl.XodusSaveFilesMonitor
