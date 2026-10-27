@@ -281,6 +281,10 @@ void Jobs::ExecuteDiscard(GameId game) {
         std::lock_guard<std::mutex> lock(mutex_);
         auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
         next->partials.erase(std::remove(next->partials.begin(),next->partials.end(),game),next->partials.end());
+        // Completion must never expose the just-removed game as installed,
+        // including the intermediate snapshot consumed by ExecuteUninstall.
+        next->prepared.erase(std::remove_if(next->prepared.begin(),next->prepared.end(),
+            [&](const auto& item) { return item.game == game; }),next->prepared.end());
         next->phase = "cleaned"; next->message = "Partial Xbox download deleted."; state_ = std::move(next);
     }
 }
