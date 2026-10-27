@@ -40,32 +40,49 @@ pub(super) async fn run(
     .map_err(|_| "device-timeout")?
     .map_err(|error| error.diagnostic_code())?;
     let login = DeviceCodeClient::new(client.clone());
-    let mut challenge = login
-        .start(Scope::Xbox)
-        .await
-        .map_err(|_| "phone-code-request")?;
-    let expires =
-        chrono::Utc::now() + chrono::Duration::seconds(challenge.expires_in().as_secs() as i64);
-    state(
-        root,
-        req,
-        "sign-in-code",
-        json!({"userCode":challenge.user_code,
+    // Rechecking a previously verified candidate must prove a genuine refresh
+    // after restart, without asking the player to approve another device code.
+    // A full sign-out removes this record and therefore always starts fresh.
+    let candidate = if let Some(saved) = tokens
+        .phone_candidate()
+        .map_err(|_| "phone-candidate-read")?
+    {
+        state(root, req, "checking-game-access", json!({}))?;
+        login
+            .refresh(&saved, Some(Scope::Xbox))
+            .await
+            .map_err(|_| "phone-candidate-refresh")?
+    } else {
+        let mut challenge = login
+            .start(Scope::Xbox)
+            .await
+            .map_err(|_| "phone-code-request")?;
+        let expires =
+            chrono::Utc::now() + chrono::Duration::seconds(challenge.expires_in().as_secs() as i64);
+        state(
+            root,
+            req,
+            "sign-in-code",
+            json!({"userCode":challenge.user_code,
         "verificationUri":challenge.verification_uri,"expiresAt":expires.to_rfc3339()}),
-    )?;
-    let candidate = loop {
-        match login.poll(&mut challenge).await {
-            Ok(Poll::Pending) => continue,
-            Ok(Poll::Complete(candidate)) => break candidate,
-            Err(error) => {
-                return Err(match error {
-                    xodus::api::live::device_code::Error::Expired => "phone-code-expired",
-                    xodus::api::live::device_code::Error::Denied => "phone-sign-in-denied",
-                    xodus::api::live::device_code::Error::Cancelled => "phone-sign-in-cancelled",
-                    _ => "phone-sign-in-failed",
-                });
+        )?;
+        let candidate = loop {
+            match login.poll(&mut challenge).await {
+                Ok(Poll::Pending) => continue,
+                Ok(Poll::Complete(candidate)) => break candidate,
+                Err(error) => {
+                    return Err(match error {
+                        xodus::api::live::device_code::Error::Expired => "phone-code-expired",
+                        xodus::api::live::device_code::Error::Denied => "phone-sign-in-denied",
+                        xodus::api::live::device_code::Error::Cancelled => {
+                            "phone-sign-in-cancelled"
+                        }
+                        _ => "phone-sign-in-failed",
+                    });
+                }
             }
-        }
+        };
+        candidate
     };
     // Overwrite the short code immediately; it never enters the public ABI.
     state(root, req, "checking-game-access", json!({}))?;
