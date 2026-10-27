@@ -912,3 +912,38 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   Gary's local PS5_ArtSwap project documents ShellUI caching and refresh; no
   ShellUI restart or game reinstall was performed. New MIO title has generated
   icon0/pic0 before first registration; verify its actual Home display next.
+
+### PC licensing validation and follow-up issues
+
+- Backend 2fbd5e9 extends the isolated phone probe with optional PC licensing
+  and game-specific client checks; 8 device-code tests pass. Existing device
+  credentials are copied into memory before renewal, with no active-user reads
+  or writes. MIO desktop content 10e0a79c-f329-4cf6-a9eb-d0559d38ebcf in GB:
+  phone OAuth, Xbox profile/marketplace, Store refresh, HTTP 200 PC content
+  license, and authenticated content-key unpack all PASSED twice. The candidate
+  was never adopted and its credentials were dropped on exit.
+- MIO MSA application 0000000041180A5D: direct OAuth refresh into both normal
+  xboxlive.signin and full-trust service scope was REJECTED by Microsoft. This
+  does not invalidate the app-level session, which still passes licensing.
+  Native phone sign-in and actual in-game runtime acceptance remain unfinished;
+  keep the working console session and do not ask Gary to sign in repeatedly
+  until a concrete next runtime validation is ready.
+- Backend f2c2fb0 raises native Tokio HTTP workers from 2 to 4 while retaining
+  four bounded ranges and the four-worker blocking-IO pool. Native 5/5 tests
+  and PS5 cross-build pass. No further real speed improvement claimed yet.
+- Frontend 046fcc2 disables upstream app update recovery/check/install/swap in
+  Game Pass mode while preserving pinned kit downloads, and removes update
+  controls. Regression proves old update state stays untouched, no app network
+  request or swap occurs, and kit checks still work. Full host 152/152 passed
+  in 140.64 s; PS5 build passed. Deployment still pending the exit follow-up.
+- Gary reports games reopening Playden after quit and no resolution above
+  1080p in-game. Found the first cause in our xbox-handoff payload: it explicitly
+  waited for games to close then relaunched Playden. New follow-up skips that
+  return for game-session mode; host harness tests the real payload lifecycle
+  including session forwarding, worker return, busy/unknown refusal, launch
+  failure and malformed requests. Full checks/deploy pending.
+- Wine patch 0630 limits game display modes to the configured desktop size.
+  Playden defaults desktop to 1920x1080 but already offers 2560x1440 and
+  3840x2160. Updated the setting explanation to say this is the maximum offered
+  in-game and requires a game restart. Need actual higher-resolution acceptance;
+  do not confuse desktop/internal render size with verified HDMI output.
