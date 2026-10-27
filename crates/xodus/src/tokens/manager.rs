@@ -13,6 +13,7 @@ mod keys {
     pub const USER_TOKENS: &str = "user-tokens";
     pub const USER_INFO: &str = "user-DA";
     pub const USER_SESSION: &str = "user-session";
+    pub const PHONE_CANDIDATE: &str = "phone-sign-in-candidate";
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -97,6 +98,7 @@ impl TokenManager {
     }
 
     pub fn remove_persistent(&self) -> Result<(), TokenStoreError> {
+        self.remove_phone_candidate()?;
         self.persistent.remove(keys::DEVICE_TOKENS)?;
         self.persistent.remove(keys::USER_TOKENS)?;
         self.persistent.remove(keys::USER_INFO)?;
@@ -106,6 +108,23 @@ impl TokenManager {
     }
 
     // ---- Device identity / license -----------------------------------------
+
+    /// A phone-login candidate is deliberately not a user session. Existing
+    /// downloads and runtime callers continue to read the active account only.
+    pub fn phone_candidate(&self) -> Result<Option<crate::api::live::device_code::Credentials>, TokenStoreError> {
+        self.persistent.get(keys::PHONE_CANDIDATE)?.map(|bytes|
+            crate::api::live::device_code::Credentials::from_private_candidate_record(&bytes)
+                .map_err(|_| TokenStoreError::NotFound)).transpose()
+    }
+
+    pub fn save_phone_candidate(&self, candidate: &crate::api::live::device_code::Credentials) -> Result<(), TokenStoreError> {
+        let bytes = candidate.private_candidate_record().map_err(|_| TokenStoreError::NotFound)?;
+        Self::write_verified(&*self.persistent, keys::PHONE_CANDIDATE, &bytes)
+    }
+
+    pub fn remove_phone_candidate(&self) -> Result<(), TokenStoreError> {
+        self.persistent.remove(keys::PHONE_CANDIDATE)
+    }
 
     pub fn get_device_license(&self) -> Result<Device, TokenStoreError> {
         let bytes = self

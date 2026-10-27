@@ -71,7 +71,7 @@ pub struct Credentials {
     access_token: String,
     refresh_token: String,
     user_id: Option<String>,
-    expires_in: Duration,
+    expires_at: chrono::DateTime<chrono::Utc>,
     scope: Scope,
     client_id: String,
 }
@@ -86,7 +86,66 @@ impl Credentials {
         self.user_id.as_deref()
     }
     pub fn expires_in(&self) -> Duration {
-        self.expires_in
+        (self.expires_at - chrono::Utc::now())
+            .to_std()
+            .unwrap_or(Duration::ZERO)
+    }
+
+    // This wire format is exclusively for the host-selected private credential
+    // backend. The public credential type still has no Debug/Serialize support.
+    pub(crate) fn private_candidate_record(&self) -> Result<Vec<u8>, Error> {
+        if self.client_id != CLIENT_ID
+            || !matches!(self.scope, Scope::Xbox)
+            || self.user_id.is_none()
+        {
+            return Err(Error::Response);
+        }
+        serde_json::to_vec(&serde_json::json!({"schema":1,"client_id":CLIENT_ID,
+            "access_token":self.access_token,"refresh_token":self.refresh_token,
+            "user_id":self.user_id,"expires_at":self.expires_at.timestamp()}))
+        .map_err(|_| Error::Response)
+    }
+
+    pub(crate) fn from_private_candidate_record(bytes: &[u8]) -> Result<Self, Error> {
+        if bytes.len() > RESPONSE_LIMIT {
+            return Err(Error::Response);
+        }
+        let body: Value = serde_json::from_slice(bytes).map_err(|_| Error::Response)?;
+        let fields = body.as_object().ok_or(Error::Response)?;
+        if fields.len() != 6
+            || body["schema"] != 1
+            || body["client_id"] != CLIENT_ID
+            || fields.keys().any(|key| {
+                ![
+                    "schema",
+                    "client_id",
+                    "access_token",
+                    "refresh_token",
+                    "user_id",
+                    "expires_at",
+                ]
+                .contains(&key.as_str())
+            })
+        {
+            return Err(Error::Response);
+        }
+        let expiry = body["expires_at"]
+            .as_i64()
+            .and_then(|t| chrono::DateTime::from_timestamp(t, 0))
+            .ok_or(Error::Response)?;
+        // An expired access token can still have a usable refresh token. Never
+        // stretch its lifetime when restoring; callers refresh before using it.
+        if expiry > chrono::Utc::now() + chrono::Duration::hours(24) {
+            return Err(Error::Response);
+        }
+        Ok(Self {
+            access_token: text(&body, "access_token", 16384)?,
+            refresh_token: text(&body, "refresh_token", 16384)?,
+            user_id: Some(text(&body, "user_id", 256)?),
+            expires_at: expiry,
+            scope: Scope::Xbox,
+            client_id: CLIENT_ID.into(),
+        })
     }
 }
 pub enum Poll {
@@ -373,7 +432,9 @@ fn credentials(body: &Value, fallback: Option<&str>, scope: Scope) -> Result<Cre
         access_token: text(body, "access_token", 16384)?,
         refresh_token,
         user_id,
-        expires_in: seconds(body, "expires_in", 86400)?,
+        expires_at: chrono::Utc::now()
+            + chrono::Duration::from_std(seconds(body, "expires_in", 86400)?)
+                .map_err(|_| Error::Response)?,
         scope,
         client_id: CLIENT_ID.into(),
     })
