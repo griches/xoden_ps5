@@ -12,6 +12,7 @@ if(PLAYDEN_XBOX_NATIVE_SOURCE OR PLAYDEN_XBOX_NATIVE_LIBRARY)
     # null definitions preserve AWS-LC's normal optional-hook semantics and its
     # own allocation headers/zeroization; no custom crypto allocator is installed.
     set(PLAYDEN_XBOX_NATIVE_LINK_OPTIONS
+        --wrap=arc4random_buf
         --defsym=OPENSSL_memory_alloc=0 --defsym=OPENSSL_memory_free=0
         --defsym=OPENSSL_memory_get_size=0 --defsym=OPENSSL_memory_realloc=0
         --defsym=sdallocx=0)

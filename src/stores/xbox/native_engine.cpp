@@ -4,6 +4,10 @@
 #include <chrono>
 #include <cstring>
 #include <thread>
+#include <cerrno>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/event.h>
 extern "C" int getentropy(void *, size_t);
 extern "C" int xodus_ps5_entropy_status(void);
 namespace playden::stores::xbox {
@@ -30,6 +34,20 @@ NativeRunner NativeEngine(std::string root, std::string games, std::string trust
             return NativeResult::Failed;
         }
         if (log) log("native entropy ready");
+        if (log) {
+            const int queue = kqueue();
+            log("native io queue=" + std::to_string(queue) + " errno=" + std::to_string(queue < 0 ? errno : 0));
+            if (queue >= 0) {
+                const int flags = fcntl(queue,F_SETFD,FD_CLOEXEC);
+                log("native io cloexec=" + std::to_string(flags) + " errno=" + std::to_string(flags < 0 ? errno : 0));
+                struct kevent change{}, event{}; struct timespec timeout{};
+                EV_SET(&change,0,EVFILT_USER,EV_ADD | EV_CLEAR | EV_RECEIPT,0,0,nullptr);
+                const int receipt = kevent(queue,&change,1,&event,1,&timeout);
+                log("native io receipt=" + std::to_string(receipt) + " errno=" + std::to_string(receipt < 0 ? errno : 0) +
+                    " flags=" + std::to_string(event.flags) + " data=" + std::to_string(event.data));
+                close(queue);
+            }
+        }
         XodusJobConfig config{reinterpret_cast<const uint8_t*>(root.data()),root.size(),
             reinterpret_cast<const uint8_t*>(games.data()),games.size(),
             reinterpret_cast<const uint8_t*>(trust.data()),trust.size()};
