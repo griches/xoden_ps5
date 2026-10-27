@@ -10,9 +10,11 @@ test evidence; this page tracks outstanding functionality.
 - [ ] Complete native phone sign-in and game-runtime validation. OAuth, Xbox
   profile/marketplace tickets, Store refresh and a real MIO PC content license
   with authenticated content-key unpack passed. Direct refresh into MIO's own
-  MSA client was rejected; the runtime exchange needs more work. Keep the
-  working account until candidate validation passes; then test
-  sign-out, fresh sign-in, refresh, cancellation, expiry and account replacement.
+  MSA client was rejected; the runtime exchange needs more work. Gary requested
+  full sign-out, which passed on the console and cleared user credentials and
+  the cached library. Do not restore the old session. The fresh native phone
+  flow now displays a QR code and short code; awaiting user approval, then
+  verify saved candidate persistence, activation, refresh, expiry and runtime.
 - [ ] Continue tuning direct-download throughput. Deployed bounded parallel
   ranges measured 12.3–15.5 MB/s during MIO, including a single-large-file window,
   compared with earlier 6.3 MB/s on Elder Gods. These are different games, not
@@ -23,9 +25,9 @@ test evidence; this page tracks outstanding functionality.
   restart, insufficient storage and cleanup.
 - [ ] Complete standalone app identity, separate title/package assets, settings
   and update ownership. Remove remaining Steam-specific product flows.
-- [ ] Verify generated PS5 Home `icon0` / `pic0` artwork on new installs and
-  refresh already registered titles. Generation and owned disk-cache updates
-  are deployed; existing ShellUI artwork remained cached in the visual check.
+- [ ] Refresh generated PS5 Home artwork on already registered titles. New
+  MIO installation shows icon0 and pic0 correctly on the actual Home screen;
+  Elder Gods artwork remains cached by ShellUI despite owned disk-cache updates.
 - [ ] Verify subscription expiry and account changes end to end, including
   launch-time behavior; do not claim enforcement beyond the checks actually tested.
 - [ ] Expand compatibility tests, including save/reload and longer sessions.
@@ -40,6 +42,9 @@ test evidence; this page tracks outstanding functionality.
 - Generated icon0/pic0 artwork and bounded owned-title disk-cache updates.
 - Game Pass startup/settings no longer restore or display the Steam account.
 - Controller reconnection after virtual-pad handover.
+- Native account reset retains installed games, saves and registered device identity.
+- Phone sign-in QR display and safe cancellation accepted on the actual PS5.
+- Normal game exit returns to PS5 Home; MIO's in-game 3840x2160 option verified.
 - Package choices and size review before downloads.
 - Native PS5 downloads; pause/restart/resume progress persistence and cancel cleanup.
 - Automatic Xbox runtime preparation, shipping-executable selection and Home title setup.
