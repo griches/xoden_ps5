@@ -162,3 +162,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(feature = "job-engine")]
+pub mod job;

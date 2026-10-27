@@ -239,16 +239,46 @@ pub async fn run(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
     run_observed(client,tokens,root,games,None).await
 }
 
+/// Owns the job lock independently of the async operation. Embedded hosts must
+/// retain this lease until their dedicated runtime has drained blocking file IO.
+/// Dropping only the operation future does not make partial files safe to delete.
+pub struct JobLease {
+    _lock: File,
+    root: std::path::PathBuf,
+    games: std::path::PathBuf,
+    request: Request,
+}
+impl JobLease {
+    pub fn open(root: &Path, games: &Path, observer: Option<crate::job_observer::Observer>) -> Result<Self> {
+        let lock = OpenOptions::new().create(true).truncate(false).write(true)
+            .open(root.join("job.lock")).map_err(|_| "job-lock-open")?;
+        lock.try_lock_exclusive().map_err(|_| "job-busy")?;
+        let mut request = parse(&read(&root.join("job-request.json"),4096)?)?;
+        request.observer = observer;
+        Ok(Self { _lock: lock, root: root.into(), games: games.into(), request })
+    }
+    pub async fn run(&self, client: &reqwest::Client, tokens: &TokenManager) -> ExitCode {
+        match execute(client,tokens,&self.root,&self.games,&self.request).await {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(stage) => {
+                let _ = state(&self.root,&self.request,"failed",json!({"code":stage}));
+                eprintln!("PS5_JOB_ERROR {stage}");
+                ExitCode::FAILURE
+            }
+        }
+    }
+    /// Call only after the dedicated runtime has stopped and drained all IO.
+    /// This records an interruption; it never deletes a partial download.
+    pub fn record_cancelled_after_drain(&self) -> Result<()> {
+        state(&self.root,&self.request,"cancelled",json!({"code":"user-cancelled"}))
+    }
+}
+
 pub async fn run_observed(client: &reqwest::Client, tokens: &TokenManager, root: &Path, games: &Path, observer: Option<crate::job_observer::Observer>) -> ExitCode {
-    // Native Playden provisions this private directory; never create a fallback
-    // location or use a request-supplied path. Hold the lock through publication.
-    let lock = match OpenOptions::new().create(true).truncate(false).write(true).open(root.join("job.lock")) { Ok(f) => f, Err(_) => return ExitCode::FAILURE };
-    if lock.try_lock_exclusive().is_err() { return ExitCode::FAILURE; }
-    let mut request = match read(&root.join("job-request.json"),4096).and_then(|b|parse(&b)) { Ok(r) => r, Err(stage) => { eprintln!("PS5_JOB_ERROR {stage}"); return ExitCode::FAILURE; } };
-    request.observer = observer;
-    match execute(client,tokens,root,games,&request).await {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(stage) => { let _ = state(root,&request,"failed",json!({"code":stage})); eprintln!("PS5_JOB_ERROR {stage}"); ExitCode::FAILURE }
+    // Never create a fallback directory or use a request-supplied path.
+    match JobLease::open(root,games,observer) {
+        Ok(job) => job.run(client,tokens).await,
+        Err(stage) => { eprintln!("PS5_JOB_ERROR {stage}"); ExitCode::FAILURE }
     }
 }
 

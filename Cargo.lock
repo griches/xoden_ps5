@@ -7209,8 +7209,11 @@ dependencies = [
 name = "xodus-ps5-native"
 version = "0.1.0"
 dependencies = [
+ "fs2",
  "msixvc",
  "msixvc-common",
+ "tempfile",
+ "tokio",
  "xodus-cli",
 ]
 

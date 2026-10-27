@@ -79,3 +79,11 @@ engine cross-compiles for the adapted PS5 target, but has not been linked into
 Playden or executed on the console. A locally vendored, pinned XAL dependency
 uses Rustls on FreeBSD to avoid requiring OpenSSL; other targets retain their
 previous TLS selection. See `third_party/xal-rs/PS5-PATCH.md`.
+
+The Rust `job` module now owns a dedicated runtime and an on-disk job lease.
+Cancellation drops the operation, drains runtime blocking IO, records cancellation,
+and only then releases the lease and exposes a terminal snapshot. It never deletes
+partial files itself. A host regression test holds a simulated file operation open
+and verifies the lease and unpublished cancellation remain until that operation
+finishes. The runtime supports the existing NTFS parser's `block_in_place` bridge.
+This lifecycle is not yet wired to the C ABI or Playden UI.

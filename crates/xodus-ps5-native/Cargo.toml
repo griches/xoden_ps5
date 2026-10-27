@@ -13,5 +13,11 @@ msixvc-common = { path = "../msixvc-common" }
 
 xodus-cli = { path = "../xodus-cli", default-features = false, optional = true }
 
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+fs2 = "0.4.3"
+
 [features]
-job-engine = ["dep:xodus-cli"]
+job-engine = ["dep:xodus-cli", "dep:tokio"]

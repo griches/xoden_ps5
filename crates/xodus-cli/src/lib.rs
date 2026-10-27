@@ -20,3 +20,5 @@ pub use xodus::secrets::init_file_secrets;
 
 pub use job_observer::{DownloadProgress, JobObserver, Observer};
 pub use commands::ps5_job::run_observed as run_playden_job_observed;
+
+pub use commands::ps5_job::JobLease;
