@@ -3108,6 +3108,20 @@ void live_import_choice_and_details() {
           "then copies it to the chosen drive");
 }
 
+void xbox_install_does_not_wait_for_steam() {
+    auto model = make_live();
+    const auto id = playden::GameId::Xbox("9N5PKH0KW2L1");
+    LibraryUpdate update; update.source = playden::Store::kXbox;
+    update.games.push_back(game(id,"Minishoot"));
+    check(model.UpdateLibrary(std::move(update)), "Xbox catalog accepted");
+    check(model.action("details:xbox-9n5pkh0kw2l1"), "Xbox details open");
+    const auto* install = find_row(model,"details-install");
+    check(install && install->enabled && !has_row(model,"details-checking"), "Xbox install does not need Steam metadata or Steam sign-in");
+    activate(model,"details-install");
+    const auto requests = model.TakeInstallRequests();
+    check(requests.size() == 1 && requests.front().game_id == id, "Xbox install reaches its worker");
+}
+
 void xbox_search_covers_the_complete_catalog() {
     auto model = make_live();
     LibraryUpdate update;
@@ -3126,6 +3140,7 @@ void xbox_search_covers_the_complete_catalog() {
 }
 
 int main() {
+    xbox_install_does_not_wait_for_steam();
     xbox_search_covers_the_complete_catalog();
     live_import_sheet_sends_requests();
     live_import_choice_and_details();

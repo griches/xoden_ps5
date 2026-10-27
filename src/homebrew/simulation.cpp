@@ -4844,6 +4844,10 @@ void Simulation::rebuild_view() {
                 auto& status = row("details-download", RowKind::Action, "Download", "open-downloads");
                 status.value = job_state_value(*job);
                 status.progress = job->total_bytes == 0 ? 0.0F : static_cast<float>(job->completed_bytes) / static_cast<float>(job->total_bytes);
+            } else if (game->id.store == Store::kXbox) {
+                auto& install = row("details-install", RowKind::Action, "Install", "xbox-install");
+                install.value = "Check PC package";
+                install.subtitle = "To Console storage · Xbox checks access and available packages";
             } else if (game->windows_installable.value_or(false)) {
                 auto& install = row("details-install", RowKind::Action, "Install", "live-install");
                 install.value = game->install_bytes ? format_bytes(*game->install_bytes) : "Size unknown";
@@ -6758,6 +6762,10 @@ void Simulation::activate() {
                 previous->second.play_detail.clear();
             pending_runtime_play_requests_.push_back(id);
         }
+    } else if (live() && action_name == "xbox-install") {
+        const auto id = state_.navigation.detail_id.value_or(state_.navigation.selected_game_id);
+        if (id.valid() && id.store == Store::kXbox)
+            pending_install_requests_.push_back({InstallRequestKind::Install, id});
     } else if (live() && action_name == "live-install") {
         const auto id = state_.navigation.detail_id.value_or(state_.navigation.selected_game_id);
         // Install at once when the game fits the default drive (or its size is checked later);
