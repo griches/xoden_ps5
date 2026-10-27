@@ -10,6 +10,7 @@
  *   cp  <src> <dst>    dst must be under /data/playden/; an existing dst is
  *                      kept once as <dst>.xodus-bak
  *   get <src> <name>   copies src to /data/xodus-drop/<name> (mode 0644)
+ *   get-raw <src> <name>  as get, with a 13-byte XODUS-RAW-V1 newline prefix
  *   mkdir <dir>        dir must be under /data/playden/ (mode 0700)
  *   rm <path>          path must be under /data/playden/
  */
@@ -26,6 +27,7 @@
 #define ALLOWED "/data/playden/"
 
 static FILE *out;
+static int copy_file(const char *src, const char *dst, mode_t mode);
 
 static void say(const char *fmt, ...)
 {
@@ -37,7 +39,7 @@ static void say(const char *fmt, ...)
     fflush(out);
 }
 
-static int copy_file(const char *src, const char *dst, mode_t mode)
+static int copy_file_mode(const char *src, const char *dst, mode_t mode, int raw)
 {
     char buf[1 << 16];
     ssize_t n;
@@ -52,6 +54,11 @@ static int copy_file(const char *src, const char *dst, mode_t mode)
         say("  create %s: %s", dst, strerror(errno));
         close(in);
         return -1;
+    }
+    // Some console FTP servers transparently decode SELF files on retrieval.
+    // A non-executable prefix preserves the exact on-disk bytes for verification.
+    if (raw && write(fd, "XODUS-RAW-V1\n", 13) != 13) {
+        say("  prefix write failed"); close(in); close(fd); return -1;
     }
     while ((n = read(in, buf, sizeof buf)) > 0) {
         ssize_t offset = 0;
@@ -164,7 +171,12 @@ static void do_rm(const char *path)
         say("  unlink: %s", strerror(errno));
 }
 
-static void do_get(const char *src, const char *name)
+static int copy_file(const char *src, const char *dst, mode_t mode)
+{
+    return copy_file_mode(src, dst, mode, 0);
+}
+
+static void do_get(const char *src, const char *name, int raw)
 {
     char dst[1024];
     if (strchr(name, '/')) {
@@ -172,7 +184,7 @@ static void do_get(const char *src, const char *name)
         return;
     }
     snprintf(dst, sizeof dst, DROP "/%s", name);
-    copy_file(src, dst, 0644);
+    copy_file_mode(src, dst, 0644, raw);
 }
 
 int main(void)
@@ -213,7 +225,9 @@ int main(void)
         else if (!strcmp(cmd, "cp-private") && a && b)
             do_cp(a, b, 0600);
         else if (!strcmp(cmd, "get") && a && b)
-            do_get(a, b);
+            do_get(a, b, 0);
+        else if (!strcmp(cmd, "get-raw") && a && b)
+            do_get(a, b, 1);
         else if (!strcmp(cmd, "mkdir") && a)
             do_mkdir(a);
         else if (!strcmp(cmd, "rm") && a)
