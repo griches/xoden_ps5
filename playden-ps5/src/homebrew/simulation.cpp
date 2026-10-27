@@ -1884,7 +1884,8 @@ void Simulation::UpdateXboxPhoneSignIn(std::string message,std::string code,std:
         std::all_of(code.begin(),code.end(),[](unsigned char c){return (c>='A'&&c<='Z')||(c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='-';}) &&
         (url=="https://www.microsoft.com/link" || url=="https://microsoft.com/link");
     for (auto& modal:state_.navigation.modals) if (modal.id=="phone-sign-in") {
-        modal.body=valid_code?"Open microsoft.com/link on your phone.\nCode: "+code+"\nYour current account stays connected.":std::move(message);
+        modal.link=valid_code?url:std::string{};
+        modal.body=valid_code?"Scan the QR code, then enter: "+code+"\nThis verifies sign-in and PC game access.":std::move(message);
         modal.action_keys={busy?"cancel":"xbox-phone-done"};modal.focused_action=0;
     }
     rebuild_view();
@@ -6876,13 +6877,13 @@ void Simulation::activate() {
         ModalEntry modal{"xbox-account","Xbox account",state_.navigation.focus_key,
             xbox_account_busy_ ? std::vector<std::string>{"cancel"} : std::vector<std::string>{"xbox-refresh","xbox-phone-test","xbox-signout","cancel"},0,false};
         modal.body = xbox_account_message_;
-        modal.body += " Microsoft sign-in is available as a phone test. It checks PC game access and keeps your current account until game sign-in is verified.";
+        modal.body += " Microsoft sign-in is available as a phone test. It checks PC game access. Game sign-in is still being tested.";
         open_modal(std::move(modal));
     } else if (live() && action_name=="xbox-phone-test") {
         if (!xbox_account_busy_) {
             close_modal();xbox_phone_requested_=true;xbox_phone_busy_=true;
             ModalEntry modal{"phone-sign-in","Phone sign-in test",state_.navigation.focus_key,{"cancel"},0,false};
-            modal.body="Preparing a Microsoft sign-in code. Your current account stays connected.";
+            modal.body="Preparing a Microsoft sign-in code to verify PC game access.";
             open_modal(std::move(modal));
         }
     } else if (live() && action_name=="xbox-phone-done") {

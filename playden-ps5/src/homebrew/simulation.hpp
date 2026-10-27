@@ -500,7 +500,7 @@ struct ModalEntry {
     bool destructive = false;
     std::string body;  // explanatory text; empty uses the simulation's default wording
     std::string setting_id;  // Game settings picker: the catalogue setting being chosen
-    std::string link;  // a web page the dialog shows as a QR code with its address (release notes)
+    std::string link;  // a validated web page shown as a QR code with its address
 };
 
 struct Navigation {

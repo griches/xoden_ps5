@@ -3269,7 +3269,7 @@ class Render::Impl
         if (!state.navigation.modals.empty())
         {
             const ModalEntry &modal = state.navigation.modals.back();
-            if (modal.destructive || modal.id == "confirmation")
+            if (modal.destructive || modal.id == "confirmation" || !modal.link.empty())
                 draw_modal_overlay(modal, view);
             else
                 draw_sheet_overlay(view);
@@ -3407,7 +3407,7 @@ class Render::Impl
         }
     }
 
-    // A dialog with a web page (release notes): the title, the text, then a strip with the page as a
+    // A dialog with a web page: the title, the text, then a strip with the page as a
     // QR code and its address (the console has no browser), then the buttons. The panel's height
     // follows the text, so a short note gives a short dialog.
     void draw_link_modal(const ModalEntry &modal, const ViewData &view)
@@ -3447,7 +3447,7 @@ class Render::Impl
         const float text_x = panel.x + pad + qr_side + strip_gap;
         const float block_h = 30.0F + 14.0F + address_lines * address_line;
         const float block_y = y + (qr_side - block_h) * 0.5F;
-        ui::text(overlay_, fonts_.semibold, "Scan for the full release notes", text_x, block_y + 24.0F, 26.0F, kText);
+        ui::text(overlay_, fonts_.semibold, modal.id=="phone-sign-in" ? "Scan to open Microsoft sign-in" : "Scan for the full release notes", text_x, block_y + 24.0F, 26.0F, kText);
         ui::paragraph(overlay_, fonts_.regular, address, text_x, block_y + 30.0F + 14.0F + 21.0F, address_size,
                       address_w, address_line, kSecondary, 3);
         y += qr_side + 40.0F;

@@ -3231,17 +3231,19 @@ void xbox_phone_signin_code_is_transient_and_closing_requests_cancellation() {
     activate(model,"settings-xbox-account");activate(model,"xbox-phone-test");
     check(model.TakeXboxPhoneTest() && !model.TakeXboxPhoneTest(),"phone sign-in sends one request");
     model.UpdateXboxPhoneSignIn("Waiting","TEST-CODE","https://www.microsoft.com/link",true);
-    check(model.view().subtitle.find("TEST-CODE")!=std::string::npos && model.view().subtitle.find("microsoft.com/link")!=std::string::npos,
-          "validated short code and Microsoft link reach the native sheet");
+    check(model.view().subtitle.find("TEST-CODE")!=std::string::npos && model.state().navigation.modals.back().link=="https://www.microsoft.com/link",
+          "validated short code and Microsoft QR destination reach the native dialog");
     model.UpdateXboxPhoneSignIn("Invalid code hidden","SECRET-CODE","https://foreign.invalid/link",true);
     check(model.view().subtitle.find("SECRET-CODE")==std::string::npos && model.view().subtitle.find("foreign.invalid")==std::string::npos,
           "foreign verification links never display");
+    check(model.state().navigation.modals.back().link.empty(),"invalid provider data clears the previous QR destination");
     model.action("circle");
     check(model.TakeXboxPhoneCancel() && !model.TakeXboxPhoneCancel(),"closing a live phone sheet cancels the worker once");
     model.UpdateXboxPhoneSignIn("Cancelled",{},{},false);
     activate(model,"settings-xbox-account");activate(model,"xbox-phone-test");
     model.TakeXboxPhoneTest();
     model.UpdateXboxPhoneSignIn("PC license verified; current account unchanged",{},{},false);
+    check(model.state().navigation.modals.back().link.empty(),"finished phone checks have no QR destination");
     activate(model,"xbox-phone-done");
     check(!model.TakeXboxPhoneCancel(),"closing a finished phone test does not cancel or alter an account");
 }
