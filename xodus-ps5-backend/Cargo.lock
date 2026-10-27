@@ -7117,6 +7117,7 @@ dependencies = [
  "keyring-core",
  "quick-xml 0.42.0",
  "reqwest 0.13.4",
+ "ron",
  "tokio",
  "xodus",
 ]

@@ -180,6 +180,43 @@ fn remember_prepared(root: &Path, entry: Value) -> Result<()> {
     publish(root, "prepared-games.json", &json!({"schema":1,"games":rows}))
 }
 
+fn rebind_content(row: &Value, games: &Path, account_key: &str, entries: &BTreeMap<String,Value>) -> Option<String> {
+    let product=row["productId"].as_str()?;
+    let old=row["accountKey"].as_str()?;
+    let content=row["contentId"].as_str()?;
+    let folder=format!("xbox-{}",product.to_ascii_lowercase());
+    if !product_id(product) || !hash(old) || old==account_key || row["folder"]!=folder ||
+        uuid::Uuid::parse_str(content).ok()?.to_string()!=content ||
+        !entitled(product,entries,chrono::Utc::now().timestamp()) { return None; }
+    let metadata=std::fs::symlink_metadata(games.join(folder)).ok()?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() { return None; }
+    Some(content.into())
+}
+
+async fn revalidate_prepared(client: &reqwest::Client, tokens: &TokenManager, root: &Path, games: &Path,
+    req: &Request, account: &str, key: &str, entries: &BTreeMap<String,Value>) -> Result<usize> {
+    let path=root.join("prepared-games.json");
+    if !path.exists() { return Ok(0); }
+    let mut record:Value=serde_json::from_slice(&read(&path,2*1024*1024)?).map_err(|_| "prepared-index-json")?;
+    if record["schema"]!=1 { return Err("prepared-index-schema"); }
+    let rows=record["games"].as_array_mut().filter(|rows|rows.len()<=400).ok_or("prepared-index-shape")?;
+    let mut changed=0;
+    for row in rows {
+        let Some(content)=rebind_content(row,games,key,entries) else { continue; };
+        state(root,req,"checking-installed-games",json!({"verified":changed}))?;
+        let result=tokio::time::timeout(Duration::from_secs(45),crate::license::get_license(client,tokens,content,req.market.clone())).await;
+        let Ok(Ok((device,license)))=result else { continue; };
+        if license.content_keys.len()!=1 || !license.content_keys.into_values().next().is_some_and(|key|key.unpack(&device).is_ok()) { continue; }
+        if tokens.active_account().map_err(|_| "account-changed")?!=account { return Err("account-changed"); }
+        row["accountKey"]=json!(key);changed+=1;
+    }
+    if changed>0 {
+        if tokens.active_account().map_err(|_| "account-changed")?!=account { return Err("account-changed"); }
+        publish(root,"prepared-games.json",&record)?;
+    }
+    Ok(changed)
+}
+
 async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, games: &Path, req: &Request) -> Result<()> {
     if req.operation == "signout" {
         state(root,req,"signing-out",json!({}))?;
@@ -223,10 +260,11 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
         }
         if tokens.active_account().map_err(|_| "account-changed")? != account { return Err("account-changed"); }
         let count = rows.len();
+        let rebound=if active { revalidate_prepared(client,tokens,root,games,req,&account,&account_key,&entries).await? } else { 0 };
         publish(root, "catalog.json", &json!({"schema":1,"requestId":req.id,"accountKey":account_key,"gamertag":profile["gamertag"],
             "market":req.market,"subscriptionActive":active,"checkedAt":library["checkedAt"],"games":rows,
             "skippedEntitlements":library["skippedEntitlements"]}))?;
-        return state(root, req, "complete", json!({"accountKey":account_key,"games":count}));
+        return state(root, req, "complete", json!({"accountKey":account_key,"games":count,"revalidatedInstalls":rebound}));
     }
     if !active { return Err("active-pc-subscription-required"); }
     let product = req.product.as_deref().ok_or("request-product")?;
@@ -306,6 +344,28 @@ pub async fn run_observed(client: &reqwest::Client, tokens: &TokenManager, root:
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn installed_account_revalidation_refuses_unentitled_paths_and_symlinks() {
+        let games=tempfile::tempdir().unwrap();
+        let key="b".repeat(64);
+        let entries=BTreeMap::from([(A.into(),row())]);
+        let record=json!({"productId":A,"accountKey":"a".repeat(64),"folder":format!("xbox-{}",A.to_ascii_lowercase()),
+            "contentId":"11111111-1111-4111-8111-111111111111","executable":"Game.exe"});
+        let folder=games.path().join(record["folder"].as_str().unwrap());
+        assert!(rebind_content(&record,games.path(),&key,&entries).is_none());
+        std::fs::create_dir(&folder).unwrap();
+        assert!(rebind_content(&record,games.path(),&key,&entries).is_some());
+        assert!(rebind_content(&record,games.path(),&key,&BTreeMap::new()).is_none());
+        let mut escape=record.clone();escape["folder"]=json!("../outside");
+        assert!(rebind_content(&escape,games.path(),&key,&entries).is_none());
+        let mut bound=record.clone();bound["accountKey"]=json!(key);
+        assert!(rebind_content(&bound,games.path(),&key,&entries).is_none());
+        #[cfg(unix)] {
+            std::fs::remove_dir(&folder).unwrap();
+            std::os::unix::fs::symlink(games.path(),&folder).unwrap();
+            assert!(rebind_content(&record,games.path(),&key,&entries).is_none());
+        }
+    }
     #[tokio::test]
     async fn native_failure_reports_only_static_stage_to_host_observer() {
         struct Capture(std::sync::Mutex<Option<&'static str>>);
