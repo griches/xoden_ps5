@@ -24,9 +24,29 @@ struct UserSession {
 
 pub const PASSPORT_STS: &str = "http://Passport.NET/STS";
 
+pub(crate) struct DeviceRenewalGuard {
+    _local: tokio::sync::OwnedMutexGuard<()>,
+    #[cfg(unix)]
+    _process: Option<std::fs::File>,
+}
+
 #[cfg(test)]
 mod credential_account_metadata_tests {
     use super::*;
+    #[tokio::test]
+    async fn credential_memory_device_renewal_is_shared_by_clones_and_isolated_between_stores() {
+        let manager = TokenManager::with_memory();
+        let clone = manager.clone();
+        let first = manager.lock_device_renewal().await.unwrap();
+        #[cfg(unix)]
+        assert!(first._process.is_none());
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(20), clone.lock_device_renewal()).await.is_err());
+        let separate = TokenManager::with_memory();
+        let independent = tokio::time::timeout(std::time::Duration::from_millis(100), separate.lock_device_renewal()).await.unwrap().unwrap();
+        drop(independent);
+        drop(first);
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(100), clone.lock_device_renewal()).await.unwrap().is_ok());
+    }
     #[test]
     fn credential_account_metadata_snapshot_is_atomic_and_logout_removes_it() {
         let manager = TokenManager::with_memory();
@@ -66,6 +86,10 @@ mod credential_account_metadata_tests {
 pub struct TokenManager {
     persistent: Arc<dyn TokenBackend>,
     ephemeral: Arc<dyn ExpiringTokenBackend>,
+    device_renewal: Arc<tokio::sync::Mutex<()>>,
+    isolated: bool,
+    #[cfg(unix)]
+    renewal_root: Option<std::path::PathBuf>,
 }
 
 impl TokenManager {
@@ -76,6 +100,10 @@ impl TokenManager {
         Self {
             persistent,
             ephemeral,
+            device_renewal: Arc::new(tokio::sync::Mutex::new(())),
+            isolated: false,
+            #[cfg(unix)]
+            renewal_root: None,
         }
     }
 
@@ -88,17 +116,29 @@ impl TokenManager {
         )
     }
 
-    /// Keychain for persistent storage, in-memory for ephemeral - the default
-    /// wiring for both `xodus-cli` and `xodus-service` today.
+    /// Fully isolated credentials. Clones serialize renewal together without
+    /// accessing a process-shared filesystem lock or the system keychain.
     pub fn with_memory() -> Self {
-        Self::new(
+        let mut manager = Self::new(
             Arc::new(MemoryBackend::default()),
             Arc::new(MemoryBackend::default()),
-        )
+        );
+        manager.isolated = true;
+        manager
     }
 
     pub fn with_host_file(path:&std::path::Path,commit:Arc<dyn Fn(&[u8])->bool+Send+Sync>)->Result<Self,TokenStoreError> {
-        Ok(Self::new(Arc::new(super::backend::HostFileBackend::open(path,commit)?),Arc::new(MemoryBackend::default())))
+        let manager = Self::new(Arc::new(super::backend::HostFileBackend::open(path,commit)?),Arc::new(MemoryBackend::default()));
+        #[cfg(unix)]
+        let manager = Self { renewal_root: Some(path.parent().ok_or(TokenStoreError::NotFound)?.join("session-lock")), ..manager };
+        Ok(manager)
+    }
+
+    pub(crate) async fn lock_device_renewal(&self) -> Result<DeviceRenewalGuard, TokenStoreError> {
+        let local = self.device_renewal.clone().lock_owned().await;
+        #[cfg(unix)]
+        let process = if self.isolated { None } else { Some(super::session::renewal_lock(self.renewal_root.as_deref()).await?) };
+        Ok(DeviceRenewalGuard { _local: local, #[cfg(unix)] _process: process })
     }
 
     pub fn remove_persistent(&self) -> Result<(), TokenStoreError> {

@@ -82,8 +82,7 @@ async fn reauthenticate_device(
     reuse_current: bool,
 ) -> Result<(), TokenStoreError> {
     // Shared by service, login and optional reads. Waiters reuse genuine renewal.
-    #[cfg(unix)]
-    let _guard = super::session::renewal_lock().await?;
+    let _guard = tokens.lock_device_renewal().await?;
     if !same_device(&tokens.get_device_license()?, &license) {
         return Err(TokenStoreError::DeviceAuthentication);
     }

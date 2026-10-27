@@ -32,9 +32,9 @@ pub fn state(token: &Token, now: DateTime<Utc>) -> State {
 }
 
 #[cfg(unix)]
-pub(crate) async fn renewal_lock() -> std::io::Result<std::fs::File> {
+pub(crate) async fn renewal_lock(root: Option<&std::path::Path>) -> std::io::Result<std::fs::File> {
     let uid = unsafe { libc::geteuid() };
-    let root = std::env::temp_dir().join(format!("xodus-nexus-session-{uid}"));
+    let root = root.map(std::path::Path::to_path_buf).unwrap_or_else(|| std::env::temp_dir().join(format!("xodus-nexus-session-{uid}")));
     renewal_lock_at(&root, uid, WaitDuration::from_secs(15)).await
 }
 #[cfg(unix)]

@@ -38,7 +38,7 @@ pub(super) async fn run(
     )
     .await
     .map_err(|_| "device-timeout")?
-    .map_err(|_| "device-refresh")?;
+    .map_err(|error| error.diagnostic_code())?;
     let login = DeviceCodeClient::new(client.clone());
     let mut challenge = login
         .start(Scope::Xbox)

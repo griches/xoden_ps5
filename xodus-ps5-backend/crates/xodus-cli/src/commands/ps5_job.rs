@@ -21,7 +21,7 @@ fn parse(bytes: &[u8]) -> Result<Request> {
     if v["schema"] != 1 || obj.keys().any(|k| !["schema","requestId","operation","market","accountKey","productId","contentId"].contains(&k.as_str())) { return Err("request-schema"); }
     let id = v["requestId"].as_str().ok_or("request-id")?;
     if uuid::Uuid::parse_str(id).map(|u| u.to_string()).ok().as_deref() != Some(id) { return Err("request-id"); }
-    let operation = v["operation"].as_str().filter(|s| ["refresh","plan","install","signin-test"].contains(s)).ok_or("request-operation")?;
+    let operation = v["operation"].as_str().filter(|s| ["refresh","plan","install","signin-test","signout"].contains(s)).ok_or("request-operation")?;
     let market = v["market"].as_str().filter(|s| s.len() == 2 && s.bytes().all(|b| b.is_ascii_uppercase())).ok_or("request-market")?;
     let optional = |key: &str| -> Result<Option<String>> { match v.get(key) { None | Some(Value::Null) => Ok(None), Some(Value::String(s)) => Ok(Some(s.clone())), _ => Err("request-field") } };
     let account = optional("accountKey")?;
@@ -32,6 +32,7 @@ fn parse(bytes: &[u8]) -> Result<Request> {
     if (operation == "install" || operation == "plan") && (account.is_none() || product.is_none()) { return Err("request-install-identity"); }
     if operation == "refresh" && (product.is_some() || content.is_some()) { return Err("request-refresh-fields"); }
     if operation == "signin-test" && (product.is_none() || account.is_some()) { return Err("request-signin-fields"); }
+    if operation == "signout" && (product.is_some() || content.is_some() || account.is_some()) { return Err("request-signout-fields"); }
     Ok(Request { id: id.into(), operation: operation.into(), market: market.into(), account, product, content, observer: None })
 }
 
@@ -180,6 +181,14 @@ fn remember_prepared(root: &Path, entry: Value) -> Result<()> {
 }
 
 async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, games: &Path, req: &Request) -> Result<()> {
+    if req.operation == "signout" {
+        state(root,req,"signing-out",json!({}))?;
+        tokens.remove_persistent().map_err(|_| "signout-credentials")?;
+        match std::fs::remove_file(root.join("catalog.json")) {
+            Ok(())=>(),Err(error) if error.kind()==std::io::ErrorKind::NotFound=>(),Err(_)=>return Err("signout-catalog"),
+        }
+        return state(root,req,"signed-out",json!({"accountCleared":true}));
+    }
     if req.operation == "signin-test" { return signin::run(client,tokens,root,req).await; }
     state(root, req, "checking-account", json!({}))?;
     let account = tokens.get_user().map_err(|_| "sign-in-required")?.username;
@@ -266,6 +275,9 @@ impl JobLease {
         match execute(client,tokens,&self.root,&self.games,&self.request).await {
             Ok(()) => ExitCode::SUCCESS,
             Err(stage) => {
+                // Only static stage identifiers enter the host mailbox. Never
+                // forward an upstream error body, URL or credential here.
+                if let Some(observer) = &self.request.observer { observer.diagnostic(stage); }
                 let _ = state(&self.root,&self.request,"failed",json!({"code":stage}));
                 eprintln!("PS5_JOB_ERROR {stage}");
                 ExitCode::FAILURE
@@ -290,6 +302,22 @@ pub async fn run_observed(client: &reqwest::Client, tokens: &TokenManager, root:
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn native_failure_reports_only_static_stage_to_host_observer() {
+        struct Capture(std::sync::Mutex<Option<&'static str>>);
+        impl crate::job_observer::JobObserver for Capture {
+            fn diagnostic(&self, code: &'static str) { *self.0.lock().unwrap() = Some(code); }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let games = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("job-request.json"), serde_json::to_vec(&request()).unwrap()).unwrap();
+        let capture = std::sync::Arc::new(Capture(std::sync::Mutex::new(None)));
+        let lease = JobLease::open(root.path(), games.path(), Some(capture.clone())).unwrap();
+        assert_eq!(lease.run(&reqwest::Client::new(), &TokenManager::with_memory()).await, ExitCode::FAILURE);
+        assert_eq!(*capture.0.lock().unwrap(), Some("sign-in-required"));
+        let result: Value = serde_json::from_slice(&std::fs::read(root.path().join("job-result.json")).unwrap()).unwrap();
+        assert_eq!(result["detail"]["code"], "sign-in-required");
+    }
     const A: &str = "9AAAAAAAAAAA";
     const B: &str = "9BBBBBBBBBBB";
     fn request() -> Value { json!({"schema":1,"requestId":"11111111-1111-4111-8111-111111111111","operation":"refresh","market":"GB"}) }
@@ -323,6 +351,30 @@ mod tests {
         assert!(parse(&serde_json::to_vec(&value).unwrap()).is_ok());
         value["accountKey"]=json!("a".repeat(64));
         assert!(parse(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+    #[tokio::test] async fn native_signout_clears_all_user_credentials_without_deleting_games_or_device_identity() {
+        let root=tempfile::tempdir().unwrap();let games=tempfile::tempdir().unwrap();
+        let tokens=TokenManager::with_memory();
+        tokens.save_device_license(&xodus::models::secrets::Device{puid:"synthetic-device".into(),username:"device-only".into(),
+            password:"synthetic-device-secret".into(),hwid:"stable-hardware".into(),device_id:"keep-device".into(),splicense:"synthetic-device-license".into()}).unwrap();
+        tokens.save_device_token(xodus::tokens::PASSPORT_STS.into(),xodus::models::secrets::Token::Compact("synthetic-device-token".into())).unwrap();
+        tokens.save_user_session(xodus::models::secrets::User{puid:"synthetic".into(),username:"synthetic".into()},
+            std::collections::HashMap::from([(xodus::tokens::PASSPORT_STS.into(),xodus::models::secrets::Token::Compact("synthetic-user-token".into()))])).unwrap();
+        std::fs::write(root.path().join("catalog.json"),"synthetic-catalog").unwrap();
+        std::fs::write(root.path().join("prepared-games.json"),"keep-installed-records").unwrap();
+        std::fs::write(games.path().join("save-file"),"keep-saves").unwrap();
+        let req=parse(&serde_json::to_vec(&json!({"schema":1,"requestId":"11111111-1111-4111-8111-111111111111","operation":"signout","market":"GB"})).unwrap()).unwrap();
+        execute(&reqwest::Client::new(),&tokens,root.path(),games.path(),&req).await.unwrap();
+        assert!(tokens.get_user().is_err() && tokens.get_user_sts_token().is_err());
+        assert!(tokens.get_device_sts_token().is_err());
+        assert_eq!(tokens.get_device_license().unwrap().device_id,"keep-device");
+        assert!(!root.path().join("catalog.json").exists());
+        assert_eq!(std::fs::read_to_string(root.path().join("prepared-games.json")).unwrap(),"keep-installed-records");
+        assert_eq!(std::fs::read_to_string(games.path().join("save-file")).unwrap(),"keep-saves");
+        let mut bad=json!({"schema":1,"requestId":req.id,"operation":"signout","market":"GB","productId":A});
+        assert!(parse(&serde_json::to_vec(&bad).unwrap()).is_err());
+        bad.as_object_mut().unwrap().remove("productId");bad["accountKey"]=json!("a".repeat(64));
+        assert!(parse(&serde_json::to_vec(&bad).unwrap()).is_err());
     }
     #[test] fn catalog_never_accepts_foreign_products_or_authenticated_image_urls() {
         let p = json!({"ProductId":A,"ProductType":"Game","LocalizedProperties":[{"ProductTitle":"Example","Images":[{"ImagePurpose":"BoxArt","Uri":"https://secret@store-images.s-microsoft.com/a"}]}]});
