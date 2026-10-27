@@ -103,7 +103,7 @@ pub(super) async fn query(tokens: &TokenManager, market: &str) -> Result<Value, 
     if market.len() != 2 || !market.bytes().all(|b| b.is_ascii_uppercase()) {
         return Err("market");
     }
-    let account = tokens.get_user().map_err(|_| "stored-account")?.username;
+    let account = tokens.active_account().map_err(|_| "stored-account")?;
     let (client, ticket) = super::subscription::store_session(tokens, &account).await?;
     let mut all = Entitlements::default();
     let mut continuation: Option<String> = None;
@@ -158,7 +158,7 @@ pub(super) async fn query(tokens: &TokenManager, market: &str) -> Result<Value, 
         let page: Value = serde_json::from_slice(&bytes).map_err(|_| "entitlements-json")?;
         all.add(&page)?;
         if continuation.is_none() {
-            if tokens.get_user().map_err(|_| "account-check")?.username != account {
+            if tokens.active_account().map_err(|_| "account-check")? != account {
                 return Err("account-changed");
             }
             all.finish();

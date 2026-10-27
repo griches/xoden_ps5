@@ -190,8 +190,12 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
         return state(root,req,"signed-out",json!({"accountCleared":true}));
     }
     if req.operation == "signin-test" { return signin::run(client,tokens,root,req).await; }
+    if req.operation == "refresh" && matches!(tokens.active_account(), Err(xodus::tokens::store::TokenStoreError::NotFound))
+        && tokens.phone_candidate().map_err(|_| "phone-candidate-read")?.is_some() {
+        tokens.activate_phone_candidate().map_err(|_| "phone-activation")?;
+    }
     state(root, req, "checking-account", json!({}))?;
-    let account = tokens.get_user().map_err(|_| "sign-in-required")?.username;
+    let account = tokens.active_account().map_err(|_| "sign-in-required")?;
     let account_key = msixvc::streaming::resume_digest(account.as_bytes());
     if req.account.as_ref().is_some_and(|key| key != &account_key) { return Err("account-changed"); }
     let (membership, library) = tokio::try_join!(
@@ -217,7 +221,7 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
             let bytes = super::profile::bounded(response, 8 * 1024 * 1024).await?;
             rows.extend(catalog_rows(&serde_json::from_slice(&bytes).map_err(|_| "catalog-json")?, chunk)?);
         }
-        if tokens.get_user().map_err(|_| "account-changed")?.username != account { return Err("account-changed"); }
+        if tokens.active_account().map_err(|_| "account-changed")? != account { return Err("account-changed"); }
         let count = rows.len();
         publish(root, "catalog.json", &json!({"schema":1,"requestId":req.id,"accountKey":account_key,"gamertag":profile["gamertag"],
             "market":req.market,"subscriptionActive":active,"checkedAt":library["checkedAt"],"games":rows,
@@ -241,7 +245,7 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
     if super::streaming::run_observed(client,tokens,product.into(),destination.to_string_lossy().into(),false,None,Some(req.market.clone()),true,false,Some(content.clone()),req.observer.clone()).await != ExitCode::SUCCESS { return Err(req.observer.as_ref().and_then(|observer| observer.failure_code()).unwrap_or("download-failed")); }
     state(root, req, "preparing", json!({"contentId":content}))?;
     if super::prepare_ps5::run(client,tokens,destination.to_string_lossy().into(),Some(req.market.clone())).await != ExitCode::SUCCESS { return Err("preparation-failed"); }
-    if tokens.get_user().map_err(|_| "account-changed")?.username != account { return Err("account-changed"); }
+    if tokens.active_account().map_err(|_| "account-changed")? != account { return Err("account-changed"); }
     let program = executable(&destination)?;
     let entry = json!({"accountKey":account_key,"folder":folder,"contentId":content,"executable":program,
         "requestId":req.id,"productId":product});

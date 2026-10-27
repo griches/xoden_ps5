@@ -10,6 +10,10 @@ pub async fn get_license(
     content_id: String,
     market: String,
 ) -> std::result::Result<(DeviceKey, SPLicense), String> {
+    if let Some(phone) = tokens.active_phone_ticket(client, xodus::api::live::device_code::Scope::Store).await.map_err(|_| "Phone sign-in could not be refreshed.")? {
+        xodus::tokens::device::ensure_device_credentials(client,tokens).await.map_err(|_| "Device sign-in could not be refreshed.")?;
+        return get_candidate_license(client,tokens,&phone,content_id,market).await;
+    }
     let dev_token = tokens
         .get_device_sts_token()
         .map_err(|error| error.to_string())?;

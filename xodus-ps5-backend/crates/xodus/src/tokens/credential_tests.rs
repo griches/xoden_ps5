@@ -98,6 +98,45 @@ fn credential_phone_candidate_never_replaces_active_account_and_logout_clears_bo
 }
 
 #[test]
+fn credential_phone_activation_is_explicit_and_does_not_fabricate_legacy_identity() {
+    let (_, manager) = setup();
+    manager.save_phone_candidate(&phone_candidate()).unwrap();
+    assert!(manager.active_account().is_err());
+    manager.activate_phone_candidate().unwrap();
+    assert_eq!(manager.active_account().unwrap(),"phone:new-phone-user");
+    assert!(manager.get_user().is_err() && manager.get_user_sts_token().is_err());
+    manager.remove_persistent().unwrap();
+    assert!(manager.active_phone().unwrap().is_none());
+    assert!(manager.active_account().is_err() && manager.phone_candidate().unwrap().is_none());
+}
+
+#[test]
+fn credential_phone_activation_never_replaces_existing_account_or_ignores_corrupt_session() {
+    let (backend, manager) = setup();
+    manager.save_user_session(user("old-active"),session_tokens("old-active-token")).unwrap();
+    manager.save_phone_candidate(&phone_candidate()).unwrap();
+    assert!(manager.activate_phone_candidate().is_err());
+    assert_eq!(manager.active_account().unwrap(),"old-active");
+    backend.values.lock().unwrap().insert("phone-user-session".into(),b"invalid".to_vec());
+    assert!(manager.active_account().is_err());
+}
+
+#[test]
+fn credential_late_phone_refresh_cannot_restore_logged_out_or_replaced_credentials() {
+    let (_, manager) = setup();
+    let previous=phone_candidate();
+    manager.save_phone_candidate(&previous).unwrap();
+    manager.activate_phone_candidate().unwrap();
+    manager.save_phone_refresh(&previous,&previous).unwrap();
+    manager.remove_persistent().unwrap();
+    assert!(manager.save_phone_refresh(&previous,&previous).is_err());
+    assert!(manager.active_account().is_err());
+    manager.save_user_session(user("replacement"),session_tokens("replacement-token")).unwrap();
+    assert!(manager.save_phone_refresh(&previous,&previous).is_err());
+    assert_eq!(manager.active_account().unwrap(),"replacement");
+}
+
+#[test]
 fn credential_phone_candidate_failed_write_preserves_working_account() {
     for fault in ["missing","empty","different"] {
         let (backend, manager) = setup();
