@@ -314,3 +314,12 @@ title preparation. Only a successful native download completed in the current
 process queues automatic preparation, once per request. Existing files can still
 be prepared explicitly with Setup/Play. Legacy worker downloads now need explicit setup
 on return. This avoids recreating titles the user removed from the home screen.
+
+Validation/deployment: ba8bb8c passed all 152 host tests (132.32 seconds)
+and the native PS5 build. Deployed eboot SHA256
+6e610735c9afdc3a8878e165589577e8705855cdf6f28bb54724679d70ba6420
+and identity cd0d40066789 with exact read-back verification; backup is
+xodus-games/console-backups/20261027-uninstall-ui. Launched FAKE77031 and
+captured its Home screen successfully. No virtual pad was opened and no console
+uninstall was confirmed: end-to-end physical content removal remains untested
+on this build, intentionally leaving that action to Gary.
