@@ -1,0 +1,1 @@
+Browser view adapted from Xodus Nexus (MIT), local checkout 2026-10-27. auth-browser.ts, auth-cdp.ts and auth-protocol.ts retain the upstream transport and origin checks. The local adapter supplies an installed browser directly; no default browser profile or remote debugging socket is used.

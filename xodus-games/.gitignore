@@ -31,3 +31,17 @@ ps5-extras/xodus-export/*
 !ps5-extras/xodus-export/Cargo.lock
 !ps5-extras/xodus-export/src/
 !ps5-extras/xodus-export/src/*.rs
+!ps5-extras/signin/
+ps5-extras/signin/*
+!ps5-extras/signin/.gitignore
+!ps5-extras/signin/*.mjs
+!ps5-extras/signin/*.html
+!ps5-extras/signin/package.json
+!ps5-extras/signin/package-lock.json
+!ps5-extras/signin/start.command
+!ps5-extras/signin/README.md
+!ps5-extras/signin/browser/
+ps5-extras/signin/browser/*
+!ps5-extras/signin/browser/*.ts
+!ps5-extras/signin/browser/LICENSE
+!ps5-extras/signin/browser/NOTICE.md

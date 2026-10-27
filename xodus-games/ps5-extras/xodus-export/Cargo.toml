@@ -6,3 +6,5 @@ edition = "2024"
 [dependencies]
 keyring-core = { version = "=1.0.0", features = ["sample"] }
 apple-native-keyring-store = { version = "=1.0.2", features = ["keychain"] }
+base64 = "0.22"
+serde_json = "1"

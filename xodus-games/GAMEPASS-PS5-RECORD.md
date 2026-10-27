@@ -1151,3 +1151,200 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   managed installer can copy it into a stopped game's bottle safely; no UID
   transfer payloads and no direct private-bottle FTP writes. Game acceptance
   remains pending.
+
+### First game launch with active phone bridge (19:57Z)
+
+- Backend c8f6541 selects a real active phone session without a test flag;
+  opt-in candidate-only testing still exists. Both phone paths load a memory-only
+  store, never save or implicitly rewrite the console account on Drop, and
+  never fabricate PUIDs. Host 4/4 tests and Windows DLL build passed.
+- Frontend 4f711b7 optionally bundles the locally built bridge via
+  PLAYDEN_XBOX_WRAPPER_DLL. Native preparation copies only that validated DLL
+  into the private stopped bottle; base runtime DLLs remain separately
+  provisioned. Invalid bridge regression preserves the existing bottle file.
+  Full suite 153/153 passed (143.86 s); PS5 build passed. Deployed app SHA256
+  0d4942f6b809adba14c3197d8d0e44bc1f30582382e1d180048164e67b081e99,
+  wrapper 70ff52139fdc prefix, backup console-backups/20261027-phone-runtime-bridge.
+- MIO details artwork and Play/Ready visible. Launch at 19:57:53Z via Playden,
+  durable session 7d58b874-040e-49c6-956f-b059a1b090f8. Stayed BLACK. Native title
+  was alive, no save loaded or game started. Closed only this agent-launched
+  test title at 20:00:19Z and returned to Playden, no console restart.
+- Latest session-2.log showed Vulkan presentation stopped at vk_shown=19 and
+  vk_busy=1; no direct phone bridge evidence published yet. The apparent earlier
+  wgl internal context error belonged to PREVIOUS session-1.log, not this run.
+  Do not claim in-game authentication succeeded or that auth caused the stall.
+- Building filtered bridge diagnostics from the game's private profile via the
+  native app, never raw tokens/errors. Also bounded wrapper HTTP to 15 seconds
+  with redirects disabled. Frontend diagnostic bridge evidence is prefixed
+  before large session logs so it survives the public log size cap.
+- MIO resolution TEMPORARILY changed 3840x2160 -> 1920x1080 for graphics
+  isolation, revision 1->2 applied successfully 20:04:13Z. MUST RESTORE 4K
+  after this check as promised to Gary. No other settings/saves changed.
+- Virtual pad CLOSED. Remote Play remains OFF.
+
+- Further inspection of latest session-2.log found native xgameruntime.dll and
+  builtin xgameruntime_impl.dll loaded from system32, followed by repeated
+  gdkc:get_rps_tickets xodus-service request failures (0x8000ffff). This narrows
+  the unfinished in-game check to the bridge exchange; graphics stall alone
+  was not sufficient to diagnose it.
+- Frontend 09d2384 filters bridge startup/request/result markers from the
+  private wrapper log and prefixes them to the existing published title log.
+  No raw credential error/path/tokens exported; regression verifies filtering.
+  Full suite 153/153 passed 133.81 s and PS5 build passed. Backend 04d81b4
+  bounds runtime HTTP to 15 seconds, redirects disabled; 4 wrapper tests and
+  Windows build passed. Prepared app SHA256
+  1af33a784ff6af10925952a53e09ed5a34b126ba7ef1f1e5a2b881dac9aee5a4,
+  deploying with backup console-backups/20261027-bridge-startup-diagnostics.
+- Gary noted actions taking too long. Use focused checks during diagnosis and
+  the required full suite before reporting done; avoid full regression for
+  every experimental iteration or repeating controller navigation blindly.
+
+- Diagnostic build 1af33a78 deployed successfully. Native app exported actual
+  filtered wrapper markers from the first failed run: started, listening,
+  MSA requests and phone-scope-rejected repeatedly. This error had collapsed
+  network and scope failures, so its label alone did not prove an HTTP denial.
+- Backend 6731066 always requests the app's approved Xbox service scope; the
+  game's non-full-trust request does not grant the app xboxlive.signin scope.
+  It also verifies TLS with the native app's packaged CA bundle and distinguishes
+  network failure, invalid response and rejection using static codes. No TLS
+  bypass. Host wrapper tests 4/4, Windows build passed.
+- Frontend 12700b2 distinguishes full-trust/signin request markers and network,
+  response or trust failures. Focused xbox_runtime check passed, PS5 build
+  passed. Deployed SHA256
+  cb13ba36eddfcacf1e65b81bfe32685955a84a60bf07063604f7b14e97ce6f32,
+  wrapper 0980542c9818 prefix; backup console-backups/20261027-bridge-phone-trust.
+- Actual 1080p test launched MIO at 20:11Z, remained BLACK at ~40 seconds.
+  Closed only this test and reopened Playden to collect its new bridge result.
+  Still MUST RESTORE 4K before handing back. Pad CLOSED, Remote Play OFF.
+
+- The 1080p corrected-scope/trust run DID issue real phone MSA service tickets
+  five times inside MIO. After closing the test, native filtered bridge output
+  shows msa-request-signin + phone-ticket-issued repeatedly. RPC ticket errors
+  disappeared from latest session-3.log, but MIO reports [xbox] login failed and
+  create context failed. Thus ticket issuance is accepted, final game/SISU
+  sign-in remains FAILED, and black startup persists. Do not claim it works.
+- Existing xgameruntime_impl.dll lacks the newer AUTH_META diagnostics from
+  current Nexus sources. Investigating the downstream device/SISU exchange
+  without enabling traces that print RPS tickets or HTTP authorization bodies.
+- Full frontend regression on current trust/diagnostic code passed 153/153
+  (143.48 s). MIO is stopped; Playden running. Resolution still temporarily
+  1080p and MUST be restored to 4K. Pad CLOSED; Remote Play OFF.
+
+### Downstream game grant restriction and account-flow cleanup (20:33Z)
+
+- Corrected Xboxlive.signin scope spelling to match the existing XAL library.
+  Runtime now requests the game's own client grant first, and prefers the
+  documented OAuth d= representation when validating Xbox user tickets.
+  Actual MIO test still stalled; filtered native evidence records
+  game-application-rejected followed by app-level phone-ticket-issued for all
+  five requests. A valid app/library ticket is NOT a successful game login.
+- Independent public challenge requests for MIO's app ID, both uppercase and
+  lowercase, returned HTTP 400 invalid_client. No challenge or user approval
+  was requested. No old account was restored. Further work needs a suitable
+  game authorisation path rather than repeating the same phone approval.
+- Backend c700f56 adds bounded fixed-code live diagnostics at
+  /data/playden/logs/xbox-runtime-status.log (Windows only), avoiding raw
+  credentials/provider data and reducing restart cycles. 5 wrapper tests,
+  9 device-code tests and Windows build pass. Live-status DLL prepared but NOT
+  deployed; console still uses game-grant build SHA256
+  c83cc25e222027aaaac5130f929cb4b499faa678fa7df00528737300d55efdf6.
+- RESTORED MIO 3840x2160 through its normal Game settings UI. Screenshot
+  /tmp/gamepass-mio-restored-four-k.png. Revision 2->3, Settings applied at
+  20:30:58Z. No save loaded or modified. Pad CLOSED, Remote Play remains OFF.
+- Finishing automatic catalogue refresh after successful phone approval with
+  no connected account, plus account-cancellation cleanup. Focused real
+  controller + native-runner integration passed: exactly one sign-in test and
+  one automatic refresh, no Steam auth calls or game-completion flags.
+
+
+### Crash recovery and single Microsoft browser sign-in (2026-10-27, from 20:49Z)
+
+- Recovered the original Codex thread from local history. It had resumed after
+  the app crash; sent it a coordination message and it stopped editing. Its
+  handoff is /tmp/gamepass-browser-relay-handoff.md. No subagents were spawned.
+- Gary wants ONE Sign in with Microsoft action covering game authorisation,
+  library and licensing. The phone/computer choice has been removed. Native
+  browser success saves one primary user session atomically and automatically
+  refreshes the library/revalidates existing installs. Failed/late saves retain
+  the prior account; logout removes all account methods. First empty-device
+  setup has implementation and synthetic coverage, but no live acceptance.
+- Source spans xodus-ps5-backend, playden-ps5 and the new source-controlled
+  xodus-games/ps5-extras/signin directory. The Mac page is localhost port 47832;
+  the native temporary TLS listener is port 47834. Pairing uses the TV's grouped
+  16-character certificate fingerprint prefix. Browser adapter uses a disposable
+  Chrome profile and private CDP pipes. Safari can host the local page.
+- Latest DEPLOYED app SHA256:
+  04bcf768149c1694b4fdaceb3aa6e95f29d4aa3c09b8699688f4c68c354d2716.
+  Backup: playden-ps5/console-backups/20261027-signin-callback-order.
+  Its sole sign-in action and readable URL/uppercase pairing code were seen on
+  the actual PS5. Existing phone account/library and installs remain available.
+- Real browser attempts have NOT completed console acceptance. Early failures:
+  browser-disconnected and browser-session-order. Native now ignores stale
+  callbacks from previous login legs (3 focused protocol tests pass). Mac view
+  now ignores destroyed execution contexts during navigation, records only fixed
+  diagnostics and no longer misleadingly calls every post-login error a Chrome
+  launch failure. The latest authoritative native failure was xbox-user, i.e.
+  browser transport advanced into Xbox verification. Do NOT claim login works.
+- The previously completed original Mac embedded-browser login also failed the
+  same Xbox profile verification. Added explicit raw/d=/t= RPS representation
+  validation to profile.rs. A rebuilt Mac CLI profile check was blocked in
+  SecItem/Keychain (confirmed using a stack sample), not a browser window.
+  A profile check is currently waiting for Gary to approve Xodus Keychain access.
+  It prints only success/subscription booleans, never credentials. CUA refuses
+  to operate SecurityAgent; those OS prompts require Gary's own clicks.
+- Prefix fix and post-save-notification fix are NOT DEPLOYED yet. Native cross
+  build runs in /tmp/gamepass-signin-profile-native-build.log. Once a credential
+  commit succeeds, a lost computer connection must no longer mark it failed.
+  Current local sign-in server uses the Mac redirect fix; don't restart it during
+  an active attempt. Its stdout/stderr diagnostic prefix is SIGNIN_VIEW.
+- Original exporter also had a real outdated-format bug: it exported only four
+  legacy entries, missing user-session. Exporter now exports a complete atomic
+  session (or a complete legacy session), fails closed, uses private output, and
+  has 4 passing tests. Legacy ps5_xbox.py signin now checks console-idle twice,
+  uses random staging, verifies read-back hash and always cleans staging; 8
+  Python tests passed. NO Mac session export/UID credential transfer was run in
+  this recovery turn, and no cleared old console login was restored.
+- Checks: native TLS/protocol build and Windows DLL build passed; 38 credential
+  checks (36 plus 2 new primary-flow checks), 3 native relay protocol tests,
+  4 local TLS relay tests, wrapper 5 tests and focused UI/jobs/controller tests
+  passed across the iterations. Full app suite ran twice with only an evolving
+  UI test failing; that test was corrected and passes focused. A third full run
+  was stopped after Gary requested faster iteration. Run the required full suite
+  ONCE after the implementation settles; don't keep repeating it while debugging.
+- Gary explicitly allows terminating the game for this work. Closed PPSA99322
+  twice and agent-launched Playden for deployment. No saves were loaded or game
+  settings changed. MIO remains 4K. Virtual pad is CLOSED; Remote Play remains OFF.
+- All recovery changes are still UNCOMMITTED, including the earlier thread's
+  backend relay work. The combined gamepass-ps5 subtree checkout is not synced
+  with these changes yet. No pushes/releases were performed. Preserve unrelated
+  existing work, particularly the earlier appended 20:33 work record section.
+
+
+#### Recovery checkpoint after the services stopped answering
+
+- Source is now committed locally: backend aa94997, app b5eb3f7,
+  exporter/handover b7ad28a, local page 729e5bc. None has been pushed.
+- Final prepared app (NOT DEPLOYED) SHA256:
+  0244bdb9af7556d28919d11e7b01b347487d635c5ed9facfae6d54bfafa2be66.
+  It includes the RPS representation verification change and preserves a
+  successful credential commit even if the final computer notification fails.
+- Latest Mac profile check returned failure; no successful verification is
+  established. No Xodus login/profile subprocess remains running. Do not keep
+  asking for Keychain approval without identifying its current need.
+- Final full host run completed with 150/153 passing. Two failures were tests
+  still selecting the removed phone option; they were updated to the unified
+  browser sign-in and both pass focused, including automatic library loading.
+  The installed-locations check still times out at line 597 on a focused rerun.
+  Therefore do NOT claim a clean full test suite. Focused auth/protocol/TLS
+  checks and PS5/native/Windows builds pass; live sign-in remains unaccepted.
+- At approximately 23:06, console FTP, loader, controller and capture services
+  were all unavailable. A local discovery found no alternate console exposing
+  ftpsrv and the ELF loader together.
+- Gary said try again: FTP/loader briefly returned. Reloaded the known ps5vkctl
+  and DevLoop payloads; one status and one ping worked, then further control
+  requests stalled. The deployment aborted BEFORE copying files. FTP stopped
+  answering again. Asked Gary whether the menu responds and to close Game Pass
+  from Home if possible. Do not overwrite the running app while its state is
+  uncertain. No reboot was triggered by this session.
+- Virtual pad remains closed. The local page server remains available on Mac
+  localhost port 47832; its last attempt is failed, with no active auth job.

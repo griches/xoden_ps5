@@ -24,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UIDCP = os.path.join(HERE, "uidcp", "uidcp.elf")
@@ -111,6 +112,8 @@ def running(host):
 
 
 def signin(args):
+    if running(args.host) != "ok idle":
+        raise RuntimeError("Close Game Pass and any running game before saving sign-in.")
     if not args.no_login:
         print("Opening the Microsoft sign-in window (xodus-cli login)...")
         subprocess.run([XODUS_CLI, "login"], check=True)
@@ -121,17 +124,25 @@ def signin(args):
         subprocess.run([XODUS_EXPORT, path], check=True)
         with open(path, "rb") as exported:
             data = exported.read()
+    # Recheck after the Keychain dialog; never replace credentials while a
+    # title may be refreshing the current account.
+    if running(args.host) != "ok idle":
+        raise RuntimeError("The PS5 started a title. Close it and retry saving sign-in.")
     console = Console(args.host)
+    staged = f"signin-{uuid.uuid4().hex}.ron"
     try:
-        console.put(data, "xodus-keyring.ron")
-        log = console.uid([("mkdir", XBOX), ("cp-private", f"{DROP}/xodus-keyring.ron", f"{XBOX}/xodus-keyring.ron")])
+        console.put(data, staged)
+        log = console.uid([("mkdir", XBOX), ("cp-private", f"{DROP}/{staged}", f"{XBOX}/xodus-keyring.ron")])
+        if f"published {XBOX}/xodus-keyring.ron" not in log:
+            raise RuntimeError("The PS5 could not save the Microsoft sign-in. Try again.")
+        installed = console.get(f"{XBOX}/xodus-keyring.ron")
+        if hashlib.sha256(installed).digest() != hashlib.sha256(data).digest():
+            raise RuntimeError("The saved Microsoft session did not pass verification.")
     finally:
-        console.delete("xodus-keyring.ron")
+        console.delete(staged)
+        console.delete("out.bin")
         console.ftp.close()
-    print(log)
-    if f"published {XBOX}/xodus-keyring.ron" not in log:
-        sys.exit("the sign-in was not installed")
-    print(f"Signed in on the console: {XBOX}/xodus-keyring.ron")
+    print("Microsoft browser sign-in saved and verified on the PS5.")
 
 
 def bottles(args):
