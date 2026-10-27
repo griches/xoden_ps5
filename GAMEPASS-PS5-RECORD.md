@@ -769,3 +769,22 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Existing Elder Gods content was not deleted, redownloaded or modified by this
   recovery attempt. No gameplay acceptance and no download speed improvement.
   Virtual pad was closed before reload; Remote Play and DevTools were off.
+
+## 2026-10-27 — user-confirmed Elder Gods launch after reboot
+
+- Gary reports that after restarting the PS5 and jailbreaking again he was able
+  to run the game (Elder Gods in the current task context). Treat this as
+  user-confirmed successful launch after recovery, not agent-verified extended
+  gameplay or completion. The downloaded content did not need replacing.
+- This resolves the immediate user-visible launch blocker. It supports the
+  stalled-loader diagnosis, but does not prove its internal cause or make hot
+  reload reliable. Avoid repeating the unsuccessful live loader replacement.
+- Read-only launcher status check after Gary's report received connection
+  refused: the DevLoop helper is not currently available after reboot. No pad
+  opened, payload loaded, Remote Play started, or running game interrupted.
+- Remaining priorities: fresh native Microsoft sign-in and PC-license bridge;
+  download throughput diagnosis; queued multi-job management and final recovery
+  acceptance; standalone title/assets/settings/updater separation; generated
+  icon0/pic0; broader per-game compatibility and subscription expiry acceptance.
+  Green UI, full-library search, persistent covers, package size/choice UI and
+  basic pause/resume/cancel cleanup are already implemented and tested.
