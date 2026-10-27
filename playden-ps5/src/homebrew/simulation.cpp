@@ -498,7 +498,7 @@ std::string action_label(const std::string& key) {
         {"inject-logs-ready", "Inject ready logs"}, {"account-auth", "Authentication"},
         {"account-last-sync", "Last library sync"}, {"account-sync", "Sync now"},
         {"account-recover", "Reconnect account"}, {"account-switch", "Switch account"},
-        {"xbox-refresh", "Refresh Xbox library"}, {"account-reauth", "Sign in again"}, {"job-resume-all", "Resume all"}, {"job-clear-completed", "Clear completed"},
+        {"xbox-refresh", "Refresh Xbox library"}, {"xbox-phone-test", "Test phone sign-in"}, {"xbox-phone-done", "Done"}, {"account-reauth", "Sign in again"}, {"job-resume-all", "Resume all"}, {"job-clear-completed", "Clear completed"},
         {"prep-clear-completed", "Clear completed"}, {"storage-close", "Close"}, {"collection-new", "New collection"}, {"collection-manage", "Manage collections"},
         {"about-version", "Version"}, {"self-update-install", "Download and install"},
         {"self-update-restart", "Restart Playden"}, {"self-update-cancel", "Cancel update"},
@@ -1873,6 +1873,20 @@ void Simulation::SetGamePassOnly(bool enabled) {
 
 void Simulation::UpdateXboxAccount(std::string name, std::string message, bool busy) {
     xbox_account_name_ = std::move(name); xbox_account_message_ = std::move(message); xbox_account_busy_ = busy;
+    rebuild_view();
+}
+
+void Simulation::UpdateXboxPhoneSignIn(std::string message,std::string code,std::string url,bool busy) {
+    xbox_phone_busy_=busy;
+    // Provider data is validated again at this display boundary; codes never
+    // become profile data, notifications, URLs or credential-bearing logs.
+    const bool valid_code=!code.empty() && code.size()<=32 &&
+        std::all_of(code.begin(),code.end(),[](unsigned char c){return (c>='A'&&c<='Z')||(c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='-';}) &&
+        (url=="https://www.microsoft.com/link" || url=="https://microsoft.com/link");
+    for (auto& modal:state_.navigation.modals) if (modal.id=="xbox-phone-signin") {
+        modal.body=valid_code?"On your phone, open "+url+"\n\nEnter code: "+code+"\n\nYour current account stays connected.":std::move(message);
+        modal.action_keys={busy?"cancel":"xbox-phone-done"};modal.focused_action=0;
+    }
     rebuild_view();
 }
 
@@ -3869,7 +3883,7 @@ void Simulation::rebuild_view() {
     } else if (!state_.navigation.modals.empty()) {
         const auto& modal = state_.navigation.modals.back();
         view_.title = modal.title;
-        if (modal.id == "xbox-account" || modal.id == "compatibility") view_.subtitle = modal.body;
+        if (modal.id == "xbox-account" || modal.id == "xbox-phone-signin" || modal.id == "compatibility") view_.subtitle = modal.body;
         if (modal.id == "logs") {
             view_.subtitle = state_.log_context;
             if (state_.log_state == LogState::Loading) row("logs-loading", RowKind::Status, "Loading fixture logs…", "").enabled = false;
@@ -5544,6 +5558,7 @@ void Simulation::open_modal(ModalEntry modal) {
 
 void Simulation::close_modal() {
     if (state_.navigation.modals.empty()) return;
+    if (state_.navigation.modals.back().id=="xbox-phone-signin" && xbox_phone_busy_) xbox_phone_cancel_=true;
     const auto opener = state_.navigation.modals.back().opener_focus_key;
     // Step 2 opened from a game's page (no step 1 under it) was for that game only.
     if (state_.navigation.modals.back().id == "import-storage" &&
@@ -6859,10 +6874,19 @@ void Simulation::activate() {
         xbox_discard_game_ = {}; close_modal();
     } else if (live() && action_name == "xbox-account") {
         ModalEntry modal{"xbox-account","Xbox account",state_.navigation.focus_key,
-            xbox_account_busy_ ? std::vector<std::string>{"cancel"} : std::vector<std::string>{"xbox-refresh","cancel"},0,false};
+            xbox_account_busy_ ? std::vector<std::string>{"cancel"} : std::vector<std::string>{"xbox-refresh","xbox-phone-test","cancel"},0,false};
         modal.body = xbox_account_message_;
-        if (xbox_account_name_.empty()) modal.body += " Microsoft sign-in currently needs the Xodus sign-in window on your computer. After connecting that account to the console, choose Refresh Xbox library.";
+        modal.body += " Microsoft sign-in is available as a phone test. It checks PC game access and keeps your current account until game sign-in is verified.";
         open_modal(std::move(modal));
+    } else if (live() && action_name=="xbox-phone-test") {
+        if (!xbox_account_busy_) {
+            close_modal();xbox_phone_requested_=true;xbox_phone_busy_=true;
+            ModalEntry modal{"xbox-phone-signin","Phone sign-in test",state_.navigation.focus_key,{"cancel"},0,false};
+            modal.body="Preparing a Microsoft sign-in code. Your current account stays connected.";
+            open_modal(std::move(modal));
+        }
+    } else if (live() && action_name=="xbox-phone-done") {
+        close_modal();
     } else if (live() && action_name == "xbox-refresh") {
         if (!xbox_account_busy_) xbox_refresh_requested_ = true;
         close_modal();

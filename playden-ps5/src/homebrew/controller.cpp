@@ -1787,6 +1787,18 @@ const installs::InstalledLocation* Controller::LocationOf(GameId id) const {
 }
 void Controller::TickXboxJobs() {
   if (!xbox_jobs_ || !xbox_library_) return;
+  if (model_.TakeXboxPhoneTest()) {
+    const auto catalog=xbox_library_->Snapshot();
+    auto game=model_.state().navigation.selected_game_id;
+    if (!game.valid() || game.store!=Store::kXbox) {
+      const auto prepared=xbox_jobs_->Snapshot();
+      if (!prepared->prepared.empty()) game=prepared->prepared.front().game;
+      else if (catalog && !catalog->games.empty()) game=catalog->games.front().id;
+    }
+    if (!xbox_jobs_->TestPhoneSignIn(game,catalog?catalog->market:"GB"))
+      model_.UpdateXboxPhoneSignIn("Select a PC game from your library and wait for the current operation to finish before testing phone sign-in.",{},{},false);
+  }
+  if (model_.TakeXboxPhoneCancel()) xbox_jobs_->Cancel({});
   if (model_.TakeXboxRefresh()) {
     const auto catalog = xbox_library_->Snapshot();
     if (!xbox_jobs_->Refresh(catalog ? catalog->market : "GB")) model_.ShowLayoutNotice("Wait for the current Xbox operation to finish before refreshing.");
@@ -1804,6 +1816,7 @@ void Controller::TickXboxJobs() {
       : catalog ? "Saved Xbox account. Refresh to check your session and library."
                 : "No Xbox account is connected to this console.";
   model_.UpdateXboxAccount(catalog ? catalog->gamertag : "",account_message,state->active);
+  if (state->phone_test) model_.UpdateXboxPhoneSignIn(state->message,state->sign_in_code,state->sign_in_url,state->active);
   if (state->phase == "refreshed" && !state->request_id.empty() && state->request_id != xbox_refreshed_request_) {
     xbox_refreshed_request_ = state->request_id;
     if (library_) library_->Refresh(Store::kXbox);

@@ -12,6 +12,13 @@
 #include <sys/socket.h>
 extern "C" int getentropy(void *, size_t);
 extern "C" int xodus_ps5_entropy_status(void);
+extern "C" int xodus_ps5_commit_keyring(const std::uint8_t* bytes,std::size_t size) {
+    if (!bytes || !size || size>8*1024*1024) return -1;
+    try {
+        playden::Storage storage("/data/playden/xbox");
+        return storage.WriteAtomicPrivate("xodus-keyring.ron",playden::Bytes(bytes,bytes+size)).ok()?0:-1;
+    } catch (...) {return -1;}
+}
 extern "C" int xodus_ps5_available_space(const char* path, std::uint64_t* bytes) {
     if (!path || !bytes || path[0] != '/') return -1;
     try {
@@ -28,6 +35,9 @@ namespace {
 std::string Message(const std::string& phase) {
     if (phase == "refreshing") return "Refreshing Xbox library…";
     if (phase == "checking-account") return "Checking Xbox access…";
+    if (phase == "checking-sign-in") return "Preparing phone sign-in…";
+    if (phase == "sign-in-code") return "Enter the code on your phone to sign in.";
+    if (phase == "checking-game-access") return "Checking phone sign-in and PC game access…";
     if (phase == "resolving") return "Finding the PC download…";
     if (phase == "metadata") return "Reading game data…";
     if (phase == "downloading") return "Downloading Xbox game";
