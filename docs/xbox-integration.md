@@ -193,3 +193,26 @@ An isolated/custom standard-library adaptation or an explicit C IO bridge is
 needed before console execution. Do not treat the successful default-target
 archive build as a runnable PS5 backend. Current log:
 `/tmp/xbox-native-msixvc-probe/build-freebsd11.log`.
+
+## Verified FTP-only retry and native parser checkpoint
+
+After Gary requested a retry, the FTP-only deploy succeeded. Two files changed:
+eboot.bin (SHA prefix `d2891aad89b4`) and playden-package.identity. Exact raw
+read-back passed; backup is in sibling
+`xodus-games/console-backups/20261027-xbox-cleanup-ftp`. No UID backup payload was
+used. The existing ps5vkctl control helper was restored, reported idle, and
+launched FAKE77031 successfully. Native screenshot `/tmp/playden-cleanup-startup.png`
+shows the home screen and existing Doom 64/Minishoot entries. The capture was
+retrieved and removed from the title's developer capture directory through FTP;
+no Remote Play session or virtual pad was opened. The update boots; actual
+cancel/delete UI acceptance is still outstanding.
+
+Backend commit `c72ef04` adds `crates/xodus-ps5-native`, a versioned bounded C API
+for XVD package header inspection, three Rust tests, an executable host C ABI
+test, and an isolated PS5 build script. Host Rust and C tests pass; the C test
+links to a PS5 executable with the adapted standard library. The build script
+reproduced that result from a fresh directory with the workspace lockfile.
+Fifteen file-stat field offsets and the 120-byte total match SDK declarations.
+No native probe has been executed on the console. No networking, account refresh,
+license resolution, extraction or progress/cancellation API is implemented by
+this new crate yet. Installed downloads still use the existing Windows worker.
