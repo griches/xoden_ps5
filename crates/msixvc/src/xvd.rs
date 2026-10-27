@@ -28,7 +28,7 @@ use crate::models::xvd::{
     XvdUserDataPackageFileEntry, XvdUserDataPackageFilesHeader,
 };
 use crate::streaming_ntfs::collect_ntfs_stream_layouts;
-use crate::streaming_http::{Policy, RangeReader, TransferError};
+use crate::streaming_http::{Policy, SegmentReader, TransferError};
 
 #[cfg(test)]
 #[path = "package_metadata_tests.rs"]
@@ -926,7 +926,7 @@ impl XvdFile {
         let mut last_checkpoint = resume_offset;
         let start = sfile.offset.checked_add(v).ok_or(TransferError::new("transfer-range", 0))?;
         let end = sfile.offset.checked_add(page_length - 1).ok_or(TransferError::new("transfer-range", 0))?;
-        let mut transfer = RangeReader::new(client, url, start, end, Policy::default());
+        let mut transfer = SegmentReader::new(client, url, start, end, Policy::default());
         loop {
             if page_in_section >= page_start + page_count || remaining == 0 {
                 break;
