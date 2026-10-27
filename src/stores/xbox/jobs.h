@@ -26,6 +26,8 @@ struct JobSnapshot {
     std::string phase = "loading", message, request_id;
     std::string worker_install_id, worker_title;
     bool native = false, active = false, cancelling = false;
+    // Set only by a successful download in this process, never by startup reload.
+    GameId completed_game;
     GameId active_game, removing_game;
     std::string removal_error;
     std::uint64_t done_bytes = 0, total_bytes = 0, bytes_per_second = 0;
@@ -58,7 +60,7 @@ private:
     void Load();
     void Execute(const Request& request);
     void ExecuteDiscard(GameId game);
-    void ExecuteNative(GameId game);
+    void ExecuteNative(GameId game, const std::string& request_id);
     void ExecuteUninstall(GameId game);
     void Publish(std::string phase, std::string message = {});
     JobConfig config_;

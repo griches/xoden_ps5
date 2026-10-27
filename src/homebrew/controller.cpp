@@ -1808,7 +1808,11 @@ void Controller::TickXboxJobs() {
     if (game.account_key != account) continue;
     xbox_locations_.push_back({game.game,game.root,"internal",true,installs::InstalledLocation::Ownership::kExternal,{}});
     xbox_programs_[game.game] = game.executable;
-    if (runtime_ && !uninstalls_.Step(game.game)) {
+    // Existing downloads remain playable, but startup must not recreate titles
+    // the player removed. Only a fresh native completion prepares automatically.
+    if (runtime_ && state->completed_game == game.game && !state->request_id.empty() &&
+        xbox_completed_request_ != state->request_id && !uninstalls_.Step(game.game)) {
+      xbox_completed_request_ = state->request_id;
       const auto runtime = runtime_->Shared();
       const bool known = std::any_of(runtime->installs.begin(),runtime->installs.end(),[&](const auto& entry) { return entry.game == game.game; });
       if (!known && std::find(auto_prepare_.begin(),auto_prepare_.end(),game.game) == auto_prepare_.end()) auto_prepare_.push_back(game.game);

@@ -1157,6 +1157,28 @@ const playden::homebrew::ViewRow* find_view_row(const Simulation& model, const s
     return nullptr;
 }
 
+void live_xbox_uninstall_without_runtime_title(const std::filesystem::path& base) {
+    auto model = make_live(base);
+    const auto id = playden::GameId::Xbox("9MXND4PQLK3W");
+    playden::GameSummary game; game.id = id; game.title = "Xbox game";
+    playden::homebrew::LibraryUpdate update{{game}, false, {}, false, true, 100};
+    update.source = playden::Store::kXbox;
+    check(model.UpdateLibrary(update), "Xbox library delivered");
+    model.UpdateExternalGames({{id, "internal", true, ""}});
+    check(model.action("details:" + playden::ToKey(id)), "Xbox details without runtime title");
+    check(!find_view_row(model, "details-remove") &&
+          !find_view_row(model, "details-copy"), "Xbox files offer play without imported-folder actions");
+    activate(model, "details-more");
+    const auto* row = find_view_row(model, "uninstall");
+    check(row && row->enabled && !find_view_row(model, "import-remove"), "Xbox uninstall enabled without Steam install or PS5 title");
+    activate(model, "uninstall");
+    activate(model, "confirm-destructive");
+    const auto requests = model.TakeInstallRequests();
+    check(requests.size() == 1 && requests.front().game_id == id &&
+          requests.front().kind == playden::homebrew::InstallRequestKind::Uninstall && !requests.front().delete_saves,
+          "Xbox confirmation requests full content uninstall while preserving saves");
+}
+
 // An imported game's Game settings: Program, and a "Steam app ID" that takes plain decimal only,
 // shows the game's own steam_appid.txt when that one wins, and clears when emptied.
 void live_imported_game_steam_app_id(const std::filesystem::path& base) {
@@ -1331,6 +1353,7 @@ int main() {
     live_refresh_rate_keeps_off_over_a_preset_cap(base / "capped");
     live_update_runtime_from_maintenance(base / "update-runtime");
     live_program_change_applies_like_other_settings(base);
+    live_xbox_uninstall_without_runtime_title(base);
     live_imported_game_steam_app_id(base);
     live_imported_program_seeds_once(base);
     live_setup_asks_for_a_steam_program(base);

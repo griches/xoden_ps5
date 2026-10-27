@@ -234,6 +234,10 @@ const Installation* find_installation(const State& state, GameId id) {
 }
 
 bool is_installed(const State& state, GameId id) {
+    // Xbox owns these downloads through its manifest, independently of Steam's
+    // installed byte counts and the presence of a PS5 runtime title.
+    if (id.store == Store::kXbox && std::any_of(state.external_games.begin(), state.external_games.end(),
+        [id](const LiveExternalGame& game) { return game.game_id == id; })) return true;
     const auto found = std::find_if(state.installations.begin(), state.installations.end(),
                                     [id](const Installation& installation) { return installation.game_id == id; });
     return found != state.installations.end() && found->installed_bytes > 0;
@@ -6960,7 +6964,8 @@ void Simulation::activate() {
         if (live() && action_name == "uninstall") {
             uninstall_delete_saves_ = false;
             const auto runtime_game = state_.runtime_games.find(state_.navigation.selected_game_id);
-            if (runtime_game != state_.runtime_games.end() && runtime_game->second.has_title)
+            if (runtime_game != state_.runtime_games.end() && runtime_game->second.has_title &&
+                state_.navigation.selected_game_id.store != Store::kXbox)
                 actions = {"cancel", "uninstall-delete-saves", "confirm-destructive"};
         }
         ModalEntry confirmation{"confirmation", std::move(title), state_.navigation.focus_key, std::move(actions), 0, true};
@@ -8578,7 +8583,7 @@ std::vector<std::string> Simulation::details_context_actions() const {
     // An imported game playing from its folder is "installed" there: its settings apply, and it
     // leaves the library rather than being uninstalled.
     const bool in_place = external_game(selected) != nullptr;
-    if (in_place) std::replace(actions.begin(), actions.end(), std::string("uninstall"), std::string("import-remove"));
+    if (in_place && selected.store == Store::kLocal) std::replace(actions.begin(), actions.end(), std::string("uninstall"), std::string("import-remove"));
     const bool installed = (live() && is_installed(state_, selected)) || in_place;
     if (installed || game_prepared(state_.navigation.selected_game_id))
         actions.insert(actions.begin(), {"game-settings", "game-maintenance"});

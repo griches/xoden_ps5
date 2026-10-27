@@ -35,7 +35,7 @@ int main() {
     assert(!jobs.Install(GameId::Xbox("9N5PKH0KW2L1"),std::string(64,'a'),"GB"));jobs.Shutdown();
     std::filesystem::create_directories(root/"games/xbox-9n5pkh0kw2l1");
     Put(store,"prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9N5PKH0KW2L1\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\"xbox-9n5pkh0kw2l1\",\"executable\":\"Game.exe\"}]}");
-    { stores::xbox::Jobs reload(config);Wait(reload,"idle");assert(reload.Snapshot()->prepared.size()==1); }
+    { stores::xbox::Jobs reload(config);Wait(reload,"idle");assert(reload.Snapshot()->prepared.size()==1);assert(!reload.Snapshot()->completed_game.valid()); }
     Put(store,"prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9N5PKH0KW2L1\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\"xbox-9n5pkh0kw2l1\",\"executable\":\"../escape.exe\"}]}");
     { stores::xbox::Jobs reload(config);Wait(reload,"idle");assert(reload.Snapshot()->prepared.empty()); }
     // Orphan partials remain manageable even after a newer job finishes.
@@ -147,6 +147,21 @@ int main() {
         assert(!std::filesystem::exists(partial) && !std::filesystem::exists(quarantine));
         assert(native.Snapshot()->partials.empty());
     }
+    // Fresh completion requests preparation, while startup only inventories files.
+    native_config.native_run = [&](const auto&, const auto&) {
+        std::filesystem::create_directories(root/"games"/"xbox-9n5pkh0kw2l1");
+        Put(store,"prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9N5PKH0KW2L1\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\"xbox-9n5pkh0kw2l1\",\"executable\":\"Game.exe\"}]}");
+        return stores::xbox::NativeResult::Complete;
+    };
+    {
+        stores::xbox::Jobs native(native_config); Wait(native,"idle");
+        assert(native.Install(GameId::Xbox("9N5PKH0KW2L1"),std::string(64,'a'),"GB"));
+        for (int i=0;i<2000 && !native.Snapshot()->completed_game.valid();++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(native.Snapshot()->completed_game == GameId::Xbox("9N5PKH0KW2L1"));
+        assert(!native.Snapshot()->request_id.empty());
+    }
+    { stores::xbox::Jobs reload(native_config); Wait(reload,"idle"); assert(!reload.Snapshot()->completed_game.valid()); }
     // Installed content is admitted only from its prepared manifest, then
     // removed without touching another game's content or any saves.
     const auto installed = root/"games/xbox-9n5pkh0kw2l1";

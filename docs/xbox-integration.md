@@ -288,3 +288,29 @@ A wired connection's negotiated link rate has not been verified.
 Console observation during this work changed from worker FAKE78001 to running
 game FAKE78005. The game, virtual pad and Remote Play were left untouched.
 Wait for the console to be available before controlled native acceptance.
+
+### 2026-10-27 — uninstall UI and startup title recreation
+
+The native engine build was subsequently deployed and booted, followed by
+8457593 (Xbox title/content uninstall). Both deployments used raw FTP transfer,
+backup and exact read-back verification; no UID payload or Remote Play was used.
+Native download execution and throughput are still not console-validated.
+
+Gary revoked bulk Xbox deletion and will uninstall games himself. Only the old
+imported Minishoot library entry and FAKE78002 title were removed before that
+instruction; its source files remain. Do not resume bulk deletion. The virtual
+pad was closed. Questions/status requests do not cancel ongoing authorized work.
+
+The Xbox manifest is projected as external locations, so the standard installed
+byte-count check incorrectly disabled Uninstall. Xbox manifest locations now
+count as installed for that check and offer Uninstall rather than local-import
+copy/remove actions. Confirmation preserves saves; the Xbox backend removes its
+manifest entry and managed content after runtime title removal. A model regression
+covers opening More and confirming Uninstall without any runtime title or Steam
+installation. A separate jobs regression covers fresh completion versus reload.
+
+Startup inventories existing Xbox downloads without automatically queuing PS5
+title preparation. Only a successful native download completed in the current
+process queues automatic preparation, once per request. Existing files can still
+be prepared explicitly with Setup/Play. Legacy worker downloads now need explicit setup
+on return. This avoids recreating titles the user removed from the home screen.

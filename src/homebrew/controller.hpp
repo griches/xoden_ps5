@@ -115,6 +115,7 @@ class Controller {
   stores::xbox::XboxLibrarySource* xbox_library_ = nullptr;
   std::uint64_t xbox_revision_ = ~0ull;
   std::string xbox_account_key_;
+  std::string xbox_completed_request_;
   std::vector<installs::InstalledLocation> xbox_locations_;
   std::map<GameId, std::string> xbox_programs_;
   void TickSelfUpdate();

@@ -332,7 +332,7 @@ void Jobs::Execute(const Request& request) {
     const auto text = "{\"schema\":1,\"requestId\":\"" + *id + "\",\"operation\":\"install\",\"market\":\"" + request.market +
         "\",\"accountKey\":\"" + request.account + "\",\"productId\":\"" + request.game.value + "\"}";
     if (!storage_.WriteAtomicPrivate("job-request.json",Bytes(text.begin(),text.end())).ok()) { Publish("failed","The Xbox download request could not be saved."); return; }
-    if (config_.native_run) { ExecuteNative(request.game); return; }
+    if (config_.native_run) { ExecuteNative(request.game,*id); return; }
     const auto worker = Snapshot()->worker_title;
     std::string error;
     if (!config_.handoff || !config_.handoff(*id,worker,&error)) { Publish("failed",error.empty() ? "The Xbox worker could not be started." : error); return; }
@@ -342,7 +342,7 @@ void Jobs::Execute(const Request& request) {
         next->message = "Opening the Xbox download screen"; state_ = std::move(next);
     }
 }
-void Jobs::ExecuteNative(GameId game) {
+void Jobs::ExecuteNative(GameId game, const std::string& request_id) {
     const auto result = config_.native_run([this](const NativeProgress& progress) {
         std::lock_guard<std::mutex> lock(mutex_);
         auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
@@ -355,6 +355,13 @@ void Jobs::ExecuteNative(GameId game) {
     // The runner's contract guarantees no outstanding file writes here. Reload
     // prepared/partial admission before any cleanup, including late cancellation.
     Load();
+    if (result == NativeResult::Complete) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (std::any_of(state_->prepared.begin(),state_->prepared.end(),[&](const auto& entry) { return entry.game == game; })) {
+            auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
+            next->completed_game = game; next->request_id = request_id; state_ = std::move(next);
+        }
+    }
     if (discard) {
         const auto snapshot = Snapshot();
         if (std::find(snapshot->partials.begin(),snapshot->partials.end(),game) != snapshot->partials.end()) ExecuteDiscard(game);
