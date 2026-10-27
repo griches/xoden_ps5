@@ -136,10 +136,19 @@ fn service_main(key: String) {
         Err(err) => return log(format!("tokio: {err}")),
     };
     runtime.block_on(async move {
-        let client = match reqwest::Client::builder()
+        let mut builder = reqwest::Client::builder()
             .user_agent("xodus-wrapper/0.1")
-            .build()
-        {
+            .timeout(std::time::Duration::from_secs(15))
+            .redirect(reqwest::redirect::Policy::none());
+        if phone_test {
+            // Wine's system certificate service is not the native app's trust
+            // store. Use its packaged CA bundle with full TLS verification.
+            let path=std::env::var("XODUS_CA_BUNDLE").unwrap_or_else(|_|r"Z:\data\homebrew\FAKE77031\trust\cacert.pem".into());
+            let pem=match std::fs::read(path) { Ok(pem) if pem.len()<=2*1024*1024=>pem,_=>return log("Phone runtime CA bundle unavailable") };
+            let certificates=match reqwest::Certificate::from_pem_bundle(&pem) { Ok(certificates) if !certificates.is_empty()=>certificates,_=>return log("Phone runtime CA bundle invalid") };
+            builder=builder.tls_certs_only(certificates);
+        }
+        let client = match builder.build() {
             Ok(client) => client,
             Err(err) => return log(format!("http client: {err}")),
         };
@@ -282,14 +291,17 @@ impl Service {
         let fresh = login
             .refresh(
                 previous,
-                Some(if request.msa_full_trust {
-                    Scope::Xbox
-                } else {
-                    Scope::XboxSignin
-                }),
+                // This app's approved refresh grant is service-scoped. The
+                // game's non-full-trust flag does not grant this app the
+                // separate xboxlive.signin scope or a game-client grant.
+                Some(Scope::Xbox),
             )
             .await
-            .map_err(|_| "Microsoft rejected the phone runtime scope")?;
+            .map_err(|error| match error {
+                xodus::api::live::device_code::Error::Network => "Phone runtime refresh network failure",
+                xodus::api::live::device_code::Error::Response => "Phone runtime refresh invalid response",
+                _ => "Microsoft rejected the phone runtime scope",
+            })?;
         let expiry = chrono::Utc::now().timestamp() + fresh.expires_in().as_secs() as i64;
         let mut token = None;
         for prefix in ["t=", "d="] {
