@@ -272,6 +272,20 @@ function(playden_add_homebrew_ps5_title)
 		list(APPEND native_helper_package_commands
 			COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PLAYDEN_XBOX_HANDOFF_ELF}" "${app}/xbox-handoff.elf")
 	endif()
+	set(PLAYDEN_XBOX_WRAPPER_DLL "" CACHE FILEPATH "Optional locally built Xbox sign-in bridge")
+	if(NOT PLAYDEN_XBOX_WRAPPER_DLL STREQUAL "")
+		if(NOT EXISTS "${PLAYDEN_XBOX_WRAPPER_DLL}" OR IS_SYMLINK "${PLAYDEN_XBOX_WRAPPER_DLL}" OR IS_DIRECTORY "${PLAYDEN_XBOX_WRAPPER_DLL}")
+			message(FATAL_ERROR "The Xbox wrapper DLL must be a regular local file")
+		endif()
+		list(APPEND package_inputs "${PLAYDEN_XBOX_WRAPPER_DLL}")
+		set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PLAYDEN_XBOX_WRAPPER_DLL}")
+		list(APPEND native_helper_package_commands
+			COMMAND "${CMAKE_COMMAND}" -E make_directory "${app}/xbox-runtime"
+			COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PLAYDEN_XBOX_WRAPPER_DLL}" "${app}/xbox-runtime/xgameruntime.dll")
+	else()
+		list(APPEND native_helper_package_commands
+			COMMAND "${CMAKE_COMMAND}" -E remove_directory "${app}/xbox-runtime")
+	endif()
 	if(PLAYDEN_UI_SIMULATION)
 		set(playden_title_name "Playden UI Simulation")
 		file(GLOB_RECURSE simulation_inputs CONFIGURE_DEPENDS

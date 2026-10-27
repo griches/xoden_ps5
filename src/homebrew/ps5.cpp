@@ -648,6 +648,10 @@ int main() {
             config.write_title_allow_list = playden::ps5::WriteTitleAllowList;
             config.hold_effective_uid = playden::ps5::HoldEffectiveUid;
             config.xbox_runtime_dir = "/data/playden/xbox/runtime";
+            const auto wrapper_dir=(std::filesystem::path(paths.title_root)/"xbox-runtime").string();
+            struct stat wrapper_info{};
+            if (lstat((wrapper_dir+"/xgameruntime.dll").c_str(),&wrapper_info)==0 && S_ISREG(wrapper_info.st_mode))
+                config.xbox_wrapper_dir=wrapper_dir;
             config.try_hold_effective_uid = [](bool* busy) {
                 auto held = playden::ps5::TryHoldEffectiveUid();
                 *busy = !held;

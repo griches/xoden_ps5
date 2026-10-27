@@ -50,6 +50,7 @@ bash "$environment" bash -c 'exec "$PS5_PAYLOAD_SDK/bin/prospero-cmake" "$@"' ba
  -DPLAYDEN_XBOX_HANDOFF_ELF="$xbox_handoff" \
  -DPLAYDEN_XBOX_NATIVE_SOURCE="${PLAYDEN_XBOX_NATIVE_SOURCE:-}" \
  -DPLAYDEN_XBOX_NATIVE_LIBRARY="${PLAYDEN_XBOX_NATIVE_LIBRARY:-}" \
+ -DPLAYDEN_XBOX_WRAPPER_DLL="${PLAYDEN_XBOX_WRAPPER_DLL:-}" \
  -DPLAYDEN_PS5_DEPS_DIR="$deps" -DPLAYDEN_HUI_SOURCE_DIR="$hui"
 bash "$environment" cmake --build "$root/build/homebrew-ps5" --target playden-homebrew-ps5-package
 echo "Selected Hui package (not deployed): $root/build/homebrew-ps5/dist/FAKE77031"

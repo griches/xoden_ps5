@@ -6,6 +6,7 @@
 #include <cerrno>
 #include <algorithm>
 #include <cstring>
+#include <optional>
 
 namespace playden::runtime {
 namespace {
@@ -97,13 +98,16 @@ bool InstallFile(const platform::ManagedDirectory& input, const platform::Manage
 }
 }
 bool InstallXboxRuntime(const std::string& source, const std::string& prefix,
-                        std::int64_t unix_time, std::string* reason) {
+                        std::int64_t unix_time, std::string* reason, const std::string& wrapper_source) {
     using platform::ManagedDirectory; using platform::DirectoryPolicy;
     auto input = ManagedDirectory::Open(source,DirectoryPolicy::kApprovedTree);
     auto output = ManagedDirectory::Open(prefix + "/drive_c/windows/system32",DirectoryPolicy::kApprovedTree);
+    auto wrapper = wrapper_source.empty() ? std::optional<ManagedDirectory>{} : ManagedDirectory::Open(wrapper_source,DirectoryPolicy::kApprovedTree);
+    if (!wrapper_source.empty() && !wrapper) { *reason="The app's Xbox sign-in bridge is unavailable.";return false; }
     if (!input || !output) { *reason = "The Xbox runtime or the game's Windows folder is unavailable."; return false; }
     for (const char* name : {"xgameruntime.dll","xgameruntime_impl.dll","windows.web.dll"}) {
-        if (!InstallFile(*input, *output, name)) {
+        const auto& selected=wrapper && std::strcmp(name,"xgameruntime.dll")==0 ? *wrapper : *input;
+        if (!InstallFile(selected, *output, name)) {
             *reason = std::string("The Xbox runtime file could not be validated or installed: ") + name;
             return false;
         }
