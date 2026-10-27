@@ -62,6 +62,22 @@ fn issued(body: soap::BodyContent) -> Result<std::collections::HashMap<String,se
 pub(super) async fn run(client: &reqwest::Client,tokens: &TokenManager,root: &Path,req: &Request) -> Result<()> {
     tokio::time::timeout(Duration::from_secs(600),execute(client,tokens,root,req)).await.map_err(|_| "browser-sign-in-expired")?
 }
+
+async fn verify_candidate(tokens:&TokenManager,memory:&TokenManager,expected:Option<&str>,expected_xuid:Option<&str>,
+    user:secrets::User,issued:std::collections::HashMap<String,secrets::Token>,
+    diagnostics:&mut Vec<xodus::api::xbox::auth::UserAuthRejection>) -> Result<()> {
+    memory.save_user_session(secrets::User { puid:user.puid.clone(),username:user.username.clone() },issued.clone()).map_err(|_| "browser-session-verify")?;
+    let signed_in_xuid=super::super::profile::xbox_user_id_with_diagnostics(memory,diagnostics).await.map_err(|_| {
+        match diagnostics.last().map(|value|(value.http,value.kind)) {
+            Some((400,_))=>"browser-verify-http-400",Some((401,_))=>"browser-verify-http-401",Some((403,_))=>"browser-verify-http-403",
+            Some((_,"connect"))=>"browser-verify-connect",Some((_,"timeout"))=>"browser-verify-timeout",Some((_,"response"))=>"browser-verify-response",
+            _=>"browser-verification-pending",
+        }
+    })?;
+    if expected_xuid.is_some_and(|previous|previous!=signed_in_xuid) { return Err("browser-account-mismatch"); }
+    tokens.save_primary_browser_session(expected,user,issued).map_err(|_| "browser-session-save")
+}
+
 async fn execute(client: &reqwest::Client,tokens: &TokenManager,root: &Path,req: &Request) -> Result<()> {
     state(root,req,"checking-sign-in",json!({}))?;
     let expected=match tokens.active_account(){Ok(value)=>Some(value),Err(xodus::tokens::store::TokenStoreError::NotFound)=>None,Err(_)=>return Err("browser-session-read")};
@@ -70,6 +86,11 @@ async fn execute(client: &reqwest::Client,tokens: &TokenManager,root: &Path,req:
     let memory=TokenManager::with_memory();
     memory.save_device_license(&tokens.get_device_license().map_err(|_| "existing-device-required")?).map_err(|_| "device-copy")?;
     if let Ok(ticket)=tokens.get_device_sts_token() { memory.save_device_token(xodus::tokens::PASSPORT_STS.into(),ticket).map_err(|_| "device-copy")?; }
+    if let Some((user,issued))=tokens.browser_candidate(expected.as_deref()).map_err(|_|"browser-session-read")? {
+        state(root,req,"checking-browser-access",json!({"approvalSaved":true}))?;
+        verify_candidate(tokens,&memory,expected.as_deref(),expected_xuid.as_deref(),user,issued,&mut Vec::new()).await?;
+        return state(root,req,"browser-sign-in-saved",json!({"browserSessionSaved":true,"runtimeVerified":false}));
+    }
     xodus::tokens::device::ensure_device_credentials(client,&memory).await.map_err(|_| "browser-device-refresh")?;
     let secrets::Token::Legacy(device)=memory.get_device_sts_token().map_err(|_| "browser-device-ticket")? else { return Err("browser-device-ticket"); };
     let rcgen::CertifiedKey { cert,signing_key }=rcgen::generate_simple_self_signed(vec!["gamepass-console.local".into()]).map_err(|_| "browser-certificate")?;
@@ -135,10 +156,12 @@ async fn execute(client: &reqwest::Client,tokens: &TokenManager,root: &Path,req:
             },
             ExchangeUserTokenOutcome::Issued(body)=>{
                 let issued=issued(body)?;
-                memory.save_user_session(secrets::User { puid:user.puid.clone(),username:user.username.clone() },issued.clone()).map_err(|_| "browser-session-verify")?;
-                let signed_in_xuid=super::super::profile::xbox_user_id(&memory).await?;
-                if expected_xuid.as_ref().is_some_and(|previous|previous!=&signed_in_xuid) { return Err("browser-account-mismatch"); }
-                tokens.save_primary_browser_session(expected.as_deref(),user,issued).map_err(|_| "browser-session-save")?;
+                tokens.save_browser_candidate(expected.as_deref(),secrets::User {puid:user.puid.clone(),username:user.username.clone()},issued.clone()).map_err(|_|"browser-approval-save")?;
+                let mut diagnostics=Vec::new();
+                if let Err(code)=verify_candidate(tokens,&memory,expected.as_deref(),expected_xuid.as_deref(),user,issued,&mut diagnostics).await {
+                    let _=send(&mut writer,json!({"type":"failed","approvalSaved":true,"code":code,"rejections":diagnostics})).await;
+                    return Err(code);
+                }
                 state(root,req,"browser-sign-in-saved",json!({"browserSessionSaved":true,"runtimeVerified":false}))?;
                 // Persistence already succeeded. A computer closing its window
                 // cannot turn this committed sign-in into a failed account job.

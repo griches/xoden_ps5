@@ -81,6 +81,45 @@ fn phone_candidate() -> crate::api::live::device_code::Credentials {
         "expires_at":chrono::Utc::now().timestamp()+3600})).unwrap()).unwrap()
 }
 
+fn browser_candidate_tokens(expires:chrono::DateTime<chrono::Utc>) -> HashMap<String,Token> {
+    HashMap::from([(super::PASSPORT_STS.into(),Token::Legacy(crate::models::secrets::LegacyToken {
+        key_name:None,token:"synthetic-new-approval".into(),binary_secret:None,tpm_key:None,
+        lifetime:crate::models::soap::Timestamp {id:None,created:(chrono::Utc::now()-chrono::Duration::hours(1)).to_rfc3339(),expires:expires.to_rfc3339()},
+    }))])
+}
+
+#[test]
+fn credential_browser_candidate_is_inactive_reusable_and_removed_by_logout_or_commit() {
+    let (_,manager)=setup();
+    manager.save_browser_candidate(None,user("new-approval"),browser_candidate_tokens(chrono::Utc::now()+chrono::Duration::hours(1))).unwrap();
+    assert!(manager.active_account().is_err());
+    for _ in 0..2 {assert_eq!(manager.browser_candidate(None).unwrap().unwrap().0.username,"new-approval");}
+    manager.remove_persistent().unwrap();
+    assert!(manager.browser_candidate(None).unwrap().is_none());
+    manager.save_browser_candidate(None,user("new-approval"),browser_candidate_tokens(chrono::Utc::now()+chrono::Duration::hours(1))).unwrap();
+    let (user,tokens)=manager.browser_candidate(None).unwrap().unwrap();
+    manager.save_primary_browser_session(None,user,tokens).unwrap();
+    assert_eq!(manager.active_account().unwrap(),"new-approval");
+    assert!(manager.browser_candidate(Some("new-approval")).unwrap().is_none());
+}
+
+#[test]
+fn credential_browser_candidate_rejects_expiry_and_account_changes() {
+    let (backend,manager)=setup();
+    assert!(manager.save_browser_candidate(None,user("expired"),browser_candidate_tokens(chrono::Utc::now()-chrono::Duration::minutes(1))).is_err());
+    manager.save_browser_candidate(None,user("new-approval"),browser_candidate_tokens(chrono::Utc::now()+chrono::Duration::hours(1))).unwrap();
+    let mut candidate:serde_json::Value=serde_json::from_slice(&backend.values.lock().unwrap()["browser-sign-in-candidate"]).unwrap();
+    // Force a stored grant to expire after approval, before its next retry.
+    let expired=browser_candidate_tokens(chrono::Utc::now()-chrono::Duration::minutes(1));
+    candidate["session"]["tokens"]=serde_json::to_value(expired).unwrap();
+    backend.values.lock().unwrap().insert("browser-sign-in-candidate".into(),serde_json::to_vec(&candidate).unwrap());
+    assert!(manager.browser_candidate(None).unwrap().is_none());
+    manager.save_browser_candidate(None,user("new-approval"),browser_candidate_tokens(chrono::Utc::now()+chrono::Duration::hours(1))).unwrap();
+    manager.save_user_session(user("different-account"),session_tokens("other-ticket")).unwrap();
+    assert!(manager.browser_candidate(Some("different-account")).unwrap().is_none());
+    assert!(manager.save_browser_candidate(None,user("late"),browser_candidate_tokens(chrono::Utc::now()+chrono::Duration::hours(1))).is_err());
+}
+
 #[test]
 fn credential_browser_session_keeps_phone_identity_and_projects_only_to_memory() {
     let (_, manager)=setup();

@@ -10,7 +10,11 @@ const MAX_IMAGE: usize = 2 * 1024 * 1024;
 /// Compare Microsoft's authenticated Xbox identity, never an email, display
 /// name or an assumed relationship between OAuth CID and Store PUID.
 pub(super) async fn xbox_user_id(tokens: &TokenManager) -> Result<String, &'static str> {
-    let (client, authorization, _) = xbox_session(tokens).await?;
+    xbox_user_id_with_diagnostics(tokens, &mut Vec::new()).await
+}
+
+pub(super) async fn xbox_user_id_with_diagnostics(tokens: &TokenManager, diagnostics: &mut Vec<xodus::api::xbox::auth::UserAuthRejection>) -> Result<String, &'static str> {
+    let (client, authorization, _) = xbox_session_with_diagnostics(tokens, diagnostics).await?;
     let response = client.get(PROFILE).header("Authorization", authorization)
         .header("x-xbl-contract-version", "2").send().await.map_err(|_| "identity-request")?;
     let body: Value = serde_json::from_slice(&bounded(response,128*1024).await?).map_err(|_| "identity-json")?;
@@ -58,7 +62,20 @@ fn image_data(bytes: &[u8]) -> Option<String> {
     Some(format!("data:{mime};base64,{}", BASE64_STANDARD.encode(bytes)))
 }
 
+fn rps_representations(ticket:&str) -> Vec<String> {
+    let bare=ticket.strip_prefix("d=").or_else(||ticket.strip_prefix("t=")).unwrap_or(ticket);
+    let mut output=vec![ticket.to_owned()];
+    for value in [bare.to_owned(),format!("d={bare}"),format!("t={bare}")] {
+        if !output.contains(&value){output.push(value);}
+    }
+    output
+}
+
 pub(super) async fn xbox_session(tokens: &TokenManager) -> Result<(reqwest::Client, String, String), &'static str> {
+    xbox_session_with_diagnostics(tokens, &mut Vec::new()).await
+}
+
+async fn xbox_session_with_diagnostics(tokens: &TokenManager, diagnostics: &mut Vec<xodus::api::xbox::auth::UserAuthRejection>) -> Result<(reqwest::Client, String, String), &'static str> {
     let client = crate::transport::builder()?.redirect(reqwest::redirect::Policy::none())
         .timeout(super::session::REQUEST_TIMEOUT).user_agent("xodus-nexus-profile/1").build().map_err(|_| "http-client")?;
     if let Some(phone) = tokens.active_phone_ticket(&client, xodus::api::live::device_code::Scope::Xbox).await.map_err(|_| "phone-session-refresh")? {
@@ -94,8 +111,8 @@ pub(super) async fn xbox_session(tokens: &TokenManager) -> Result<(reqwest::Clie
     // requiring an explicit RPS representation. Ask Xbox to validate the
     // representation instead of rejecting an otherwise completed browser login.
     let mut authenticated=None;
-    for prefix in ["", "d=", "t="] {
-        match xodus::api::xbox::authenticate_xbox_user(&client,format!("{prefix}{ticket}")).await {
+    for ticket in rps_representations(&ticket) {
+        match xodus::api::xbox::auth::authenticate_xbox_user_with_diagnostics(&client,ticket,diagnostics).await {
             Ok(value)=>{authenticated=Some(value);break;},
             Err(error) if error.status().is_some_and(|status|matches!(status.as_u16(),400|401|403))=>continue,
             Err(_)=>return Err("xbox-user"),
@@ -150,6 +167,15 @@ pub async fn run(tokens: &TokenManager, json_output: bool) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn profile_rps_representations_never_double_an_existing_prefix() {
+        for ticket in ["synthetic","d=synthetic","t=synthetic"] {
+            let values=rps_representations(ticket);
+            assert_eq!(values.first().unwrap(),ticket);
+            assert_eq!(values.len(),3);
+            for expected in ["synthetic","d=synthetic","t=synthetic"]{assert!(values.iter().any(|value|value==expected));}
+        }
+    }
     #[test]
     fn profile_settings_are_validated_without_exposing_other_fields() {
         let value = json!({"profileUsers":[{"id":"private-id", "settings":[

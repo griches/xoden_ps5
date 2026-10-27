@@ -6,6 +6,26 @@ pub async fn authenticate_xbox_user(
     client: &reqwest::Client,
     rps_ticket: String,
 ) -> reqwest::Result<XstsResponse> {
+    authenticate_xbox_user_with_diagnostics(client, rps_ticket, &mut Vec::new()).await
+}
+
+/// Only numeric rejection metadata may leave the authentication layer.
+#[derive(Clone, serde::Serialize)]
+pub struct UserAuthRejection {
+    pub http: u16,
+    pub xerr: Option<u64>,
+    pub kind: &'static str,
+}
+
+fn rejection_code(bytes: &[u8]) -> Option<u64> {
+    serde_json::from_slice::<serde_json::Value>(bytes).ok()?.get("XErr")?.as_u64()
+}
+
+pub async fn authenticate_xbox_user_with_diagnostics(
+    client: &reqwest::Client,
+    rps_ticket: String,
+    diagnostics: &mut Vec<UserAuthRejection>,
+) -> reqwest::Result<XstsResponse> {
     let body = UserAuthRequest {
         relying_party: "http://auth.xboxlive.com".to_string(),
         token_type: "JWT".to_string(),
@@ -16,16 +36,48 @@ pub async fn authenticate_xbox_user(
         },
     };
 
-    let resp = client
+    let response = client
         .post("https://user.auth.xboxlive.com/user/authenticate")
         .header("Content-Type", "application/json")
         .header("x-xbl-contract-version", "1")
         .json(&body)
         .send()
-        .await?
-        .error_for_status()?;
+        .await;
+    let mut resp=match response {
+        Ok(response)=>response,
+        Err(error)=>{
+            diagnostics.push(UserAuthRejection { http:0,xerr:None,
+                kind:if error.is_timeout(){"timeout"}else if error.is_connect(){"connect"}else{"request"} });
+            return Err(error);
+        }
+    };
 
-    resp.json().await
+    if let Err(error) = resp.error_for_status_ref() {
+        let http = resp.status().as_u16();
+        let mut bytes = Vec::new();
+        while let Ok(Some(chunk)) = resp.chunk().await {
+            if bytes.len() + chunk.len() > 16 * 1024 { bytes.clear(); break; }
+            bytes.extend_from_slice(&chunk);
+        }
+        diagnostics.push(UserAuthRejection { http, xerr: rejection_code(&bytes), kind:"http" });
+        return Err(error);
+    }
+
+    let result=resp.json().await;
+    if result.is_err(){diagnostics.push(UserAuthRejection {http:200,xerr:None,kind:"response"});}
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn xbox_rejection_diagnostics_accept_only_numeric_codes() {
+        assert_eq!(rejection_code(br#"{"XErr":2148916233,"Message":"private"}"#),Some(2148916233));
+        for bytes in [br#"{"XErr":"private"}"#.as_slice(),b"private",br#"{"XErr":-1}"#] {
+            assert_eq!(rejection_code(bytes),None);
+        }
+    }
 }
 
 pub async fn request_xsts_token(

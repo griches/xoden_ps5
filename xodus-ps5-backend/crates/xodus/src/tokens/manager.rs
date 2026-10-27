@@ -16,6 +16,7 @@ mod keys {
     pub const PHONE_CANDIDATE: &str = "phone-sign-in-candidate";
     pub const PHONE_SESSION: &str = "phone-user-session";
     pub const BROWSER_SESSION: &str = "runtime-browser-session";
+    pub const BROWSER_CANDIDATE: &str = "browser-sign-in-candidate";
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -30,6 +31,13 @@ struct UserSession {
 #[serde(deny_unknown_fields)]
 struct RuntimeBrowserSession {
     phone_id: String,
+    session: UserSession,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BrowserCandidate {
+    expected_account: Option<String>,
     session: UserSession,
 }
 
@@ -160,6 +168,7 @@ impl TokenManager {
         let _guard = self.account_write.lock().map_err(|_| TokenStoreError::WriteVerification)?;
         self.persistent.remove(keys::PHONE_SESSION)?;
         self.persistent.remove(keys::BROWSER_SESSION)?;
+        self.persistent.remove(keys::BROWSER_CANDIDATE)?;
         self.remove_phone_candidate()?;
         self.persistent.remove(keys::DEVICE_TOKENS)?;
         self.persistent.remove(keys::USER_TOKENS)?;
@@ -409,7 +418,37 @@ impl TokenManager {
         let current=match self.active_account() {Ok(value)=>Some(value),Err(TokenStoreError::NotFound)=>None,Err(error)=>return Err(error)};
         if current.as_deref()!=expected {return Err(TokenStoreError::NotFound);}
         let session=UserSession{user,tokens,primary_browser:true};
-        Self::write_verified(&*self.persistent,keys::USER_SESSION,&serde_json::to_vec(&session)?)
+        Self::write_verified(&*self.persistent,keys::USER_SESSION,&serde_json::to_vec(&session)?)?;
+        // Cleanup cannot undo a successfully committed active session.
+        let _=self.persistent.remove(keys::BROWSER_CANDIDATE);
+        Ok(())
+    }
+
+    /// Preserve a newly approved grant for verification retries without making
+    /// it visible to library, licensing or runtime callers as an active account.
+    pub fn save_browser_candidate(&self, expected: Option<&str>, user: User, tokens: HashMap<String,Token>) -> Result<(),TokenStoreError> {
+        if user.username.trim().is_empty() || user.puid.is_empty() ||
+            !tokens.get(PASSPORT_STS).is_some_and(|token|super::session::state(token,chrono::Utc::now())==super::session::State::Current) {
+            return Err(TokenStoreError::WriteVerification);
+        }
+        let _guard=self.account_write.lock().map_err(|_|TokenStoreError::WriteVerification)?;
+        let current=match self.active_account(){Ok(value)=>Some(value),Err(TokenStoreError::NotFound)=>None,Err(error)=>return Err(error)};
+        if current.as_deref()!=expected {return Err(TokenStoreError::NotFound);}
+        let candidate=BrowserCandidate { expected_account:expected.map(str::to_owned),session:UserSession{user,tokens,primary_browser:false} };
+        Self::write_verified(&*self.persistent,keys::BROWSER_CANDIDATE,&serde_json::to_vec(&candidate)?)
+    }
+
+    pub fn browser_candidate(&self, expected: Option<&str>) -> Result<Option<(User,HashMap<String,Token>)>,TokenStoreError> {
+        let _guard=self.account_write.lock().map_err(|_|TokenStoreError::WriteVerification)?;
+        let Some(bytes)=self.persistent.get(keys::BROWSER_CANDIDATE)? else {return Ok(None);};
+        let candidate:BrowserCandidate=serde_json::from_slice(&bytes)?;
+        let current=match self.active_account(){Ok(value)=>Some(value),Err(TokenStoreError::NotFound)=>None,Err(error)=>return Err(error)};
+        if current.as_deref()!=expected || candidate.expected_account.as_deref()!=expected ||
+            !candidate.session.tokens.get(PASSPORT_STS).is_some_and(|token|super::session::state(token,chrono::Utc::now())==super::session::State::Current) {
+            self.persistent.remove(keys::BROWSER_CANDIDATE)?;
+            return Ok(None);
+        }
+        Ok(Some((candidate.session.user,candidate.session.tokens)))
     }
 
     // ---- Ephemeral XSTS-by-relying-party cache --------------------------------
