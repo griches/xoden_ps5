@@ -24,6 +24,8 @@ pub fn configure(pem: &[u8]) -> Result<(), &'static str> {
 }
 pub fn builder() -> Result<reqwest::ClientBuilder, &'static str> {
     let builder = reqwest::Client::builder();
+    #[cfg(all(target_os = "freebsd", feature = "ps5-native-dns"))]
+    let builder = builder.dns_resolver(std::sync::Arc::new(ps5_dns::Resolver));
     match TRUST.get() {
         Some((_, certificates)) => Ok(builder.tls_certs_only(certificates.clone())),
         None => {
@@ -40,6 +42,35 @@ mod tests {
     fn rejects_empty_malformed_and_oversized_bundles() {
         for bytes in [Vec::new(), b"not a certificate".to_vec(), vec![0;2*1024*1024+1], b"-----BEGIN CERTIFICATE-----\ninvalid\n-----END CERTIFICATE-----".to_vec()] {
             assert!(super::parse(&bytes).is_err());
+        }
+    }
+}
+
+// The PS5 title has no libc getaddrinfo export. Keep the original hostname in
+// the request (including TLS verification/SNI); replace only DNS resolution.
+#[cfg(all(target_os = "freebsd", feature = "ps5-native-dns"))]
+mod ps5_dns {
+    use reqwest::dns::{Addrs, Name, Resolve, Resolving};
+    use std::{ffi::CString, io, net::{Ipv4Addr, SocketAddr}};
+    unsafe extern "C" {
+        fn xodus_ps5_resolve_ipv4(host: *const std::ffi::c_char, address: *mut u8) -> i32;
+    }
+    pub struct Resolver;
+    impl Resolve for Resolver {
+        fn resolve(&self, name: Name) -> Resolving {
+            let host = CString::new(name.as_str());
+            Box::pin(async move {
+                let host = host?;
+                // Console DNS is synchronous and bounded to five seconds. The
+                // job drains this blocking task before cancellation completes.
+                let address = tokio::task::spawn_blocking(move || {
+                    let mut octets = [0u8; 4];
+                    let code = unsafe { xodus_ps5_resolve_ipv4(host.as_ptr(), octets.as_mut_ptr()) };
+                    if code != 0 { return Err(io::Error::other("console DNS lookup failed")); }
+                    Ok(SocketAddr::from((Ipv4Addr::from(octets), 0)))
+                }).await??;
+                Ok(Box::new(std::iter::once(address)) as Addrs)
+            })
         }
     }
 }

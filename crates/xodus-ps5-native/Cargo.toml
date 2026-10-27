@@ -21,4 +21,4 @@ tempfile = "3.27.0"
 fs2 = "0.4.3"
 
 [features]
-job-engine = ["dep:xodus-cli", "dep:tokio"]
+job-engine = ["dep:xodus-cli", "dep:tokio", "xodus-cli/ps5-native-dns"]

@@ -81,17 +81,20 @@ def main():
     bindir = run([llvm, '--bindir'],capture_output=True,text=True).stdout.strip()
     env.update(LLVM_CONFIG=str(llvm), PS5_PAYLOAD_SDK=str(sdk), PATH=bindir+os.pathsep+env.get('PATH',''),
         RUSTC=str(rustc), CARGO_TARGET_DIR=str(work/'target'),
+        # PS5 title text is execute-only; assembly embeds readable constants there.
+        # AWS-LC's cc builder supports portable code at optimization level 2.
+        AWS_LC_SYS_NO_ASM='1', AWS_LC_SYS_CMAKE_BUILDER='0',
         CC_x86_64_unknown_freebsd=str(sdk/'bin/prospero-clang'),
         AR_x86_64_unknown_freebsd=str(sdk/'bin/prospero-ar'),
         CFLAGS_x86_64_unknown_freebsd='-include '+shlex.quote(str(crate/'tools/entropy_decl.h')),
         RUSTFLAGS='-Ztls-model=emulated --cfg libc_unstable_freebsd_version="11" --cfg xodus_ps5_std_revision="'+adaptation+'"')
     run(['cargo','+'+args.toolchain,'build','--manifest-path',workspace/'Cargo.toml','-p','xodus-ps5-native',
          *(['--features','job-engine'] if args.job_engine else []),
-         '--locked','-Zbuild-std=std,panic_abort','--target','x86_64-unknown-freebsd','--release'],env=env)
+         '--locked','--config','profile.release.package.aws-lc-sys.opt-level=2','-Zbuild-std=std,panic_abort','--target','x86_64-unknown-freebsd','--release'],env=env)
     output = work/('xodus-job-probe.elf' if args.job_engine else 'xodus-header-probe.elf')
     run([sdk/'bin/prospero-clang','-Wl,--gc-sections',*(['-DXODUS_JOB_ENGINE'] if args.job_engine else []),'-I',crate/'include',crate/'tests/c_api.c',
          crate/'tools/probe_compat.c',work/'target/x86_64-unknown-freebsd/release/libxodus_ps5_native.a',
-         *([crate/'tools/ps5_entropy.c','-Wl,--wrap=arc4random_buf'] if args.job_engine else []),
+         *([crate/'tools/ps5_entropy.c',crate/'tools/ps5_dns.c','-lSceNet','-Wl,--wrap=arc4random_buf'] if args.job_engine else []),
          '-lunwind','-o',output],env=env)
     print('Built only; not deployed or executed:',output)
 

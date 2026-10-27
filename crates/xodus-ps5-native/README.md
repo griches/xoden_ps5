@@ -107,3 +107,20 @@ handles, polling, release and stale-handle rejection. The full optional job
 engine now compiles and links into `xodus-job-probe.elf` for the adapted PS5
 target. This is a link result, not console download acceptance. The probe build
 script never deploys or runs it.
+
+
+## Native title DNS and execute-only code
+
+The job-engine feature enables `xodus-cli/ps5-native-dns` on FreeBSD. Link
+`tools/ps5_dns.c` with SceNet; the embedding title must already own network
+initialization. DNS runs on the blocking pool with a five-second resolver timeout;
+job cancellation drains it before releasing the lease. Output is four network-order
+IPv4 octets; no hostname, token or signed URL is logged. Reqwest retains the URL
+hostname for TLS verification and SNI. Desktop builds retain their normal resolver.
+The mock `tests/dns.c` covers cleanup at each failure point and byte order.
+
+PS5 native titles map text execute-only. AWS-LC X25519 assembly reads constants
+from text and faults during TLS key generation. `build_probe.py` selects the
+supported portable implementation with `AWS_LC_SYS_NO_ASM=1`, the cc builder,
+and optimization level 2 for aws-lc-sys only. This keeps system toolchains and
+normal desktop builds untouched. TLS/certificate checks are not disabled.
