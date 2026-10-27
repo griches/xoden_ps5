@@ -6877,7 +6877,7 @@ void Simulation::activate() {
         ModalEntry modal{"xbox-account","Xbox account",state_.navigation.focus_key,
             xbox_account_busy_ ? std::vector<std::string>{"cancel"} : std::vector<std::string>{"xbox-refresh","xbox-phone-test","xbox-signout","cancel"},0,false};
         modal.body = xbox_account_message_;
-        modal.body += " Phone sign-in checks PC game access and loads your library when no account is connected. In-game sign-in is still being tested.";
+        modal.body += " Microsoft sign-in on your phone checks PC game access and loads your library when no account is connected. In-game sign-in is still being tested.";
         open_modal(std::move(modal));
     } else if (live() && action_name=="xbox-phone-test") {
         if (!xbox_account_busy_) {
