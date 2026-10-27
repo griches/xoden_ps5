@@ -323,3 +323,32 @@ xodus-games/console-backups/20261027-uninstall-ui. Launched FAKE77031 and
 captured its Home screen successfully. No virtual pad was opened and no console
 uninstall was confirmed: end-to-end physical content removal remains untested
 on this build, intentionally leaving that action to Gary.
+
+### 2026-10-27 — native Install crash investigation
+
+Gary reported the PS5 “something went wrong” screen after installing. Kernel log
+confirmed SIGSEGV at address zero in xodus-job; reproducing with the Xbox offer
+“A Game About Digging A Hole” failed identically. No game payload was downloaded.
+Captured register values and linked disassembly locate the first failure in
+Tokio's random seed initialization: Rust's FreeBSD std calls arc4random_buf.
+The native title did not provide that entry point, and the initial libSceRandom
+adapter also depended on an unloaded import. Use the kernel /dev/urandom device
+(as Playden's RandomUuid already does), wrap arc4random_buf, and preflight entropy
+before entering Rust. SDK payload builds need --wrap to avoid a duplicate SDK
+libc definition. Adapter success/error and real-device contracts pass.
+
+With entropy repaired, the console stays in Playden and reports job-runtime
+rather than crashing. Added bounded xbox-native.log with startup/terminal error
+codes only. Console kqueue, close-on-exec and EVFILT_USER receipt probes all pass;
+Tokio returns ENOTSUP. Investigation found workspace Tokio full features include
+an unused Unix signal driver (including descriptor cloning). PS5 embedded builds
+are being narrowed to IO/time/tasks; desktop CLI/service retain full features.
+This is ongoing acceptance, not a working native download claim.
+
+Gary successfully removed Doom64, 33 Immortals, the old download-worker entry and
+native Minishoot himself. Runtime logs confirm all title removals, and FTP lists
+only the managed marker and saved-games directory under /data/playden-games.
+No bulk cleanup was resumed. Controller is released after each reproduction;
+Remote Play remains off. Reproduction packages/backups are named native-crash-
+trace, native-align (discarded hypothesis), native-entropy, native-random-module,
+native-random-device, and native-io under console-backups/20261027-*.
