@@ -49,6 +49,17 @@ An install rechecks live membership and entitlement, then downloads and prepares
 the package. A `prepared` result still requires native Playden runtime setup
 and title publication before it can be called installed.
 
-Still required: controller job handoff/progress UI, on-console sign-in UX,
-automatic per-game runtime finalization and end-to-end native UI acceptance. Do not describe this binary
-as an independently working PS5 store until those checks pass.
+The worker now also publishes `prepared-games.json`: account-bound product IDs,
+fixed installation folders and a validated x64 executable selected from
+MicrosoftGame.config. Playden consumes this list to prepare a fresh bottle and
+register the game. Ambiguous executable/package choices fail explicitly.
+
+The native integration expects private `worker.json` (schema 1, `titleId`,
+`installId`) and Xbox runtime files under `/data/playden/xbox/runtime`. Its
+packaged handoff helper waits for Playden to close, launches the worker, then
+returns to Playden when the worker exits. It does not close an unrelated title.
+The worker displays a progress window while the job runs.
+
+Still required: end-to-end native Install/return/automatic-runtime acceptance,
+visual progress acceptance and on-console sign-in UX. Do not describe this
+binary as an independently working PS5 store until those checks pass.
