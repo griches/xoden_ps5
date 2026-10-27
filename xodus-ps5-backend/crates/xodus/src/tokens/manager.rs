@@ -15,12 +15,22 @@ mod keys {
     pub const USER_SESSION: &str = "user-session";
     pub const PHONE_CANDIDATE: &str = "phone-sign-in-candidate";
     pub const PHONE_SESSION: &str = "phone-user-session";
+    pub const BROWSER_SESSION: &str = "runtime-browser-session";
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct UserSession {
     user: User,
     tokens: HashMap<String, Token>,
+    #[serde(default)]
+    primary_browser: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RuntimeBrowserSession {
+    phone_id: String,
+    session: UserSession,
 }
 
 pub const PASSPORT_STS: &str = "http://Passport.NET/STS";
@@ -149,6 +159,7 @@ impl TokenManager {
     pub fn remove_persistent(&self) -> Result<(), TokenStoreError> {
         let _guard = self.account_write.lock().map_err(|_| TokenStoreError::WriteVerification)?;
         self.persistent.remove(keys::PHONE_SESSION)?;
+        self.persistent.remove(keys::BROWSER_SESSION)?;
         self.remove_phone_candidate()?;
         self.persistent.remove(keys::DEVICE_TOKENS)?;
         self.persistent.remove(keys::USER_TOKENS)?;
@@ -178,9 +189,49 @@ impl TokenManager {
     }
 
     pub fn active_phone(&self) -> Result<Option<crate::api::live::device_code::Credentials>, TokenStoreError> {
+        if self.user_session()?.is_some_and(|session|session.primary_browser) { return Ok(None); }
         self.persistent.get(keys::PHONE_SESSION)?.map(|bytes|
             crate::api::live::device_code::Credentials::from_private_candidate_record(&bytes)
                 .map_err(|_| TokenStoreError::WriteVerification)).transpose()
+    }
+
+    /// Save only a freshly authenticated browser session whose Xbox identity
+    /// the caller has verified against this exact active phone session.
+    /// Device keys and the library's account namespace are never replaced.
+    pub fn save_runtime_browser_session(&self, expected: &crate::api::live::device_code::Credentials,
+        user: User, tokens: HashMap<String, Token>) -> Result<(), TokenStoreError> {
+        if user.username.trim().is_empty() || user.puid.is_empty() || !tokens.contains_key(PASSPORT_STS) {
+            return Err(TokenStoreError::WriteVerification);
+        }
+        let before = expected.private_candidate_record().map_err(|_| TokenStoreError::WriteVerification)?;
+        let phone_id = expected.user_id().ok_or(TokenStoreError::WriteVerification)?.to_owned();
+        let _guard = self.account_write.lock().map_err(|_| TokenStoreError::WriteVerification)?;
+        if self.persistent.get(keys::PHONE_SESSION)?.as_deref() != Some(before.as_slice()) {
+            return Err(TokenStoreError::NotFound);
+        }
+        let bytes = serde_json::to_vec(&RuntimeBrowserSession { phone_id, session: UserSession { user, tokens, primary_browser:false } })?;
+        Self::write_verified(&*self.persistent, keys::BROWSER_SESSION, &bytes)
+    }
+
+    /// Project the same-account browser grant into an isolated runtime store.
+    /// The returned store cannot write to the console's account or device keys.
+    pub fn runtime_browser_tokens(&self) -> Result<Option<Self>, TokenStoreError> {
+        if let Some(session)=self.user_session()?.filter(|session|session.primary_browser) {
+            let memory=Self::with_memory();
+            memory.save_device_license(&self.get_device_license()?)?;
+            if let Ok(ticket)=self.get_device_sts_token(){memory.save_device_token(PASSPORT_STS.into(),ticket)?;}
+            memory.save_user_session(session.user,session.tokens)?;
+            return Ok(Some(memory));
+        }
+        let Some(phone) = self.active_phone()? else { return Ok(None); };
+        let Some(bytes) = self.persistent.get(keys::BROWSER_SESSION)? else { return Ok(None); };
+        let saved: RuntimeBrowserSession = serde_json::from_slice(&bytes)?;
+        if Some(saved.phone_id.as_str()) != phone.user_id() { return Err(TokenStoreError::WriteVerification); }
+        let memory = Self::with_memory();
+        memory.save_device_license(&self.get_device_license()?)?;
+        if let Ok(ticket) = self.get_device_sts_token() { memory.save_device_token(PASSPORT_STS.into(), ticket)?; }
+        memory.save_user_session(saved.session.user, saved.session.tokens)?;
+        Ok(Some(memory))
     }
 
     /// An opaque account namespace, never a fabricated Store PUID or email.
@@ -339,12 +390,26 @@ impl TokenManager {
         if tokens.is_empty() || user.username.trim().is_empty() || user.puid.is_empty() {
             return Err(TokenStoreError::NotFound);
         }
-        let session = UserSession { user, tokens };
+        let session = UserSession { user, tokens, primary_browser:false };
         Self::write_verified(
             &*self.persistent,
             keys::USER_SESSION,
             &serde_json::to_vec(&session)?,
         )
+    }
+
+    /// A single atomic record selects browser authorisation for library,
+    /// licensing and runtime use. Failed/late saves retain the previous account.
+    pub fn save_primary_browser_session(&self, expected: Option<&str>, user: User,
+        tokens: HashMap<String, Token>) -> Result<(), TokenStoreError> {
+        if user.username.trim().is_empty() || user.puid.is_empty() || !tokens.contains_key(PASSPORT_STS) {
+            return Err(TokenStoreError::WriteVerification);
+        }
+        let _guard=self.account_write.lock().map_err(|_|TokenStoreError::WriteVerification)?;
+        let current=match self.active_account() {Ok(value)=>Some(value),Err(TokenStoreError::NotFound)=>None,Err(error)=>return Err(error)};
+        if current.as_deref()!=expected {return Err(TokenStoreError::NotFound);}
+        let session=UserSession{user,tokens,primary_browser:true};
+        Self::write_verified(&*self.persistent,keys::USER_SESSION,&serde_json::to_vec(&session)?)
     }
 
     // ---- Ephemeral XSTS-by-relying-party cache --------------------------------

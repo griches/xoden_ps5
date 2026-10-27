@@ -7,6 +7,18 @@ use xodus::{models::{live::ExchangeUserTokenOutcome, secrets::Token, soap}, toke
 const PROFILE: &str = "https://profile.xboxlive.com/users/me/profile/settings?settings=Gamertag,PublicGamerpic";
 const MAX_IMAGE: usize = 2 * 1024 * 1024;
 
+/// Compare Microsoft's authenticated Xbox identity, never an email, display
+/// name or an assumed relationship between OAuth CID and Store PUID.
+pub(super) async fn xbox_user_id(tokens: &TokenManager) -> Result<String, &'static str> {
+    let (client, authorization, _) = xbox_session(tokens).await?;
+    let response = client.get(PROFILE).header("Authorization", authorization)
+        .header("x-xbl-contract-version", "2").send().await.map_err(|_| "identity-request")?;
+    let body: Value = serde_json::from_slice(&bounded(response,128*1024).await?).map_err(|_| "identity-json")?;
+    let users = body["profileUsers"].as_array().filter(|rows|rows.len()==1).ok_or("identity-shape")?;
+    users[0]["id"].as_str().filter(|id| !id.is_empty() && id.len()<=32 && id.bytes().all(|b|b.is_ascii_digit()))
+        .map(str::to_owned).ok_or("identity-value")
+}
+
 pub(super) async fn bounded(mut response: reqwest::Response, limit: usize) -> Result<Vec<u8>, &'static str> {
     if !response.status().is_success() { return Err("http-status"); }
     if response.content_length().is_some_and(|size| size > limit as u64) { return Err("response-size"); }
@@ -78,7 +90,18 @@ pub(super) async fn xbox_session(tokens: &TokenManager) -> Result<(reqwest::Clie
         _ => return Err("msa-response"),
     };
     let Token::Compact(ticket) = token else { return Err("msa-ticket"); };
-    let user = xodus::api::xbox::authenticate_xbox_user(&client, ticket).await.map_err(|_| "xbox-user")?;
+    // Microsoft issues both unprefixed broker tickets and compact tickets
+    // requiring an explicit RPS representation. Ask Xbox to validate the
+    // representation instead of rejecting an otherwise completed browser login.
+    let mut authenticated=None;
+    for prefix in ["", "d=", "t="] {
+        match xodus::api::xbox::authenticate_xbox_user(&client,format!("{prefix}{ticket}")).await {
+            Ok(value)=>{authenticated=Some(value);break;},
+            Err(error) if error.status().is_some_and(|status|matches!(status.as_u16(),400|401|403))=>continue,
+            Err(_)=>return Err("xbox-user"),
+        }
+    }
+    let user=authenticated.ok_or("xbox-user")?;
     let xsts = xodus::api::xbox::request_xsts_token(&client, user.token, "http://xboxlive.com").await.map_err(|_| "xsts")?;
     let uhs = xsts.user_hash().ok_or("xsts-claim")?;
     let authorization = format!("XBL3.0 x={uhs};{}", xsts.token);

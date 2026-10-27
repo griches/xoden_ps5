@@ -15,10 +15,11 @@ msixvc-common = { path = "../msixvc-common" }
 xodus-cli = { path = "../xodus-cli", default-features = false, optional = true }
 
 tokio = { workspace = true, optional = true }
+serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
 tempfile = "3.27.0"
 fs2 = "0.4.3"
 
 [features]
-job-engine = ["dep:xodus-cli", "dep:tokio", "xodus-cli/ps5-native-platform"]
+job-engine = ["dep:xodus-cli", "dep:tokio", "dep:serde_json", "xodus-cli/ps5-native-platform"]

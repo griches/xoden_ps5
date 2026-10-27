@@ -82,6 +82,60 @@ fn phone_candidate() -> crate::api::live::device_code::Credentials {
 }
 
 #[test]
+fn credential_browser_session_keeps_phone_identity_and_projects_only_to_memory() {
+    let (_, manager)=setup();
+    let phone=phone_candidate();
+    manager.save_device_license(&device()).unwrap();
+    manager.save_phone_candidate(&phone).unwrap();manager.activate_phone_candidate().unwrap();
+    manager.save_runtime_browser_session(&phone,user("fresh-browser"),session_tokens("fresh-browser-ticket")).unwrap();
+    assert_eq!(manager.active_account().unwrap(),"phone:new-phone-user");
+    let isolated=manager.runtime_browser_tokens().unwrap().unwrap();
+    assert_eq!(isolated.active_account().unwrap(),"fresh-browser");
+    isolated.remove_persistent().unwrap();
+    assert!(manager.runtime_browser_tokens().unwrap().is_some());
+    manager.remove_persistent().unwrap();
+    assert!(manager.runtime_browser_tokens().unwrap().is_none());
+    assert!(manager.save_runtime_browser_session(&phone,user("late"),session_tokens("late-ticket")).is_err());
+}
+
+#[test]
+fn credential_browser_session_refuses_account_changes_and_late_callbacks() {
+    let (backend,manager)=setup();let phone=phone_candidate();
+    manager.save_device_license(&device()).unwrap();
+    manager.save_phone_candidate(&phone).unwrap();manager.activate_phone_candidate().unwrap();
+    manager.save_runtime_browser_session(&phone,user("first"),session_tokens("first-ticket")).unwrap();
+    let mut changed:serde_json::Value=serde_json::from_slice(&phone.private_candidate_record().unwrap()).unwrap();
+    changed["user_id"]=serde_json::json!("different-phone-user");
+    backend.values.lock().unwrap().insert("phone-user-session".into(),serde_json::to_vec(&changed).unwrap());
+    assert!(manager.runtime_browser_tokens().is_err());
+    assert!(manager.save_runtime_browser_session(&phone,user("late"),session_tokens("late-ticket")).is_err());
+}
+
+#[test]
+fn credential_single_browser_login_serves_account_and_runtime_and_logout_never_reveals_phone() {
+    let (_,manager)=setup();let phone=phone_candidate();
+    manager.save_device_license(&device()).unwrap();
+    manager.save_phone_candidate(&phone).unwrap();manager.activate_phone_candidate().unwrap();
+    manager.save_primary_browser_session(Some("phone:new-phone-user"),user("browser-account"),session_tokens("fresh-ticket")).unwrap();
+    assert!(manager.active_phone().unwrap().is_none());
+    assert_eq!(manager.active_account().unwrap(),"browser-account");
+    assert_eq!(manager.runtime_browser_tokens().unwrap().unwrap().active_account().unwrap(),"browser-account");
+    manager.save_user_token(super::PASSPORT_STS.into(),Token::Compact("renewed-ticket".into())).unwrap();
+    assert!(manager.active_phone().unwrap().is_none());
+    manager.remove_persistent().unwrap();
+    assert!(manager.active_account().is_err() && manager.active_phone().unwrap().is_none());
+}
+
+#[test]
+fn credential_single_browser_login_handles_empty_account_and_refuses_stale_completion() {
+    let (_,manager)=setup();
+    manager.save_primary_browser_session(None,user("new-account"),session_tokens("fresh-ticket")).unwrap();
+    assert_eq!(manager.active_account().unwrap(),"new-account");
+    assert!(manager.save_primary_browser_session(None,user("late-account"),session_tokens("late-ticket")).is_err());
+    assert_eq!(manager.active_account().unwrap(),"new-account");
+}
+
+#[test]
 fn credential_phone_candidate_never_replaces_active_account_and_logout_clears_both() {
     let (backend, manager) = setup();
     manager.save_user_session(user("old-active"),session_tokens("old-active-token")).unwrap();

@@ -48,6 +48,7 @@ fn token_file() -> String {
 fn log(message: impl AsRef<str>) {
     // Public live diagnostics contain fixed codes only. The private log retains
     // details; tokens, headers, URLs and provider text never enter this file.
+    #[cfg(windows)]
     if let Some(code)=public_status_code(message.as_ref()) {
         if let Ok(mut file)=std::fs::OpenOptions::new().create(true).append(true).open(r"Z:\data\playden\logs\xbox-runtime-status.log") {
             if file.metadata().is_ok_and(|meta|meta.len()<128*1024) {
@@ -79,6 +80,8 @@ fn log(message: impl AsRef<str>) {
 fn public_status_code(message: &str) -> Option<&'static str> {
     if message.starts_with("start pid ") { Some("started") }
     else if message=="listening" { Some("listening") }
+    else if message=="Browser runtime session selected" { Some("browser-session-selected") }
+    else if message=="MSA token issued" { Some("runtime-ticket-issued") }
     else if message.starts_with("MSA token for ") { Some("msa-request") }
     else if message=="Phone game application refresh granted" { Some("game-application-granted") }
     else if message=="Phone game application refresh rejected" { Some("game-application-rejected") }
@@ -120,6 +123,7 @@ struct Service {
     store: Arc<keyring_core::sample::Store>,
     device: tokio::sync::Mutex<Option<LegacyToken>>,
     phone_test: bool,
+    persist_store: bool,
     phone: tokio::sync::Mutex<Option<xodus::api::live::device_code::Credentials>>,
 }
 
@@ -135,13 +139,19 @@ fn service_main(key: String) {
         Err(err) => return log(format!("token store: {err}")),
     };
     keyring_core::set_default_store(store.clone());
-    let tokens = Arc::new(TokenManager::with_keychain_and_memory());
+    let mut tokens = Arc::new(TokenManager::with_keychain_and_memory());
     let active_phone = match tokens.active_phone() {
         Ok(phone) => phone.is_some(),
         Err(_) => return log("Active phone session is invalid; refusing legacy fallback"),
     };
-    let phone_test = requested_test || active_phone;
-    let store = if phone_test {
+    let browser = if requested_test { None } else { match tokens.runtime_browser_tokens() {
+        Ok(browser)=>browser,Err(_)=>return log("Browser runtime session is invalid; refusing account fallback"),
+    } };
+    let browser_mode=browser.is_some();
+    if let Some(browser)=browser { tokens=Arc::new(browser);log("Browser runtime session selected"); }
+    let phone_test = requested_test || (active_phone && !browser_mode);
+    let persist_store = !phone_test && !browser_mode;
+    let store = if !persist_store {
         store
     } else {
         match load_store(&tokens_path, false) {
@@ -165,7 +175,7 @@ fn service_main(key: String) {
             .user_agent("xodus-wrapper/0.1")
             .timeout(std::time::Duration::from_secs(15))
             .redirect(reqwest::redirect::Policy::none());
-        if phone_test {
+        if phone_test || browser_mode {
             // Wine's system certificate service is not the native app's trust
             // store. Use its packaged CA bundle with full TLS verification.
             let path=std::env::var("XODUS_CA_BUNDLE").unwrap_or_else(|_|r"Z:\data\homebrew\FAKE77031\trust\cacert.pem".into());
@@ -191,6 +201,7 @@ fn service_main(key: String) {
             // Explicit test mode only. It never falls back to the working
             // account and never saves this process's keyring snapshot.
             phone_test,
+            persist_store,
             phone: tokio::sync::Mutex::new(None),
         });
         loop {
@@ -256,7 +267,7 @@ impl Service {
                     vec![]
                 }
             };
-            if !self.phone_test {
+            if self.persist_store {
                 if let Err(err) = self.store.save() {
                     log(format!("saving tokens: {err}"));
                 }
@@ -531,6 +542,7 @@ mod tests {
             store: keyring_core::sample::Store::new_with_configuration(&HashMap::new()).unwrap(),
             device: tokio::sync::Mutex::new(None),
             phone_test: true,
+            persist_store: false,
             phone: tokio::sync::Mutex::new(None),
         }
     }
