@@ -138,6 +138,8 @@ fn service_main(key: String) {
     runtime.block_on(async move {
         let client = match reqwest::Client::builder()
             .user_agent("xodus-wrapper/0.1")
+            .timeout(std::time::Duration::from_secs(15))
+            .redirect(reqwest::redirect::Policy::none())
             .build()
         {
             Ok(client) => client,
