@@ -352,6 +352,8 @@ void Jobs::Load() {
             else if (code == "account-changed") next->message = "The Xbox account changed. Refresh your Xbox library before downloading.";
             else if (code == "active-pc-subscription-required") next->message = "An active PC Game Pass or Game Pass Ultimate subscription is required.";
             else if (code == "game-entitlement-required") next->message = "This Xbox account does not currently have access to this game.";
+            else if (code == "metadata-memory") next->message = "The app ran out of working memory while reading this package. Downloaded files were kept.";
+            else if (code == "metadata-invalid") next->message = "The game's package data could not be read. Retry the download; existing files were kept.";
             else if (code == "package-resolution") next->message = "The Store could not find this game's PC packages. Try again.";
         }
         else if (phase == "package-choice") {

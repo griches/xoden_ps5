@@ -61,6 +61,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// A 22 GB MSIXVC package needs about 124 MiB of page tables before the
+// renderer/network allocations. The driver's 128 MiB default forces large
+// tables into the small libc fallback heap. Use its supported direct-memory
+// heap override for the combined UI and single native download worker.
+extern "C" const size_t ps5_opengl_heap_size = 512u * 1024u * 1024u;
+
 extern "C" void playden_release_splash(void);
 // The native signer requires every referenced export to resolve, including
 // the kit's optional weak splash callback. Use the launcher's held splash.
