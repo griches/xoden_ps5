@@ -514,3 +514,38 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   sign-in remains required; account refresh must not be presented as fresh login.
 - New package builds successfully but is not deployed or console-accepted yet.
   No user games were deleted, no live downloads restarted, no virtual pad opened.
+
+## 2026-10-27 — cached covers, download recovery and sign-in preparation
+
+- Persistent validated artwork cache: Playden 589c2de; bounded to 128 MiB /
+  2048 files under user/artwork-cache. Tests cover reuse after backend restart,
+  changed URLs, corrupt images and cancellation. Deployed on the console.
+- Pause/restart/resume tested on Minishoot Adventures and MIO. Paused counters
+  now persist (1658fcf); MIO restored 32%, 1.1 GB / 3.5 GB after restarting.
+- Large MIO resume metadata previously caused a Rust allocation abort. Backend
+  c643d7c streams the same fingerprint without allocating serialized metadata.
+  Console download passed that point, reached 9.5 MB/s and resumed successfully.
+- MIO was cancelled using the actual UI. Queue cleared and FTP inventory now
+  contains only the existing Digging and Minishoot Xbox content folders, with
+  no deletion quarantine. No bulk deletion was performed.
+- Minishoot finished downloading; latest preparation screen says Waiting for
+  the PS5 / Quit Playden and the PS5 adds it to Home. Gameplay not tested yet.
+- Backend 5501d87 adds a read-only package-plan request before new downloads.
+  Frontend automatic package picker and green palette are being validated.
+- Companion 8605d25: verified Microsoft session is distinct from merely stored
+  account and from active PC subscription. Login can be cancelled, timeout and
+  closed-window errors offer retry, and late results cannot claim success after
+  cancellation. Fourteen offline Node tests pass; no live login was started.
+- Fresh console sign-in remains unfinished. The present Xodus hosted login
+  needs its desktop webview/TokenBroker exchange; it is not a standard phone
+  device-code flow. The companion explicitly says its login is on the Mac and
+  does not pretend it also connected the console. Do not reuse the old private
+  keyring UID payload transfer without replacing its crash-prone handoff.
+- Compatibility ratings/notes are saved locally. Community recipe export is
+  Steam-only and must not appear for Xbox games. No report submission endpoint
+  was found in the rating path. Standalone app must also remove upstream updater
+  routes, Steam UI, Playden identity, and get separate app assets/title identity.
+- Gary requests green styling without Xbox logos, and all sign-in preparation
+  that does not require him authenticating. Actual Microsoft authentication is
+  deferred until he returns. Keep current credentials intact.
+- Remote Play remains off; virtual pad was closed after download testing.
