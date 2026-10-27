@@ -24,7 +24,7 @@ impl Scope {
         match self {
             Self::Xbox => "service::user.auth.xboxlive.com::MBI_SSL",
             Self::Store => "service::www.microsoft.com::MBI_SSL",
-            Self::XboxSignin => "xboxlive.signin",
+            Self::XboxSignin => "Xboxlive.signin",
         }
     }
 }

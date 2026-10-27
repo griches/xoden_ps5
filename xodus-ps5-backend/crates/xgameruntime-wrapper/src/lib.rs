@@ -46,6 +46,15 @@ fn token_file() -> String {
 }
 
 fn log(message: impl AsRef<str>) {
+    // Public live diagnostics contain fixed codes only. The private log retains
+    // details; tokens, headers, URLs and provider text never enter this file.
+    if let Some(code)=public_status_code(message.as_ref()) {
+        if let Ok(mut file)=std::fs::OpenOptions::new().create(true).append(true).open(r"Z:\data\playden\logs\xbox-runtime-status.log") {
+            if file.metadata().is_ok_and(|meta|meta.len()<128*1024) {
+                let _=writeln!(file,"{} pid={} {}",chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ"),std::process::id(),code);
+            }
+        }
+    }
     let file = LOG.get_or_init(|| {
         Mutex::new(
             std::fs::OpenOptions::new()
@@ -65,6 +74,22 @@ fn log(message: impl AsRef<str>) {
             message.as_ref()
         );
     }
+}
+
+fn public_status_code(message: &str) -> Option<&'static str> {
+    if message.starts_with("start pid ") { Some("started") }
+    else if message=="listening" { Some("listening") }
+    else if message.starts_with("MSA token for ") { Some("msa-request") }
+    else if message=="Phone game application refresh granted" { Some("game-application-granted") }
+    else if message=="Phone game application refresh rejected" { Some("game-application-rejected") }
+    else if message=="Phone test MSA service ticket issued; game acceptance pending" { Some("phone-ticket-issued") }
+    else if message.contains("Phone runtime refresh network failure") { Some("phone-refresh-network") }
+    else if message.contains("Phone runtime refresh invalid response") { Some("phone-refresh-response") }
+    else if message.contains("Microsoft rejected the phone runtime scope") { Some("phone-scope-rejected") }
+    else if message.starts_with("Phone runtime CA bundle ") { Some("phone-trust-unavailable") }
+    else if message.contains("Microsoft rejected the phone runtime ticket") { Some("phone-ticket-rejected") }
+    else if message.contains("Microsoft rejected the runtime device ticket") { Some("device-ticket-rejected") }
+    else { None }
 }
 
 fn random_key() -> String {
@@ -288,23 +313,29 @@ impl Service {
         // The API grants a service-scoped MSA ticket to the signed-in app.
         // Whether the game's XAL accepts it is explicitly unproven until the
         // opt-in console test. Do not synthesize a game-client authorization.
-        let fresh = login
-            .refresh(
+        let title = login.refresh_for_title(previous,&request.client_id,request.msa_full_trust).await;
+        let fresh = match title {
+            Ok(title) => { log("Phone game application refresh granted");title },
+            Err(xodus::api::live::device_code::Error::Rejected) => {
+                log("Phone game application refresh rejected");
+                login.refresh(
                 previous,
                 // This app's approved refresh grant is service-scoped. The
                 // game's non-full-trust flag does not grant this app the
                 // separate xboxlive.signin scope or a game-client grant.
                 Some(Scope::Xbox),
-            )
-            .await
-            .map_err(|error| match error {
+                ).await.map_err(|error| match error {
                 xodus::api::live::device_code::Error::Network => "Phone runtime refresh network failure",
                 xodus::api::live::device_code::Error::Response => "Phone runtime refresh invalid response",
                 _ => "Microsoft rejected the phone runtime scope",
-            })?;
+                })?
+            },
+            Err(xodus::api::live::device_code::Error::Network) => return Err("Phone runtime refresh network failure".into()),
+            Err(_) => return Err("Phone runtime refresh invalid response".into()),
+        };
         let expiry = chrono::Utc::now().timestamp() + fresh.expires_in().as_secs() as i64;
         let mut token = None;
-        for prefix in ["t=", "d="] {
+        for prefix in ["d=", "t="] {
             let ticket = format!("{prefix}{}", fresh.access_token());
             if xodus::api::xbox::authenticate_xbox_user(&self.client, ticket.clone())
                 .await
@@ -454,6 +485,12 @@ impl Service {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    #[test]
+    fn public_bridge_diagnostics_never_return_provider_text_or_secrets() {
+        assert_eq!(public_status_code("MSATokenRequest failed: Phone runtime refresh network failure private-secret"),Some("phone-refresh-network"));
+        assert_eq!(public_status_code("provider echoed token=private-secret https://private.example"),None);
+        assert_eq!(public_status_code("Phone game application refresh granted"),Some("game-application-granted"));
+    }
 
     #[test]
     fn phone_test_store_drop_never_rewrites_the_shared_credential_snapshot() {

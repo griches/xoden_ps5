@@ -257,7 +257,7 @@ async fn device_code_title_refresh_binds_client_scope_and_keeps_app_session_sepa
     ));
     let requests = task.await.unwrap();
     assert!(requests[0].contains("client_id=0000000041180A5D"));
-    assert!(requests[0].contains("scope=xboxlive.signin"));
+    assert!(requests[0].contains("scope=Xboxlive.signin"));
     assert!(requests[1].contains("client_id=0000000041180A5D"));
     assert!(requests[1].contains("refresh_token=synthetic-title-refresh"));
     assert!(requests[2].contains("scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL"));
