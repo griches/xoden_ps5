@@ -275,6 +275,9 @@ impl JobLease {
         match execute(client,tokens,&self.root,&self.games,&self.request).await {
             Ok(()) => ExitCode::SUCCESS,
             Err(stage) => {
+                // Only static stage identifiers enter the host mailbox. Never
+                // forward an upstream error body, URL or credential here.
+                if let Some(observer) = &self.request.observer { observer.diagnostic(stage); }
                 let _ = state(&self.root,&self.request,"failed",json!({"code":stage}));
                 eprintln!("PS5_JOB_ERROR {stage}");
                 ExitCode::FAILURE
@@ -299,6 +302,22 @@ pub async fn run_observed(client: &reqwest::Client, tokens: &TokenManager, root:
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn native_failure_reports_only_static_stage_to_host_observer() {
+        struct Capture(std::sync::Mutex<Option<&'static str>>);
+        impl crate::job_observer::JobObserver for Capture {
+            fn diagnostic(&self, code: &'static str) { *self.0.lock().unwrap() = Some(code); }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let games = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("job-request.json"), serde_json::to_vec(&request()).unwrap()).unwrap();
+        let capture = std::sync::Arc::new(Capture(std::sync::Mutex::new(None)));
+        let lease = JobLease::open(root.path(), games.path(), Some(capture.clone())).unwrap();
+        assert_eq!(lease.run(&reqwest::Client::new(), &TokenManager::with_memory()).await, ExitCode::FAILURE);
+        assert_eq!(*capture.0.lock().unwrap(), Some("sign-in-required"));
+        let result: Value = serde_json::from_slice(&std::fs::read(root.path().join("job-result.json")).unwrap()).unwrap();
+        assert_eq!(result["detail"]["code"], "sign-in-required");
+    }
     const A: &str = "9AAAAAAAAAAA";
     const B: &str = "9BBBBBBBBBBB";
     fn request() -> Value { json!({"schema":1,"requestId":"11111111-1111-4111-8111-111111111111","operation":"refresh","market":"GB"}) }

@@ -50,7 +50,7 @@ int32_t xodus_job_cancel(uint64_t handle);
 int32_t xodus_job_release(uint64_t handle);
 /* Host import used by credential writes: atomically commit the private keyring
  * snapshot at the host's approved path. Never log or publish these bytes.
- * 0 confirms durable private-file publication; any other result preserves the
+ * 0 confirms atomic private-file publication; any other result preserves the
  * old file. The link-only probe refuses writes. */
 int xodus_ps5_commit_keyring(const uint8_t *bytes, size_t length);
 #ifdef __cplusplus
