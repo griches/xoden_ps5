@@ -382,3 +382,11 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Test caught runtime reads exceeding Storage's 32 MiB maximum; corrected before deployment. Private worker.json and the three shared runtime DLLs provisioned and verified on PS5.
 - Helper return was proven with a console refresh job; integrated UI Install/fresh bottle launch still pending. Deployment backup 20261027-xbox-installer underway. Console idle, virtual pad closed, Remote Play off.
 - On-console account sign-in remains unfinished; current tests reuse the existing authenticated console account. Do not call the project complete.
+
+### Native Install acceptance in progress
+
+- Console browsing now has Microsoft covers. Controller search for Mini returned Minishoot from the full 669-game Xbox cache without paging.
+- Found and fixed an Xbox details button waiting for Steam metadata; 90c7e33 adds Xbox-specific submission and a signed-out-Steam regression. Again 151/151 host tests and native build pass.
+- Deployed c1db7ec1a8ef259318752a542647add2a740d368d695bd613b22ba1df4e51790 (backup 20261027-xbox-install-gate).
+- Selected native Xbox Minishoot Install with the controller. Playden exited, helper launched worker, visible Xbox on Playden progress screen appeared (screenshot /tmp/xbox-native-progress.png). Worker resumed the earlier direct-download folder, completed preparation and published one prepared-game record. Handoff status returned; Playden reopened automatically.
+- New Xbox entry automatically started native preparation, observed step 2/6 at 35 percent (/tmp/playden-auto-setup.png). Fresh Xbox bottle launch acceptance is still pending. This is separate from the prior Local imported test copy.
