@@ -29,6 +29,20 @@ int main() {
     assert(prefix.Read("user.reg").value()==first.value());
     assert(system32.Read("xgameruntime.dll").value()==dll);
     assert(system32.Read("windows.web.dll").value()==dll);
+    // A bundled bridge replaces only the bridge; base runtime files still
+    // come from their separately provisioned source. Removing it restores base.
+    std::filesystem::create_directories(root/"bridge");
+    playden::Storage bridge((root/"bridge").string());
+    auto replacement=dll;replacement[200]=0x72;
+    assert(bridge.WriteAtomicPrivate("xgameruntime.dll",replacement).ok());
+    assert(playden::runtime::InstallXboxRuntime((root/"runtime").string(),(root/"prefix").string(),456,&reason,(root/"bridge").string()));
+    assert(system32.Read("xgameruntime.dll").value()==replacement);
+    assert(system32.Read("xgameruntime_impl.dll").value()==dll);
+    assert(bridge.WriteAtomicPrivate("xgameruntime.dll",{'b','a','d'}).ok());
+    assert(!playden::runtime::InstallXboxRuntime((root/"runtime").string(),(root/"prefix").string(),456,&reason,(root/"bridge").string()));
+    assert(system32.Read("xgameruntime.dll").value()==replacement);
+    assert(playden::runtime::InstallXboxRuntime((root/"runtime").string(),(root/"prefix").string(),456,&reason));
+    assert(system32.Read("xgameruntime.dll").value()==dll);
     // Exercise multiple copy chunks and a PE header beyond the first chunk.
     auto large = dll;
     large.resize(1024 * 1024 + 17, 0x5a);

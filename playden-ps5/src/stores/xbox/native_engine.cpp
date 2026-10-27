@@ -52,6 +52,7 @@ std::string Message(const std::string& phase) {
     if (phase == "signing-out") return "Clearing the saved account…";
     if (phase == "sign-in-code") return "Enter the code on your phone to sign in.";
     if (phase == "checking-game-access") return "Checking phone sign-in and PC game access…";
+    if (phase == "checking-installed-games") return "Checking installed games for this account…";
     if (phase == "resolving") return "Finding the PC download…";
     if (phase == "metadata") return "Reading game data…";
     if (phase == "downloading") return "Downloading Xbox game";

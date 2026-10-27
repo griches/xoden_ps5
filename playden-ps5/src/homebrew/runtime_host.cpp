@@ -1082,7 +1082,7 @@ std::string RuntimeHost::ApplyPreparationSteps(Composition& c, const rt::Runtime
   files.prefix = (HostPath(record.data_root) / "library/prefixes/game").string();
   if (GameOf(record).store == Store::kXbox) {
     std::string reason;
-    if (config_.xbox_runtime_dir.empty() || !rt::InstallXboxRuntime(config_.xbox_runtime_dir,files.prefix,config_.unix_time(),&reason))
+    if (config_.xbox_runtime_dir.empty() || !rt::InstallXboxRuntime(config_.xbox_runtime_dir,files.prefix,config_.unix_time(),&reason,config_.xbox_wrapper_dir))
       return reason.empty() ? "The Xbox runtime has not been installed on this console." : reason;
   }
   for (const auto& entry : files.recipe->launch_entries) {
