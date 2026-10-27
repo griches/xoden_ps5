@@ -1406,3 +1406,22 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   Gary, Remote Play remains off. Captured the app's own frame through its
   existing hook over FTP and removed the transient capture; no gallery/saves
   or MIO settings were touched. Local helper restarted with the new protocol.
+
+#### 23:33 cached approval verified and library refreshed
+
+- Gary reported logged in and asked to check. Native log confirms the cached
+  approval retry started at 23:33:16Z and completed successfully at 23:33:21Z.
+  The automatic library refresh then started immediately and completed
+  successfully at 23:33:51Z. Both terminal records are state=4 with no error.
+  This is the first accepted new unified browser sign-in after the recovery.
+- The computer page continues to show the PREVIOUS HTTP 401. This retry used
+  the private PS5 candidate directly; no computer connection was involved.
+  Do not use that stale page to decide whether the console is signed in.
+- Foreground title is now FAKE78001, Call of the Elder Gods, launched at
+  approximately 23:34. Did not interrupt it or connect a virtual pad. The
+  private runtime status log is not readable through ordinary FTP; do not
+  change its permissions/owner to inspect it. Asked Gary whether the game
+  actually signed in; runtime acceptance remains pending that evidence.
+- A title capture was requested before discovering Playden had closed for
+  the game launch. No completed frame was produced. Removed/confirmed absent
+  the transient Playden request; no system screenshot or gallery operation.
