@@ -947,3 +947,29 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   3840x2160. Updated the setting explanation to say this is the maximum offered
   in-game and requires a game restart. Need actual higher-resolution acceptance;
   do not confuse desktop/internal render size with verified HDMI output.
+
+### Game exit, 4K menu and fresh Home artwork accepted (18:16Z)
+
+- Frontend d318063 deployed after 153/153 host tests (143.93 s) and PS5 build.
+  Current app SHA256 42eb96bd2d092c9840d37d33ae926ad87e12c7f0b76c18a105a384e6a9b3f704;
+  handoff helper d887a6484b2f8ae7d0d373ed1cf9a6314c8012f3572d8a6452833009c9dcfa15.
+  Backup console-backups/20261027-game-exit-four-workers. Includes four native
+  HTTP workers (f2c2fb0), not yet measured against the previous two-worker build.
+- Fresh MIO Home entry shows both generated icon0 and pic0 on the actual PS5
+  Home screen: /tmp/ps5-home-mio-generated-art.png. Existing Elder Gods remains
+  subject to the previously recorded ShellUI cache limitation.
+- MIO's Game settings > Display > Resolution changed from 1920x1080 to
+  3840x2160. Automatic settings publication revision 0->1 completed 18:14:16Z.
+  Launched through Playden with durable session bc0fa4b1-d007-4721-8b48-330225bbc89e,
+  reached main menu, opened Settings > Graphics: the game itself reports
+  3840 x 2160. Screenshot /tmp/gamepass-mio-graphics-resolution.png. This proves
+  the in-game mode, not independently measured render performance/HDMI output.
+  MIO is LEFT AT 4K. No save loaded or new game started; Gary's existing Continue
+  entry remained untouched. Agent only navigated menus.
+- Used the game's normal Exit. At 18:16Z console status is IDLE and PS5 Home
+  remains selected on MIO, with no Playden relaunch. Screenshot
+  /tmp/gamepass-mio-normal-exit-home.png. This accepts the new game-session
+  handoff behavior; background-worker return remains host-tested.
+- Virtual controller CLOSED. Remote Play and DevTools remain off. Console
+  available to Gary; continue off-console authentication work without taking
+  his controller unless a concrete further console check is needed.
