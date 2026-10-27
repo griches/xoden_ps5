@@ -114,3 +114,14 @@ correct game identity and disabling Install during deletion; service tests cover
 orphan removal, prepared/corrupt-manifest refusal, symlink protection, first-job
 metadata cleanup and persisted cancelled status on reload. Console acceptance
 is still pending at this checkpoint.
+
+## Home-screen artwork requirement (Gary, 2026-10-27)
+
+Each installed Xbox game's PS5 home-screen title must include `icon0` and `pic0`
+(the tile icon and background), similar to the presentation produced by Playden.
+Generate these from the game's downloaded catalogue/store artwork during title
+preparation. Reuse the downloaded assets rather than generic Xbox placeholders;
+size/crop/encode them to the existing title publisher's required formats. This
+requirement applies to our current Playden branch and any later standalone app.
+Implementation and console verification remain outstanding; Gary requested that
+it be recorded while download/cleanup work continues.
