@@ -2777,7 +2777,8 @@ void gamepass_settings_exclude_steam_controls() {
               "Game Pass settings never present a Steam service");
     }
     for (const auto* key:{"settings-account","settings-signout","settings-cloud-saves","settings-import",
-                          "settings-title-store","settings-downloads-slow"})
+                          "settings-title-store","settings-downloads-slow", "settings-update", "settings-beta-updates",
+                          "settings-update-back", "settings-release-notes"})
         check(!has_row(model,key),"Steam-only settings are removed from Game Pass mode");
     check(has_row(model,"settings-xbox-account") && has_row(model,"settings-storage") && has_row(model,"settings-motion"),
           "Game Pass account, storage and display settings remain");

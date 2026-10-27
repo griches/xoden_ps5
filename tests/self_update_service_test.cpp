@@ -199,6 +199,36 @@ void Installed(const std::string& root) {
 }  // namespace
 
 int main() {
+  // A fork must not recover/stage/apply the upstream app, even with an old
+  // staged update on disk. Its admitted kit is still downloadable separately.
+  {
+    KitOnly fixture("fork-kit-only", "");
+    Installed(fixture.fixture.root);
+    Publish(fixture.fixture.server, "v0.3.0");
+    fixture.fixture.server.releases = "[" + fixture.fixture.server.latest + "]";
+    const auto state_path = fixture.fixture.root + "/playden/self-update/state.json";
+    const std::string old_state = "{\"phase\":\"staged\",\"version\":\"99.0.0\"}";
+    Put(state_path, old_state);
+    auto config = fixture.Config();
+    config.app_updates_enabled = false;
+    UpdateService service(config);
+    service.Start();
+    service.Check(true);
+    service.Install();
+    service.RequestRestart();
+    service.RequestRollback();
+    CHECK(!service.Busy() && fixture.fixture.server.requests == 0);
+    CHECK(service.Snapshot().phase == UpdatePhase::kIdle);
+    CHECK(!service.Snapshot().restart_requested && !service.Snapshot().rollback_requested);
+    CHECK(!service.ApplyAtQuit() && Read(state_path) == old_state);
+    CHECK(Read(config.installed_root + "/eboot.bin") == "eboot 0.2.0");
+    service.CheckKit();
+    Wait(service);
+    CHECK(fixture.fixture.server.requests > 0);
+    CHECK(service.Snapshot().kit.phase == KitInstallPhase::kAvailable);
+    CHECK(Read(state_path) == old_state);
+    RemoveTree(fixture.fixture.root);
+  }
   // Opt-in selects by version, never GitHub list order; disabling never downgrades.
   {
     Fixture fixture;

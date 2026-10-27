@@ -829,7 +829,7 @@ class Render::Impl
         // Saves: the games that need the player, or a spinner while a check or Sync all runs.
         std::size_t needs_you = 0;
         for (const auto &[id, cloud] : current_state_->cloud)
-            if (!cloud.queued && (cloud.status == CloudStatus::Conflict || cloud.status == CloudStatus::NeedsAccount ||
+            if ((!current_state_->gamepass_only || id.store == Store::kXbox) && !cloud.queued && (cloud.status == CloudStatus::Conflict || cloud.status == CloudStatus::NeedsAccount ||
                                   cloud.status == CloudStatus::Failed))
                 ++needs_you;
         const bool saves_busy = current_state_->saves_job.kind != SavesJobKind::None;

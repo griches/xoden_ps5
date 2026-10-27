@@ -319,6 +319,7 @@ void UpdateService::Shutdown() {
 void UpdateService::Cancel() { shared_->cancel = true; }
 
 void UpdateService::RequestRollback() {
+  if (!config_.app_updates_enabled) return;
   Set([&](UpdateSnapshot& s) {
     if (!s.previous.empty() && s.phase != UpdatePhase::kDownloading && s.phase != UpdatePhase::kUnpacking)
       s.rollback_requested = true;
@@ -375,6 +376,7 @@ void UpdateService::FindPrevious() {
 }
 
 void UpdateService::RequestRestart() {
+  if (!config_.app_updates_enabled) return;
   Set([&](UpdateSnapshot& s) {
     if (s.phase == UpdatePhase::kStaged) s.restart_requested = true;
   });
@@ -411,6 +413,7 @@ std::string UpdateService::ReadyKit(const KitPart& kit) const {
 }
 
 void UpdateService::Start() {
+  if (!config_.app_updates_enabled) return;
   FindPrevious();
   LoadCurrentNotes();
   RemoveReplacedKits();
@@ -542,6 +545,7 @@ void UpdateService::ConfirmApplied(const std::string& text) {
 bool UpdateService::SetIncludeBetas(bool enabled) { return include_betas_.exchange(enabled) != enabled; }
 
 void UpdateService::Check(bool user_asked) {
+  if (!config_.app_updates_enabled) return;
   {
     std::lock_guard<std::mutex> lock(shared_->mutex);
     const auto phase = shared_->snapshot.phase;
@@ -552,6 +556,7 @@ void UpdateService::Check(bool user_asked) {
 }
 
 void UpdateService::Install() {
+  if (!config_.app_updates_enabled) return;
   Run([this] {
     // A track change can arrive while a download is being cancelled or a check is queued.
     if (release_ && (release_->prerelease || release_->version.beta) && !include_betas_.load()) {
@@ -1135,6 +1140,7 @@ bool UpdateService::RollBackAtQuit() {
 }
 
 bool UpdateService::ApplyAtQuit() {
+  if (!config_.app_updates_enabled) return false;
   if (Snapshot().rollback_requested) return RollBackAtQuit();
   if (!Snapshot().restart_requested || staged_folder_.empty()) return false;
   const std::string stamp = std::to_string(config_.now());
