@@ -788,3 +788,103 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   icon0/pic0; broader per-game compatibility and subscription expiry acceptance.
   Green UI, full-library search, persistent covers, package size/choice UI and
   basic pause/resume/cancel cleanup are already implemented and tested.
+
+## 2026-10-27 — private repository, throughput candidate and artwork work
+
+- Created and pushed PRIVATE https://github.com/griches/gamepass-ps5. Local
+  combined checkout is gamepass-ps5/. Preserved histories from playden-ps5,
+  xodus-ps5-backend, xodus-games and the earlier xodus work; included previously
+  uncommitted legacy CLI/runtime-wrapper source in the combined repository.
+  Original working checkout remotes remain unchanged. Nexus and Playden's six
+  submodules retain their existing revisions via root .gitmodules.
+- Top-level COMPATIBILITY.md follows the requested table/report approach. Only
+  our recorded PC Game Pass results are listed: Minishoot and Digging gameplay,
+  Elder Gods and historical Hollow Knight launch-only, explicit untested titles.
+  Added a repository-local compatibility report Issue form and label, README,
+  ROADMAP and DEVELOPMENT/source provenance. No game downloads, live account
+  files, companion config, caches or deployment backups uploaded. GitHub private
+  visibility verified before and after push; Actions disabled. No upstream PR.
+- Backend 314c2f9 adds four ordered 2 MiB HTTP ranges for segments >=8 MiB;
+  smaller transfers keep the original reader. Memory bounded, no detached jobs
+  or out-of-order writes; resume/checkpoint format unchanged. Pause discards
+  speculative bytes and resumes at delivery offset; cancellation closes pending
+  connections. 55 msixvc tests passed, 3 intentionally ignored; 76 CLI tests
+  passed. Controlled local per-connection-limited benchmark: 8.73 MB/s single,
+  36.25 MB/s parallel, 4.15x. This is NOT a PS5 or Microsoft CDN speed result.
+- Backend c02ff7f adds isolated device-code candidate sessions: polling interval,
+  slowdown, cancellation, expiry, response bounds, safe refresh/token rotation,
+  Store re-scope and account-change rejection. Six offline tests pass. No active
+  TokenManager account is read/replaced/removed by that module. Unauthenticated
+  challenge probes succeeded for existing Xodus client 000000004424da1f, Game
+  Pass mobile client and Store scope. No user completed those probes. OAuth to
+  PC-license/legacy STS interoperability and PS5 sign-in UI remain unfinished.
+- Playden 92a77d1/460cb0d implement Game Pass details artwork and generated Home
+  icon0.png/pic0.dds. Microsoft catalogue currently supplies a poster, so details
+  now use its cached poster in an aspect-preserving layout instead of a stretched
+  Steam hero. Native title metadata v2 regenerates older generic metadata; DDS
+  picture is 1920x1080 BC1, fully owned/staged/hashed alongside title files even
+  on kits without pic0. Settings hide Steam account, Cloud sync, import, store
+  suffix, Steam download control, Steam features and related descriptions in
+  Game Pass mode. These commits are pushed to the private repo.
+- Full host suite 152/152 passed at 128.80 s; poster follow-up 152/152 passed at
+  135.21 s. PS5 build/deploy passed. Current console binary SHA256:
+  cc7f3c53daef947da972d83875d687afc67513e0c5684a57243f0f6c7beb799b,
+  backup console-backups/20261027-poster-layout.
+- Console screenshot /tmp/gamepass-proportional-details.png confirms artwork.
+  Startup recovery accepted Elder Gods' pending native publication after reboot;
+  read-only app.db check confirms FAKE78001 exists. No gameplay retest claimed.
+- Console check found a remaining Steam restore toast despite hidden settings.
+  New uncommitted controller startup skips Steam restore in Game Pass mode,
+  retaining saved Steam data; regression proves Xbox library still loads.
+- Repeated opening/closing test pads reveals app retains a detached handle.
+  New uncommitted PS5 loop reopens while disconnected every 2 s; not yet
+  console-accepted. Current pad is CLOSED. Both resident status/control helpers
+  restored after reboot without starting Remote Play or DevTools.
+- Current app FAKE77031 is on the Elder Gods Maintenance > Update confirmation,
+  Confirm selected. Controller closed before confirming, so no title update has
+  started. Reopening a test pad has not restored input in this old build; next
+  deployed build needs its reconnect fix. No active download or running game.
+- New work in progress: safe managed atomic copies of icon0/pic0 into existing
+  PS5 registered artwork caches, gated by native title ownership and stopped
+  activity, using existing WithRoot callback. ShadowMount skips cached metadata
+  when it already exists, so changing only /data/homebrew art is insufficient
+  for old Home entries. No system database writes. Host/PS5 build running;
+  perform full host suite and console acceptance before committing/deploying.
+- Next: finish cache-sync/reconnect acceptance; actual direct-download throughput
+  measurement (still not done); complete native sign-in/PC-ticket bridge; keep
+  at-least-minute progress updates and commit/push verified changes regularly.
+
+### Artwork/cache and controller acceptance (17:30Z)
+
+- Playden 7b24f37 is now deployed, SHA256
+  134fd8aeb13c4ebb90105a3024b024e5bf38cc61b0e2fe667ff820247896ded3,
+  backup console-backups/20261027-home-art-cache-reconnect. Final host suite
+  152/152 passed (146.54 s), PS5 build passed. Private repo contains this commit.
+- Game Pass startup no longer contacts Steam to restore its saved session.
+  Regression proves Xbox catalogue loads and saved Steam account stays intact.
+  Console Settings shows only Xbox account; Steam controls and startup warning
+  are absent. Screenshot /tmp/gamepass-clean-settings.png.
+- Controller acceptance: launch with pad closed, open a new pad while app already
+  runs, navigate to Details. Then close it, open a replacement and navigate back
+  to Home without app restart. Both passed with the new reconnect loop. Screenshot
+  /tmp/gamepass-replacement-pad-home.png. Physical pad takeover still belongs to
+  Gary; agent must close its pad at end of current Home/artwork test.
+- Maintenance > Update on Elder Gods succeeded, without launching the game:
+  runtime.log title refresh state=complete, artwork cache synced=1, prepare ready
+  at 17:29:19Z. Generated source and both native cache locations match exactly:
+  icon0.png 428,921 bytes SHA256 prefix 974280b3e26d3822;
+  pic0.dds 1,036,928 bytes SHA256 prefix 8eb9f1b4c0aed75f.
+  Existing /user/appmeta/FAKE78001 and /user/app/FAKE78001/sce_sys were updated
+  through bounded atomic managed copies after native ownership checks, as root.
+  No database edits, deletes, runtime-kit pin changes or save changes.
+- Local DDS decoder confirms 1920x1080 RGBA display from the BC1 file. Preview
+  /tmp/elder-generated-pic0-preview.png shows intact cover over dark cover-derived
+  background. Details screenshot /tmp/gamepass-reconnect-details.png is correctly
+  proportioned. Actual PS5 Home display check still in progress.
+- Backend 71825a5 adds the interactive, in-memory device_signin_probe example.
+  Built successfully. It does not open the working account/keychain, provision a
+  device, adopt an account or print credentials. A running Mac development probe
+  is awaiting Gary's phone approval; an asynchronous question gave the Microsoft
+  link and short code. Keep credentials in memory only. On completion it tests
+  Xbox profile/marketplace tickets and Store-scope refresh, NOT PC content-license
+  or in-game runtime acceptance. Fresh native PS5 sign-in remains unfinished.
