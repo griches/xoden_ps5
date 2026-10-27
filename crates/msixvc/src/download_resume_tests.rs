@@ -15,7 +15,7 @@ async fn streaming_resume_terminal_http_error_checkpoints_only_written_pages_the
         }
     });
     let client=reqwest::Client::new();let url=format!("http://{address}/private?SECRET");
-    let file=SegmentFile{offset:0,length:16384,data_hashs:vec![],keep_encrypted:false};let mut output=vec![];let mut offsets=vec![];
+    let file=SegmentFile{offset:0,length:16384,data_hashs:vec![].into(),keep_encrypted:false};let mut output=vec![];let mut offsets=vec![];
     let error=XvdFile::download_segment_http(&[],&client,&url,&mut output,&file,[0;32],|_,_|{},None,0,|p|{offsets.push(p);Ok(())}).await.unwrap_err();
     assert_eq!(error.downcast_ref::<TransferError>(),Some(&TransferError::new("transfer-http",403)));
     assert_eq!(offsets,vec![4096]);assert_eq!(output,&payload[..4096]);
@@ -33,7 +33,7 @@ async fn streaming_resume_disk_error_does_not_retry_forever_or_commit_partial_wr
     }
     let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();let address=listener.local_addr().unwrap();
     let server=tokio::spawn(async move{let(mut socket,_)=listener.accept().await.unwrap();let mut request=vec![];while !request.ends_with(b"\r\n\r\n"){request.push(socket.read_u8().await.unwrap());}socket.write_all(b"HTTP/1.1 206 Test\r\nContent-Length: 4096\r\nContent-Range: bytes 0-4095/4096\r\nConnection: close\r\n\r\n").await.unwrap();socket.write_all(&[0;4096]).await.unwrap();});
-    let client=reqwest::Client::new();let url=format!("http://{address}/package");let file=SegmentFile{offset:0,length:4096,data_hashs:vec![],keep_encrypted:false};let mut committed=false;
+    let client=reqwest::Client::new();let url=format!("http://{address}/package");let file=SegmentFile{offset:0,length:4096,data_hashs:vec![].into(),keep_encrypted:false};let mut committed=false;
     let result=timeout(std::time::Duration::from_secs(2),XvdFile::download_segment_http(&[],&client,&url,&mut Broken,&file,[0;32],|_,_|{},None,0,|_|{committed=true;Ok(())})).await.unwrap();
     assert!(result.is_err());assert!(!committed);server.await.unwrap();
 }
@@ -86,7 +86,7 @@ async fn streaming_resume_preserves_bytes_across_pause_and_process_restart_offse
         let file = SegmentFile {
             offset: 0,
             length: 16384,
-            data_hashs: vec![],
+            data_hashs: vec![].into(),
             keep_encrypted: false,
         };
         let mut did_pause = initial_offset != 0;
@@ -150,7 +150,7 @@ async fn streaming_batches_page_writes_and_flushes_tail_before_checkpoint() {
     let state = Arc::new(Mutex::new((Vec::new(),0)));
     let mut output = Sink(state.clone());
     let client = reqwest::Client::new();
-    let file = SegmentFile { offset:0, length:length as u64, data_hashs:vec![], keep_encrypted:false };
+    let file = SegmentFile { offset:0, length:length as u64, data_hashs:vec![].into(), keep_encrypted:false };
     let mut checkpoints = Vec::new();
     XvdFile::download_segment_http(&[],&client,&format!("http://{address}/package"),&mut output,&file,[0;32],|_,_|{},None,0,|position| {
         assert_eq!(state.lock().unwrap().0.len() as u64,position);

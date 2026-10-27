@@ -4,7 +4,7 @@ use crate::crypt::encrypt_page_xts;
 use std::io::Cursor;
 
 fn fixture(length: u64) -> (XvdFile, SegmentFile, [u8; 32], Vec<u8>, Vec<u8>) {
-    let content = SegmentFile { offset: 0, length, keep_encrypted: true, data_hashs: vec![] };
+    let content = SegmentFile { offset: 0, length, keep_encrypted: true, data_hashs: vec![].into() };
     let stored = content.stored_length().unwrap() as usize;
     let mut bytes = XvdHeader::buffer();
     bytes[512..520].copy_from_slice(b"msft-xvd");
@@ -17,7 +17,7 @@ fn fixture(length: u64) -> (XvdFile, SegmentFile, [u8; 32], Vec<u8>, Vec<u8>) {
     let units: Vec<u32> = (0..stored/PAGE_SIZE).map(|i| (i * 7 + 17) as u32).collect();
     let xvd = XvdFile { header, layout, encrypted_section_infos: vec![EncryptedSectionInfo {
         section_offset: 0, section_length: stored as u64, header_id: region, vduid: id,
-        data_units: Some(units.clone()), first_segment_index: 0, data_hashs: vec![],
+        data_units: Some(units.clone()), first_segment_index: 0, data_hashs: vec![].into(),
     }] };
     let key: [u8;32] = std::array::from_fn(|i| i as u8 + 1);
     let tweak_key: [u8;16] = key[..16].try_into().unwrap();
@@ -35,12 +35,12 @@ fn fixture(length: u64) -> (XvdFile, SegmentFile, [u8; 32], Vec<u8>, Vec<u8>) {
 #[test]
 fn streaming_stored_length_distinguishes_plain_and_ciphertext_and_rejects_overflow() {
     for (length, stored) in [(0,0), (1,4096), (4095,4096), (4096,4096), (4097,8192), (8192,8192)] {
-        let mut file = SegmentFile { offset: 0, length, keep_encrypted: true, data_hashs: vec![] };
+        let mut file = SegmentFile { offset: 0, length, keep_encrypted: true, data_hashs: vec![].into() };
         assert_eq!(file.stored_length().unwrap(), stored);
         file.keep_encrypted = false;
         assert_eq!(file.stored_length().unwrap(), length);
     }
-    let mut file = SegmentFile { offset: 0, length: u64::MAX, keep_encrypted: true, data_hashs: vec![] };
+    let mut file = SegmentFile { offset: 0, length: u64::MAX, keep_encrypted: true, data_hashs: vec![].into() };
     assert!(file.stored_length().is_err());
     file.keep_encrypted = false;
     assert_eq!(file.stored_length().unwrap(), u64::MAX);
@@ -106,4 +106,21 @@ async fn streaming_plain_output_remains_unpadded_and_short_ciphertext_returns_er
     server.await.unwrap();
     assert_eq!(downloaded.len(),5000);
     assert_eq!(downloaded,plain);
+}
+
+#[test]
+fn segment_hash_views_share_storage_and_reject_invalid_ranges() {
+    let original = vec![[37u8;20];65536];
+    let pointer = original.as_ptr();
+    let table: PageHashes = original.into();
+    assert_eq!(table.as_ptr(),pointer, "wrapping the table must not copy it");
+    let first = table.slice(100..65000).unwrap();
+    let child = first.slice(20..200).unwrap();
+    assert!(std::sync::Arc::ptr_eq(&table.table,&child.table));
+    assert_eq!(child.as_ptr(), pointer.wrapping_add(120));
+    assert_eq!(child.len(),180);
+    assert!(table.slice(0..65537).is_err());
+    assert!(first.slice(65000..65001).is_err());
+    drop(table); drop(first);
+    assert_eq!(child.as_ref(),vec![[37u8;20];180]);
 }

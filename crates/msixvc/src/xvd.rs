@@ -289,6 +289,37 @@ pub struct XvdFile {
     encrypted_section_infos: Vec<EncryptedSectionInfo>,
 }
 
+/// A file's page hashes share the package's immutable table. Slicing a large
+/// segment must not allocate another copy of millions of hashes on the console.
+#[derive(Clone, Debug, Default)]
+pub struct PageHashes {
+    table: std::sync::Arc<Vec<[u8; 20]>>,
+    range: std::ops::Range<usize>,
+}
+impl From<Vec<[u8; 20]>> for PageHashes {
+    fn from(table: Vec<[u8; 20]>) -> Self {
+        let end = table.len();
+        Self { table: std::sync::Arc::new(table), range: 0..end }
+    }
+}
+impl AsRef<[[u8; 20]]> for PageHashes {
+    fn as_ref(&self) -> &[[u8; 20]] { &self.table[self.range.clone()] }
+}
+impl std::ops::Deref for PageHashes {
+    type Target = [[u8; 20]];
+    fn deref(&self) -> &Self::Target { self.as_ref() }
+}
+impl PartialEq for PageHashes {
+    fn eq(&self, other: &Self) -> bool { self.as_ref() == other.as_ref() }
+}
+impl Eq for PageHashes {}
+impl PageHashes {
+    fn slice(&self, range: std::ops::Range<usize>) -> io::Result<Self> {
+        self.as_ref().get(range.clone()).ok_or_else(|| Error::new(ErrorKind::InvalidData,"segment hash range exceeds package table"))?;
+        Ok(Self { table: self.table.clone(), range: self.range.start + range.start..self.range.start + range.end })
+    }
+}
+
 #[derive(Debug)]
 pub struct EncryptedSectionInfo {
     section_offset: u64,
@@ -301,7 +332,7 @@ pub struct EncryptedSectionInfo {
     // If integrity is disabled, use page_in_section as the data unit instead.
     data_units: Option<Vec<u32>>,
     first_segment_index: u32,
-    data_hashs: Vec<[u8; 20]>,
+    data_hashs: PageHashes,
 }
 
 pub struct UserPackageFile {
@@ -312,7 +343,7 @@ pub struct UserPackageFile {
 pub struct SegmentFile {
     pub offset: u64,
     pub length: u64,
-    pub data_hashs: Vec<[u8; 20]>,
+    pub data_hashs: PageHashes,
     pub keep_encrypted: bool,
 }
 
@@ -424,8 +455,11 @@ impl XvdFile {
             }
 
             let start_page = h.offset - layout.user_data.start;
-            let mut data_units: Vec<u32> = Vec::with_capacity(num_pages as usize);
-            let mut data_hashs: Vec<[u8; 20]> = Vec::with_capacity(num_pages as usize);
+            let pages = usize::try_from(num_pages).map_err(|_| Error::new(ErrorKind::InvalidData,"package page count exceeds address space"))?;
+            let mut data_units: Vec<u32> = Vec::new();
+            let mut data_hashs: Vec<[u8; 20]> = Vec::new();
+            data_units.try_reserve_exact(pages).map_err(|_| Error::new(ErrorKind::OutOfMemory,"package data-unit table exceeds available memory"))?;
+            data_hashs.try_reserve_exact(pages).map_err(|_| Error::new(ErrorKind::OutOfMemory,"package hash table exceeds available memory"))?;
 
             let mut page = 0;
             loop {
@@ -465,7 +499,7 @@ impl XvdFile {
                 vduid: xvd_header.vduid,
                 data_units: Some(data_units),
                 first_segment_index: h.first_segment_index,
-                data_hashs,
+                data_hashs: data_hashs.into(),
             });
         }
         Ok(XvdFile {
@@ -561,7 +595,7 @@ impl XvdFile {
     where
         Reader: AsyncRead + AsyncSeek + Unpin,
     {
-        let mut file = BufReader::with_capacity(segment_metadata.length as usize, file);
+        let mut file = BufReader::with_capacity(64 * 1024, file);
         file.seek(SeekFrom::Start(segment_metadata.offset)).await?;
         let segment_header = {
             let mut buf = XvdSegmentMetadataHeader::buffer();
@@ -607,9 +641,7 @@ impl XvdFile {
                 }
                 let end = page_offset as usize - segment_page_start as usize
                     + segment.filesize.div_ceil(PAGE_SIZE as u64) as usize;
-                let data_hashs: Vec<[u8; 20]> = section.data_hashs
-                    [page_offset as usize - segment_page_start as usize..end]
-                    .into();
+                let data_hashs = section.data_hashs.slice(page_offset as usize - segment_page_start as usize..end)?;
                 files.insert(
                     file_name,
                     SegmentFile {
@@ -686,7 +718,7 @@ impl XvdFile {
                 .into());
             }
 
-            file.data_hashs = section.data_hashs[start..end].into();
+            file.data_hashs = section.data_hashs.slice(start..end)?;
         }
 
         Ok(())
@@ -780,7 +812,7 @@ impl XvdFile {
                     SegmentFile {
                         offset: partition_offset + start,
                         length: report.value_length,
-                        data_hashs: vec![],
+                        data_hashs: vec![].into(),
                         keep_encrypted: !only_plain
                             && report.path.to_ascii_lowercase().ends_with(".exe"),
                     },

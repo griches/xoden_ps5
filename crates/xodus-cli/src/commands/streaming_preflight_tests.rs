@@ -8,12 +8,12 @@ fn streaming_repair_selection_includes_short_ciphertext_even_with_matching_packa
         let path = root.path().join("Game.exe");
         let bytes = vec![9u8;size];
         std::fs::write(&path,&bytes).unwrap();
-        let make = || HashMap::from([("Game.exe".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:true,data_hashs:vec![[7;20]]})]);
+        let make = || HashMap::from([("Game.exe".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:true,data_hashs:vec![[7;20]].into()})]);
         assert_eq!(!pending_files(root.path(),&make(),&make()).unwrap().is_empty(),included);
         assert_eq!(std::fs::read(&path).unwrap(),bytes);
     }
     let root = tempfile::tempdir().unwrap();
-    let make = || HashMap::from([("Missing.exe".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:true,data_hashs:vec![[7;20]]})]);
+    let make = || HashMap::from([("Missing.exe".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:true,data_hashs:vec![[7;20]].into()})]);
     assert_eq!(pending_files(root.path(),&make(),&make()).unwrap().len(),1);
 }
 
@@ -24,13 +24,13 @@ fn streaming_repair_selection_preserves_unchanged_files_and_only_targets_current
         std::fs::write(root.path().join(file),vec![3u8;8192]).unwrap();
     }
     let make = || HashMap::from([
-        ("Game.exe".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:true,data_hashs:vec![[7;20]]}),
-        ("Plain.bin".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:false,data_hashs:vec![[7;20]]}),
+        ("Game.exe".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:true,data_hashs:vec![[7;20]].into()}),
+        ("Plain.bin".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:false,data_hashs:vec![[7;20]].into()}),
     ]);
     assert!(pending_files(root.path(),&make(),&make()).unwrap().is_empty());
     let local = make();
     let mut changed = make();
-    changed.get_mut("Game.exe").unwrap().data_hashs[0]=[8;20];
+    changed.get_mut("Game.exe").unwrap().data_hashs=vec![[8;20]].into();
     assert_eq!(pending_files(root.path(),&changed,&local).unwrap()[0].0,"Game.exe");
     let mut resized=make();resized.get_mut("Plain.bin").unwrap().length=0;
     assert_eq!(pending_files(root.path(),&resized,&local).unwrap()[0].0,"Plain.bin");
@@ -42,7 +42,7 @@ fn streaming_repair_selection_preserves_unchanged_files_and_only_targets_current
 #[test]
 fn streaming_repair_selection_rejects_nonfile_and_symlinked_encrypted_paths() {
     let root=tempfile::tempdir().unwrap();
-    let make=||HashMap::from([("Game.exe".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:true,data_hashs:vec![[7;20]]})]);
+    let make=||HashMap::from([("Game.exe".to_owned(),SegmentFile {offset:0,length:5000,keep_encrypted:true,data_hashs:vec![[7;20]].into()})]);
     std::fs::create_dir(root.path().join("Game.exe")).unwrap();
     assert!(pending_files(root.path(),&make(),&make()).is_err());
     std::fs::remove_dir(root.path().join("Game.exe")).unwrap();

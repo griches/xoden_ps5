@@ -544,7 +544,7 @@ where
                 content: SegmentFile {
                     offset: v.offset,
                     length: v.length,
-                    data_hashs: vec![],
+                    data_hashs: vec![].into(),
                     keep_encrypted: v.keep_encrypted,
                 },
             })

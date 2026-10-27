@@ -779,7 +779,7 @@ mod tests {
             let path = root.path().join("Game.exe");
             let original = vec![7u8; size];
             std::fs::write(&path, &original).unwrap();
-            let content = SegmentFile { offset: 0, length: 5000, keep_encrypted: true, data_hashs: vec![] };
+            let content = SegmentFile { offset: 0, length: 5000, keep_encrypted: true, data_hashs: vec![].into() };
             let error = open_launch_image(&path, "Bin\\Game.exe", &content).await.unwrap_err();
             assert_eq!(error.kind(), std::io::ErrorKind::UnexpectedEof);
             let message = error.to_string();
@@ -798,7 +798,7 @@ mod tests {
             let path = root.path().join("Game.exe");
             let original = vec![9u8; stored];
             std::fs::write(&path, &original).unwrap();
-            let content = SegmentFile { offset: 0, length, keep_encrypted: encrypted, data_hashs: vec![] };
+            let content = SegmentFile { offset: 0, length, keep_encrypted: encrypted, data_hashs: vec![].into() };
             let mut input = open_launch_image(&path, "Game.exe", &content).await.unwrap();
             let mut read = vec![];
             input.read_to_end(&mut read).await.unwrap();
@@ -810,7 +810,7 @@ mod tests {
     #[tokio::test]
     async fn launch_image_errors_are_named_bounded_and_do_not_panic_on_missing_or_nonfile_input() {
         let root = tempfile::tempdir().unwrap();
-        let content = SegmentFile { offset: 0, length: 4, keep_encrypted: true, data_hashs: vec![] };
+        let content = SegmentFile { offset: 0, length: 4, keep_encrypted: true, data_hashs: vec![].into() };
         let error = open_launch_image(&root.path().join("missing"), "Missing.exe", &content).await.unwrap_err();
         assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
         assert!(error.to_string().contains("Missing.exe"));
@@ -956,7 +956,7 @@ mod tests {
         let original = fake_pe();
         std::fs::write(root.path().join("Bin/MINECRAFT.WINDOWS.EXE"), &original).unwrap();
         std::fs::write(root.path().join("MicrosoftGame.config"), b"metadata unchanged").unwrap();
-        let metadata = HashMap::from([(String::from("Bin\\Minecraft.Windows.exe"), SegmentFile { offset: 0, length: original.len() as u64, data_hashs: vec![], keep_encrypted: false })]);
+        let metadata = HashMap::from([(String::from("Bin\\Minecraft.Windows.exe"), SegmentFile { offset: 0, length: original.len() as u64, data_hashs: vec![].into(), keep_encrypted: false })]);
         let (name, file) = prepare_plain_launch_entry(root.path(), &metadata, Some("bin/Minecraft.Windows.exe")).await.unwrap().unwrap();
         assert_eq!(name, "Bin\\MINECRAFT.WINDOWS.EXE");
         assert!(!fcntl_getfd(file.as_fd()).unwrap().contains(FdFlags::CLOEXEC));
@@ -990,7 +990,7 @@ mod tests {
     async fn plain_launch_entry_never_treats_an_encrypted_or_undeclared_file_as_plaintext() {
         let root = tempfile::tempdir().unwrap(); let original = fake_pe();
         std::fs::write(root.path().join("Game.exe"), &original).unwrap();
-        let mut metadata = HashMap::from([(String::from("Game.exe"), SegmentFile { offset: 0, length: original.len() as u64, data_hashs: vec![], keep_encrypted: true })]);
+        let mut metadata = HashMap::from([(String::from("Game.exe"), SegmentFile { offset: 0, length: original.len() as u64, data_hashs: vec![].into(), keep_encrypted: true })]);
         assert!(prepare_plain_launch_entry(root.path(), &metadata, Some("Game.exe")).await.unwrap().is_none());
         assert!(prepare_plain_launch_entry(root.path(), &metadata, Some("Other.exe")).await.unwrap().is_none());
         assert!(prepare_plain_launch_entry(root.path(), &metadata, None).await.unwrap().is_none());
@@ -1009,12 +1009,12 @@ mod tests {
         let root = tempfile::tempdir().unwrap(); let outside = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("Game.exe"), fake_pe()).unwrap();
         let mut metadata = HashMap::new();
-        for name in ["Game.exe", "GAME.EXE"] { metadata.insert(name.to_owned(), SegmentFile { offset: 0, length: 1024, data_hashs: vec![], keep_encrypted: false }); }
+        for name in ["Game.exe", "GAME.EXE"] { metadata.insert(name.to_owned(), SegmentFile { offset: 0, length: 1024, data_hashs: vec![].into(), keep_encrypted: false }); }
         assert!(prepare_plain_launch_entry(root.path(), &metadata, Some("Game.exe")).await.unwrap().is_some());
         assert!(prepare_plain_launch_entry(root.path(), &metadata, Some("game.exe")).await.is_err());
         std::fs::write(outside.path().join("Game.exe"), fake_pe()).unwrap();
         symlink(outside.path().join("Game.exe"), root.path().join("Outside.exe")).unwrap();
-        metadata.insert("Outside.exe".to_owned(), SegmentFile { offset: 0, length: 1024, data_hashs: vec![], keep_encrypted: false });
+        metadata.insert("Outside.exe".to_owned(), SegmentFile { offset: 0, length: 1024, data_hashs: vec![].into(), keep_encrypted: false });
         assert!(prepare_plain_launch_entry(root.path(), &metadata, Some("Outside.exe")).await.is_err());
     }
 

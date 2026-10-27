@@ -55,7 +55,7 @@ async fn streaming_resume_completed_encrypted_image_preserves_ciphertext_tail() 
     let bytes: Vec<u8> = (0..8192).map(|n| (n % 251) as u8).collect();
     fs::write(&path, &bytes).unwrap();
     let layout = HashMap::from([("game.exe".to_owned(), SegmentFile {
-        offset: 0, length: 5000, keep_encrypted: true, data_hashs: vec![],
+        offset: 0, length: 5000, keep_encrypted: true, data_hashs: vec![].into(),
     })]);
     let mut journal = Journal::open(root.path(), "synthetic-package", &layout).unwrap();
     journal.checkpoint("game.exe", 5000).unwrap();
@@ -78,7 +78,7 @@ async fn streaming_updated_file_is_trimmed_even_when_its_expected_length_is_zero
             .open(&path)
             .await
             .unwrap();
-        let content = SegmentFile { offset: 0, length: offset, keep_encrypted: false, data_hashs: vec![] };
+        let content = SegmentFile { offset: 0, length: offset, keep_encrypted: false, data_hashs: vec![].into() };
         assert_eq!(prepare_output(&mut file, offset, &content).await.unwrap(), offset);
         assert_eq!(
             std::fs::read(path).unwrap(),
@@ -109,7 +109,7 @@ async fn streaming_resume_ciphertext_layout_preserves_only_committed_pages_and_n
         let path = root.path().join("fixture");
         let bytes: Vec<u8> = (0..actual).map(|n| (n % 251) as u8).collect();
         fs::write(&path, &bytes).unwrap();
-        let content = SegmentFile { offset: 0, length, keep_encrypted: encrypted, data_hashs: vec![] };
+        let content = SegmentFile { offset: 0, length, keep_encrypted: encrypted, data_hashs: vec![].into() };
         let mut file = tokio::fs::OpenOptions::new().write(true).open(&path).await.unwrap();
         assert_eq!(prepare_output(&mut file, checkpoint, &content).await.unwrap(), expected_offset);
         assert_eq!(file.stream_position().await.unwrap(), expected_len);
@@ -124,7 +124,7 @@ async fn streaming_resume_invalid_or_changed_checkpoint_does_not_modify_files() 
         let path = root.path().join("fixture");
         let original = b"unchanged";
         fs::write(&path, original).unwrap();
-        let content = SegmentFile { offset: 0, length, keep_encrypted: encrypted, data_hashs: vec![] };
+        let content = SegmentFile { offset: 0, length, keep_encrypted: encrypted, data_hashs: vec![].into() };
         let mut file = tokio::fs::OpenOptions::new().write(true).open(&path).await.unwrap();
         assert!(prepare_output(&mut file, offset, &content).await.is_err());
         assert_eq!(fs::read(&path).unwrap(), original);
@@ -135,7 +135,7 @@ async fn streaming_resume_invalid_or_changed_checkpoint_does_not_modify_files() 
 async fn streaming_resume_repairs_old_encrypted_tail_with_actual_range_download() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     for length in [1u64, 4097, 5000, 8193] {
-        let content = SegmentFile { offset: 0, length, keep_encrypted: true, data_hashs: vec![] };
+        let content = SegmentFile { offset: 0, length, keep_encrypted: true, data_hashs: vec![].into() };
         let stored = content.stored_length().unwrap();
         let ciphertext: Vec<u8> = (0..stored).map(|n| (n % 251) as u8).collect();
         let root = tempfile::tempdir().unwrap();
@@ -216,7 +216,7 @@ impl Journal {
     ) -> io::Result<Self> {
         let mut layout: Vec<_> = files
             .iter()
-            .map(|(name, f)| (name, f.offset, f.length, f.keep_encrypted, &f.data_hashs))
+            .map(|(name, f)| (name, f.offset, f.length, f.keep_encrypted, f.data_hashs.as_ref()))
             .collect();
         layout.sort_by(|a, b| a.0.cmp(b.0));
         let mut digest = std::io::BufWriter::with_capacity(64 * 1024, msixvc::streaming::ResumeDigestWriter::default());
@@ -338,6 +338,12 @@ mod tests {
         let mut writer = std::io::BufWriter::with_capacity(64 * 1024,msixvc::streaming::ResumeDigestWriter::default());
         serde_json::to_writer(&mut writer,&value).unwrap(); writer.flush().unwrap();
         assert_eq!(writer.into_inner().ok().unwrap().finish(),expected);
+        let root = tempfile::tempdir().unwrap();
+        let files = std::collections::HashMap::from([("large-file".to_owned(),msixvc::xvd::SegmentFile {
+            offset:4096,length:268435456,keep_encrypted:true,data_hashs:hashes.into(),
+        })]);
+        assert_eq!(super::Journal::open(root.path(),"package",&files).unwrap().identity,expected,
+                   "shared hash views keep the previous serialized resume identity");
     }
     use super::*;
     #[test]
@@ -349,7 +355,7 @@ mod tests {
                 offset: 0,
                 length: 8192,
                 keep_encrypted: false,
-                data_hashs: vec![],
+                data_hashs: vec![].into(),
             },
         )]);
         fs::write(root.path().join("game.bin"), vec![7; 8192]).unwrap();
