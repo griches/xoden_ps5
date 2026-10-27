@@ -888,3 +888,27 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   link and short code. Keep credentials in memory only. On completion it tests
   Xbox profile/marketplace tickets and Store-scope refresh, NOT PC content-license
   or in-game runtime acceptance. Fresh native PS5 sign-in remains unfinished.
+
+### Direct-download and phone-login acceptance (2026-10-27 evening)
+
+- The bounded parallel-range build 7b24f37 completed MIO: Memories in Orbit
+  (9NP86K57SQM3) directly on PS5. Independent file-growth windows measured
+  1,306,448,781 bytes / 84.09848 s = 15.53 MB/s and 1,264,591,548 bytes /
+  102.77052 s = 12.31 MB/s. Only assets.gin grew in the second window. Previous
+  Elder Gods measurements were about 6.3 MB/s; this is a different game, not a
+  controlled A/B comparison. Do not quote idle time after completion as speed.
+- Native job ran 17:40:24Z–17:45:11Z; automatic runtime setup reached Ready at
+  17:46:05Z. D3D12 detection selected vkd3d-proton automatically. MIO FAKE78002
+  was registered by ShadowMount while the app remained running. Gameplay and
+  actual Home artwork visibility remain untested. Virtual controller is CLOSED.
+- First phone-code attempt expired. The second completed successfully after
+  Gary approved it: OAuth login, Xbox profile and marketplace XSTS tickets,
+  Microsoft Store scope refresh, and refresh back to Xbox all succeeded.
+  The isolated probe dropped its in-memory credentials on exit and never
+  replaced the console's working account. Native phone UI, PC content licensing
+  and per-game runtime ticket acceptance still need implementation/validation.
+- Elder Gods' source/registered disk artwork caches match, but ShellUI still
+  displayed its older orange artwork. Do not claim existing Home display fixed.
+  Gary's local PS5_ArtSwap project documents ShellUI caching and refresh; no
+  ShellUI restart or game reinstall was performed. New MIO title has generated
+  icon0/pic0 before first registration; verify its actual Home display next.
