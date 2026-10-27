@@ -16,12 +16,28 @@ const UPSTREAM_READ_CHUNK_SIZE: usize = 64 * 1024;
 mod metadata_tests;
 
 /// Stable digest used for package identity and durable download checkpoints.
+/// Incremental form used by large package-layout fingerprints. Keeping the
+/// identical SHA-256 byte stream preserves existing resume journals.
+#[derive(Default)]
+pub struct ResumeDigestWriter(sha2::Sha256);
+impl std::io::Write for ResumeDigestWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        use sha2::Digest;
+        self.0.update(bytes);
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+}
+impl ResumeDigestWriter {
+    pub fn finish(self) -> String {
+        use sha2::Digest;
+        self.0.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+}
 pub fn resume_digest(bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    let mut writer = ResumeDigestWriter::default();
+    std::io::Write::write_all(&mut writer,bytes).expect("digest writes cannot fail");
+    writer.finish()
 }
 
 type ByteStream = Pin<Box<dyn Stream<Item = std::io::Result<Bytes>> + Send>>;

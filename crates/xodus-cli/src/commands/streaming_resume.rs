@@ -219,7 +219,9 @@ impl Journal {
             .map(|(name, f)| (name, f.offset, f.length, f.keep_encrypted, &f.data_hashs))
             .collect();
         layout.sort_by(|a, b| a.0.cmp(b.0));
-        let identity = resume_digest(&serde_json::to_vec(&(content, layout))?);
+        let mut digest = std::io::BufWriter::with_capacity(64 * 1024, msixvc::streaming::ResumeDigestWriter::default());
+        serde_json::to_writer(&mut digest, &(content, layout))?;
+        let identity = digest.into_inner().map_err(|error| error.into_error())?.finish();
         let path = target(root, ".nexus-streaming-v1.jsonl")?;
         let mut entries = serde_json::Map::new();
         if let Ok(file) = File::open(&path) {
@@ -326,6 +328,17 @@ fn tail(path: &Path, offset: u64) -> io::Result<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn streamed_layout_digest_matches_existing_journals() {
+        use std::io::Write;
+        let hashes = vec![[37u8;20]; 65536];
+        let layout = vec![("large-file",4096u64,268435456u64,true,&hashes)];
+        let value = ("package",layout);
+        let expected = msixvc::streaming::resume_digest(&serde_json::to_vec(&value).unwrap());
+        let mut writer = std::io::BufWriter::with_capacity(64 * 1024,msixvc::streaming::ResumeDigestWriter::default());
+        serde_json::to_writer(&mut writer,&value).unwrap(); writer.flush().unwrap();
+        assert_eq!(writer.into_inner().ok().unwrap().finish(),expected);
+    }
     use super::*;
     #[test]
     fn streaming_resume_reopens_checkpoint_and_rejects_changed_data_or_package() {
