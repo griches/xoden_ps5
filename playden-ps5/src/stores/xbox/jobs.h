@@ -11,7 +11,7 @@
 namespace playden::stores::xbox {
 struct PreparedGame {
     GameId game;
-    std::string account_key, executable, root;
+    std::string account_key, executable, root, content_id;
 };
 struct NativeProgress {
     std::string phase, message;
@@ -59,13 +59,14 @@ public:
     bool Pause(GameId game);
     bool Refresh(std::string market);
     bool TestPhoneSignIn(GameId game, std::string market);
+    bool SignOut(std::string market);
     // Caller must first finish removing the stopped PS5 runtime title.
     bool Uninstall(GameId game);
     bool Install(GameId game, std::string account_key, std::string market, std::string content_id = {});
     std::shared_ptr<const JobSnapshot> Snapshot() const;
     void Shutdown();
 private:
-    struct Request { GameId game; std::string account, market; bool discard = false, uninstall = false; std::string content; bool refresh = false, phone_test = false; };
+    struct Request { GameId game; std::string account, market; bool discard = false, uninstall = false; std::string content; bool refresh = false, phone_test = false, signout = false; };
     void Run();
     void Load();
     void Execute(const Request& request);

@@ -1787,6 +1787,10 @@ const installs::InstalledLocation* Controller::LocationOf(GameId id) const {
 }
 void Controller::TickXboxJobs() {
   if (!xbox_jobs_ || !xbox_library_) return;
+  if(model_.TakeXboxSignOut()) {
+    const auto catalog=xbox_library_->Snapshot();
+    if(!xbox_jobs_->SignOut(catalog?catalog->market:"GB")) model_.ShowLayoutNotice("Wait for the current operation to finish before signing out.");
+  }
   if (model_.TakeXboxPhoneTest()) {
     const auto catalog=xbox_library_->Snapshot();
     auto game=model_.state().navigation.selected_game_id;
@@ -1815,9 +1819,9 @@ void Controller::TickXboxJobs() {
       ? "An Xbox operation is running. Account refresh is available when it finishes."
       : catalog ? "Saved Xbox account. Refresh to check your session and library."
                 : "No Xbox account is connected to this console.";
-  model_.UpdateXboxAccount(catalog ? catalog->gamertag : "",account_message,state->active);
+  model_.UpdateXboxAccount(state->phase=="signed-out"?"":catalog ? catalog->gamertag : "",account_message,state->active);
   if (state->phone_test) model_.UpdateXboxPhoneSignIn(state->message,state->sign_in_code,state->sign_in_url,state->active);
-  if (state->phase == "refreshed" && !state->request_id.empty() && state->request_id != xbox_refreshed_request_) {
+  if ((state->phase == "refreshed" || state->phase=="signed-out") && !state->request_id.empty() && state->request_id != xbox_refreshed_request_) {
     xbox_refreshed_request_ = state->request_id;
     if (library_) library_->Refresh(Store::kXbox);
   }

@@ -3245,11 +3245,19 @@ void xbox_phone_signin_code_is_transient_and_closing_requests_cancellation() {
     activate(model,"xbox-phone-done");
     check(!model.TakeXboxPhoneCancel(),"closing a finished phone test does not cancel or alter an account");
 }
+void xbox_signout_is_an_explicit_account_action() {
+    auto model=make_live();model.UpdateXboxAccount("Working account","Saved account",false);
+    for(int i=0;i<4;++i)model.action("r1");
+    activate(model,"settings-xbox-account");activate(model,"xbox-signout");
+    check(model.TakeXboxSignOut() && !model.TakeXboxSignOut(),"sign-out sends exactly one account reset request");
+    check(model.state().navigation.modals.empty(),"sign-out returns to Settings without deleting game data in the UI");
+}
 
 int main() {
     gamepass_mode_migrates_the_old_xbox_category();
     xbox_account_help_is_visible_without_authenticating();
     xbox_phone_signin_code_is_transient_and_closing_requests_cancellation();
+    xbox_signout_is_an_explicit_account_action();
     xbox_install_does_not_wait_for_steam();
     xbox_search_covers_the_complete_catalog();
     live_import_sheet_sends_requests();

@@ -136,6 +136,12 @@ Result<void> Storage::WriteAtomic(const std::string& relative_path,
 Result<void> Storage::WriteAtomicPrivate(const std::string& relative_path,
                                          const Bytes& bytes) const {
   const auto uid = ps5::HoldEffectiveUid();
+  return WriteAtomicPrivateWithLease(relative_path,bytes,uid);
+}
+
+Result<void> Storage::WriteAtomicPrivateWithLease(const std::string& relative_path,
+                                                const Bytes& bytes,const std::shared_ptr<void>& lease) const {
+  if(!lease) return Result<void>::Failure(StorageError::kPermissionFailed,"Private storage requires an effective-UID lease.");
   for (unsigned attempt = 0; attempt < 3; ++attempt) {
     bool retry = false;
     auto written = WriteAtomicImpl(relative_path, bytes, true, &retry);

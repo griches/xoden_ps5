@@ -63,5 +63,17 @@ int main() {
   CHECK(owner_retries == 1 && !wrong_owner);
   CHECK(storage.Read("session.v1").value() == playden::Bytes({'r', 'e', 't', 'r', 'y'}));
   CHECK(!std::filesystem::exists(root / "session.v1.tmp"));
+  CHECK(!storage.WriteAtomicPrivateWithLease("no-lease",{'n'},{}).ok());
+  CHECK(!std::filesystem::exists(root/"no-lease"));
+  {
+    // Reproduce the native job's parent/child layout: the parent holds the
+    // process-UID lease until its child callback finishes its atomic write.
+    const auto lease=playden::ps5::HoldEffectiveUid();
+    auto callback=std::async(std::launch::async,[&]{return storage.WriteAtomicPrivateWithLease("callback",{'o','k'},lease);});
+    CHECK(callback.wait_for(std::chrono::seconds(2))==std::future_status::ready);
+    CHECK(callback.get().ok());
+    CHECK(storage.Read("callback").value()==playden::Bytes({'o','k'}));
+    CHECK(stat((root/"callback").c_str(),&info)==0 && (info.st_mode&07777)==0600 && info.st_uid==getuid());
+  }
   std::filesystem::remove_all(root);
 }

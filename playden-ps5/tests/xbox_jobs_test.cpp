@@ -258,6 +258,23 @@ int main() {
         assert(snapshot->choice_game == GameId::Xbox("9N5PKH0KW2L1"));
         assert(snapshot->choices.size() == 1 && snapshot->choices[0].download_bytes == 1234);
     }
+    // Native sign-out has no download/account identity and leaves prepared games.
+    std::filesystem::remove(root/"job-request.json");std::filesystem::remove(root/"job-result.json");
+    auto signout_config=config;
+    signout_config.native_run=[&](const auto&,const auto&) {
+        const auto bytes=store.Read("job-request.json");assert(bytes.ok());
+        const auto request=steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));assert(request);
+        assert(request->Find("operation")->text()=="signout" && !request->Find("accountKey") && !request->Find("productId"));
+        Put(store,"job-result.json","{\"schema\":1,\"requestId\":\""+request->Find("requestId")->text()+"\",\"operation\":\"signout\",\"status\":\"signed-out\",\"detail\":{\"accountCleared\":true}}");
+        return stores::xbox::NativeResult::Complete;
+    };
+    {
+        stores::xbox::Jobs signout(signout_config);Wait(signout,"idle");
+        const auto prepared=signout.Snapshot()->prepared.size();
+        assert(signout.SignOut("GB"));Wait(signout,"signed-out");
+        assert(!signout.Snapshot()->active && !signout.Snapshot()->completed_game.valid());
+        assert(signout.Snapshot()->prepared.size()==prepared && !signout.Snapshot()->phone_test);
+    }
     // Phone sign-in is an account operation, never a download. Only a code
     // bound to this request and Microsoft's verification page can reach UI.
     std::filesystem::remove(root/"job-request.json");std::filesystem::remove(root/"job-result.json");

@@ -802,6 +802,7 @@ public:
     bool TakeXboxRefresh() { const bool requested = xbox_refresh_requested_; xbox_refresh_requested_ = false; return requested; }
     bool TakeXboxPhoneTest() { const bool requested=xbox_phone_requested_;xbox_phone_requested_=false;return requested; }
     bool TakeXboxPhoneCancel() { const bool requested=xbox_phone_cancel_;xbox_phone_cancel_=false;return requested; }
+    bool TakeXboxSignOut() {const bool requested=xbox_signout_requested_;xbox_signout_requested_=false;return requested;}
     void UpdateXboxPhoneSignIn(std::string message,std::string code,std::string url,bool busy);
     void UpdateXboxPackages(GameId game, std::vector<XboxPackageOption> choices);
     void UpdateXboxPartials(std::vector<GameId> games, bool busy);
@@ -900,6 +901,7 @@ private:
     std::string xbox_account_name_, xbox_account_message_;
     bool xbox_account_busy_ = false, xbox_refresh_requested_ = false;
     bool xbox_phone_requested_=false,xbox_phone_cancel_=false,xbox_phone_busy_=false;
+    bool xbox_signout_requested_=false;
     std::vector<XboxPackageOption> xbox_packages_;
     GameId xbox_discard_game_;
     bool xbox_cleanup_busy_ = false;

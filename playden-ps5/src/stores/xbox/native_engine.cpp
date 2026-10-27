@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "stores/xbox/native_engine.h"
 #include "steam/install_volumes.h"
+#include "platform/ps5/title_allow_list.h"
 #include "xodus_ps5_native.h"
 #include <chrono>
 #include <cstring>
@@ -12,11 +13,23 @@
 #include <sys/socket.h>
 extern "C" int getentropy(void *, size_t);
 extern "C" int xodus_ps5_entropy_status(void);
+namespace {
+std::mutex credential_lease_mutex;
+std::shared_ptr<void> credential_lease;
+struct CredentialLease {
+    std::shared_ptr<void> held=playden::ps5::HoldEffectiveUid();
+    CredentialLease(){std::lock_guard<std::mutex> lock(credential_lease_mutex);credential_lease=held;}
+    ~CredentialLease(){std::lock_guard<std::mutex> lock(credential_lease_mutex);credential_lease.reset();}
+};
+}
 extern "C" int xodus_ps5_commit_keyring(const std::uint8_t* bytes,std::size_t size) {
     if (!bytes || !size || size>8*1024*1024) return -1;
     try {
+        std::shared_ptr<void> lease;
+        {std::lock_guard<std::mutex> lock(credential_lease_mutex);lease=credential_lease;}
+        if(!lease)return -1;
         playden::Storage storage("/data/playden/xbox");
-        return storage.WriteAtomicPrivate("xodus-keyring.ron",playden::Bytes(bytes,bytes+size)).ok()?0:-1;
+        return storage.WriteAtomicPrivateWithLease("xodus-keyring.ron",playden::Bytes(bytes,bytes+size),lease).ok()?0:-1;
     } catch (...) {return -1;}
 }
 extern "C" int xodus_ps5_available_space(const char* path, std::uint64_t* bytes) {
@@ -36,6 +49,7 @@ std::string Message(const std::string& phase) {
     if (phase == "refreshing") return "Refreshing Xbox library…";
     if (phase == "checking-account") return "Checking Xbox access…";
     if (phase == "checking-sign-in") return "Preparing phone sign-in…";
+    if (phase == "signing-out") return "Clearing the saved account…";
     if (phase == "sign-in-code") return "Enter the code on your phone to sign in.";
     if (phase == "checking-game-access") return "Checking phone sign-in and PC game access…";
     if (phase == "resolving") return "Finding the PC download…";
@@ -50,6 +64,9 @@ NativeRunner NativeEngine(std::string root, std::string games, std::string trust
     return [root = std::move(root),games = std::move(games),trust = std::move(trust), log = std::move(log)](
         const std::function<void(const NativeProgress&)>& progress,
         const std::function<bool()>& cancelled) {
+        // The native job drains before this scope ends. Its Rust callbacks use
+        // this same live UID lease instead of locking the parent worker again.
+        CredentialLease credential_identity;
         // Load and verify the console entropy provider before Rust's infallible
         // hash-seed API is reached. Missing modules become a failed job.
         unsigned char entropy_probe;

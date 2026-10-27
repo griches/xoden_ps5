@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -106,6 +107,11 @@ class Storage {
   // bytes. Platforms without a supported permission primitive report failure.
   Result<void> WriteAtomicPrivate(const std::string& relative_path,
                                   const Bytes& bytes) const;
+  // Native worker callbacks may share their parent's live process-UID lease.
+  // The owner retains it until the callback drains; never reacquire its mutex
+  // on the child thread. A missing lease is refused before touching disk.
+  Result<void> WriteAtomicPrivateWithLease(const std::string& relative_path,
+                                         const Bytes& bytes,const std::shared_ptr<void>& lease) const;
 
   // Narrow journal operations: existing root/parents must be owned 0700 and
   // have no symlink components. Write creates an exclusive 0600 file, syncs it,
