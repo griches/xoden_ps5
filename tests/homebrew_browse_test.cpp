@@ -439,6 +439,12 @@ void gamepass_mode_excludes_steam_from_every_shelf_and_scope(const std::filesyst
     check(std::find(scopes.begin(),scopes.end(),"xbox") == scopes.end() &&
           std::find(scopes.begin(),scopes.end(),"imported") == scopes.end(),
           "single-store app has no separate Xbox or imported category");
+    state.library = {}; state.jobs.clear(); state.installations.clear(); state.external_games.clear();
+    state.games.back().playtime_minutes = 0;
+    const auto fresh = shelves(state);
+    check(fresh.size() == 1 && fresh.front().title == "Browse Game Pass" &&
+          fresh.front().game_ids == std::vector<GameId>{xbox.id},
+          "Home offers the Game Pass library when there is no play or install history");
     state.gamepass_only = false; state.library.scope = "all";
     check(filtered_games(state).size() > 1, "regular Playden still supports the combined catalog");
 }

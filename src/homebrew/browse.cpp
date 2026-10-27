@@ -274,6 +274,16 @@ std::vector<Shelf> shelves(const State& state)
                 shelf.game_ids.push_back(game.id);
         append_shelf(result, std::move(shelf));
     }
+    // With no Game Pass activity yet, Home still offers actual library games.
+    if (state.gamepass_only && result.empty()) {
+        Shelf browse{"browse", "Browse Game Pass", {}};
+        for (const Game& game : state.games) {
+            if (in_app_catalog(state,game.id) && !state.library.hidden.contains(game.id))
+                browse.game_ids.push_back(game.id);
+            if (browse.game_ids.size() == kShelfLimit) break;
+        }
+        append_shelf(result,std::move(browse));
+    }
     return result;
 }
 
