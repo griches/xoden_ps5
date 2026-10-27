@@ -277,6 +277,23 @@ void UnownedTreeOperations(DirectoryBackend backend) {
   CHECK(root->RemoveRegularFile("dxvk.conf") && !fs::exists(f.root / "dxvk.conf"));
 }
 
+void BoundedAtomicCopy(DirectoryBackend backend) {
+  Fixture f;
+  auto source=ManagedDirectory::Open(f.root,DirectoryPolicy::kApprovedTree,backend);
+  CHECK(source);
+  const auto payload=std::string(70000,'p');
+  {std::ofstream out(f.root/"source");out<<payload;}
+  {std::ofstream out(f.root/"target");out<<"original";}
+  CHECK(!source->CopyRegularFileTo("source",*source,"target",32));
+  {std::ifstream in(f.root/"target");std::string value;in>>value;CHECK(value=="original");}
+  CHECK(source->CopyRegularFileTo("source",*source,"target",100000));
+  CHECK(fs::file_size(f.root/"target")==payload.size());
+  fs::create_symlink(f.root/"target",f.root/"link");
+  CHECK(!source->CopyRegularFileTo("link",*source,"target",100000));
+  CHECK(!source->CopyRegularFileTo("source",*source,"link",100000));
+  CHECK(fs::is_symlink(f.root/"link") && fs::file_size(f.root/"target")==payload.size());
+}
+
 int main() {
 #if defined(__PROSPERO__) || (defined(PLAYDEN_PLATFORM_PS5) && PLAYDEN_PLATFORM_PS5)
   CHECK(ManagedDirectory::DefaultBackend() == DirectoryBackend::kAbsolutePath);
@@ -286,6 +303,7 @@ int main() {
   const std::vector<DirectoryBackend> backends{DirectoryBackend::kDescriptorRelative, DirectoryBackend::kAbsolutePath};
 #endif
   for (auto backend : backends) {
+    BoundedAtomicCopy(backend);
     ReadWriteRenameAndRemove(backend);
     RejectTraversalLinksAndSpecials(backend);
     RejectPolicyAndIdentityDrift(backend, false);

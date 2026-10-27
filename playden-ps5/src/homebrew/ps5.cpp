@@ -495,6 +495,25 @@ int main() {
             config.writable_folders = {"/data/homebrew", "/data/playden", "/data/playden-games", "/data/playden/user",
                                        "/data/playden/logs"};
             config.registry_transport = playden::ps5::ShadowMountPost;
+            config.sync_title_artwork = [](const std::string& title) {
+                if (!playden::ps5::IsPlaydenGameTitle(title)) return false;
+                using playden::platform::ManagedDirectory;
+                using playden::platform::DirectoryPolicy;
+                auto source=ManagedDirectory::Open("/data/homebrew/"+title+"/sce_sys",DirectoryPolicy::kApprovedTree);
+                if (!source) return false;
+                bool ok=true;
+                for (const auto& path : {"/user/appmeta/"+title,"/user/app/"+title+"/sce_sys","/user/app/"+title}) {
+                    auto target=ManagedDirectory::Open(path,DirectoryPolicy::kApprovedTree);
+                    if (!target) {if (errno!=ENOENT) ok=false;continue;}
+                    for (const auto* name : {"icon0.png","pic0.dds"}) {
+                        if (path=="/user/app/"+title && std::string(name)!="icon0.png") continue;
+                        struct stat info{};
+                        if (!source->InspectChild(name,&info)) {if (errno!=ENOENT) ok=false;continue;}
+                        ok=source->CopyRegularFileTo(name,*target,name,4*1024*1024) && ok;
+                    }
+                }
+                return ok;
+            };
             config.admit_kit = [](std::string* reason) -> std::optional<playden::homebrew::RuntimeKit> {
                 const auto firmware = playden::ps5::ConsoleFirmwareVersion();
                 playden::app::AppendLogLine(log_root, "runtime.log", "console_firmware=" + firmware.value_or("unknown") + " " +
@@ -849,11 +868,21 @@ int main() {
         std::vector<playden::GameId> dev_prepares;  // imported games the request file asked to prepare
         std::uint64_t dev_prepares_until = 0;
         std::uint64_t last_render_us = 0;
+        std::uint64_t reconnect_pad_at = hui::sys::monotonic_us() + 2'000'000;
         int slow_frames = 0;
         for (;;) {
             const auto now = hui::sys::monotonic_us();
             const auto count = pad.read(samples);
             const auto input = tracker.update(std::span<const hui::PadSample>(samples.data(), count), now);
+            // A detached virtual pad can leave scePadRead holding its old
+            // device handle. Reopen while disconnected so a physical pad (or
+            // a later test pad) can take over without restarting the app.
+            if (input.connected) reconnect_pad_at = now + 2'000'000;
+            else if (now >= reconnect_pad_at) {
+                pad.close();
+                pad.open();
+                reconnect_pad_at = now + 2'000'000;
+            }
             if (input.connected != was_connected) {
                 simulation.SetControllerConnected(input.connected);
                 was_connected = input.connected;

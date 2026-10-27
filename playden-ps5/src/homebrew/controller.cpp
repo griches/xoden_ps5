@@ -79,13 +79,13 @@ void Controller::Start(app::PersistenceService* persistence_service) {
     library_ = std::make_unique<app::LibraryController>(model_, *steam);
   }
   service_ = stores_.steam_account();
-  phase_ = Phase::Restore;
-  Update(AuthState::Restoring,{},true);
+  phase_ = model_.state().gamepass_only ? Phase::Idle : Phase::Restore;
+  Update(model_.state().gamepass_only ? AuthState::SignedOut : AuthState::Restoring,{},true);
   if(persistence_service) {
     persistence_=std::make_unique<app::PersistenceController>(model_,*persistence_service);
     persistence_->SetLog(persistence_log_);
   }
-  request_ = service_->RestoreSession();
+  if (!model_.state().gamepass_only) request_ = service_->RestoreSession();
   // Every other store's library loads now, next to Steam's.
   if (library_)
     for (auto* source : stores_.libraries())

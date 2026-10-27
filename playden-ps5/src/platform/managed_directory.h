@@ -76,6 +76,10 @@ class ManagedDirectory {
   // no-replace primitive against concurrent writers.
   bool RenameChild(const std::string& from, const ManagedDirectory& destination,
                    const std::string& to, bool replace_existing = true) const;
+  // Bounded, no-follow copy through an owned temporary file and atomic rename.
+  // A readable source may belong to another user; replacements must be owned.
+  bool CopyRegularFileTo(const std::string& from, const ManagedDirectory& destination,
+                         const std::string& to, std::size_t limit, mode_t mode = 0644) const;
   bool RemoveRegularFile(const std::string& name) const;
   bool RemoveEmptyDirectory(const std::string& name) const;
   bool Sync() const;

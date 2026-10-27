@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <string>
 #include <utility>
+#include <array>
 
 #if defined(__PROSPERO__) || (defined(PLAYDEN_PLATFORM_PS5) && PLAYDEN_PLATFORM_PS5)
 #define PLAYDEN_MANAGED_NATIVE 1
@@ -362,6 +363,46 @@ std::optional<bool> RecordsOwnership(const fs::path& directory) {
 }
 
 void SetOwnershipProbeForTesting(std::optional<bool> (*probe)(const fs::path&)) { g_ownership_probe = probe; }
+
+bool ManagedDirectory::CopyRegularFileTo(const std::string& from, const ManagedDirectory& destination,
+    const std::string& to, std::size_t limit, mode_t mode) const {
+  if (!ValidName(from) || !destination.ValidName(to) || !Validate() || !destination.Validate()) return false;
+  const int in = OpenRegularFile(from,false);
+  if (in < 0) return false;
+  struct stat before{},after{};
+  if (::fstat(in,&before) || before.st_size < 0 || static_cast<std::uint64_t>(before.st_size)>limit) {
+    ::close(in);return Refuse(EFBIG);
+  }
+  const std::string temp=".copy-"+to+".new";
+  if (!destination.RemoveRegularFile(temp) && errno!=ENOENT) {::close(in);return false;}
+  const int out=destination.CreateExclusiveFile(temp,mode);
+  if (out<0) {::close(in);return false;}
+  std::array<char,16*1024> buffer{};
+  std::size_t total=0;bool ok=true;
+  for (;;) {
+    const auto n=::read(in,buffer.data(),buffer.size());
+    if (n<0 && errno==EINTR) continue;
+    if (n<0 || (n>0 && static_cast<std::size_t>(n)>limit-total)) {ok=false;break;}
+    if (!n) break;
+    std::size_t done=0;
+    while (done<static_cast<std::size_t>(n)) {
+      const auto wrote=::write(out,buffer.data()+done,static_cast<std::size_t>(n)-done);
+      if (wrote<0 && errno==EINTR) continue;
+      if (wrote<=0) {ok=false;break;}
+      done+=static_cast<std::size_t>(wrote);
+    }
+    if (!ok) break;
+    total+=static_cast<std::size_t>(n);
+  }
+  if (::fstat(in,&after) || !SameIdentity(before,after) || before.st_size!=after.st_size ||
+      before.st_mtime!=after.st_mtime || total!=static_cast<std::size_t>(before.st_size) ||
+      !Validate() || !destination.Validate() || ::fsync(out)!=0) ok=false;
+  if (::close(in)) ok=false;
+  if (::close(out)) ok=false;
+  if (ok) ok=destination.RenameChild(temp,destination,to) && destination.Sync();
+  if (!ok) destination.RemoveRegularFile(temp);
+  return ok;
+}
 
 bool ManagedDirectory::RemoveRegularFile(const std::string& name) const { return Remove(name, false); }
 bool ManagedDirectory::RemoveEmptyDirectory(const std::string& name) const { return Remove(name, true); }

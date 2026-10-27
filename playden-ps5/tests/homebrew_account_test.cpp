@@ -585,6 +585,26 @@ void SlowLicenseCheckShowsAfterAFewSeconds() {
   }
   std::filesystem::remove_all(root);
 }
+void GamePassStartupDoesNotRestoreSteam() {
+  Repository repo;repo.value=Session();CacheFixture cache;
+  Simulation model({}, {},ModelMode::Live);model.SetGamePassOnly(true);
+  Backend backend;LibraryBackendFixture library_backend;
+  LibraryService library_service(library_backend,repo,&cache);
+  stores::Registry registry;
+  registry.Add(std::make_unique<stores::SteamAccount>(backend,repo));
+  registry.Add(std::make_unique<stores::SteamLibrarySource>(library_service));
+  auto xbox=std::make_unique<test::FakeLibrarySource>(Store::kXbox);
+  GameSummary game;game.id=GameId::Xbox("9N5PKH0KW2L1");game.title="Xbox fixture";
+  xbox->games={game};registry.Add(std::move(xbox));
+  Controller controller(model,registry);
+  Wait(controller,[&]{return model.state().games.size()==1 && !model.state().library_loading;});
+  assert(model.state().navigation.route==Route::Home);
+  assert(model.state().games.front().id==game.id);
+  assert(backend.restores==0 && backend.calls==0 && library_backend.calls==0);
+  controller.Shutdown();
+  assert(repo.clears==0 && repo.value && repo.value->steam_id==Session().steam_id);
+}
+
 // Without a Steam session, another store's games open Playden on Home; with none, it waits on Startup.
 void NoSteamSessionWithOtherGamesOpensHome() {
   for (const bool other : {true, false}) {
@@ -789,4 +809,4 @@ void StaySignedInOffKeepsTheTokenInMemory() {
   }
   std::filesystem::remove_all(root);
 }
-int main() { StaySignedInOffKeepsTheTokenInMemory(); TitleNamesCarryTheirStore(); NoSteamSessionWithOtherGamesOpensHome(); FailedRestoreWithOtherGamesOpensHome(); OtherRestoreFailuresWithOtherGamesOpenHome(); SteamSignOutKeepsOtherGames(); PasswordSignInWithGuardCode(); PasswordFailuresAndCancel(); SlowLicenseCheckShowsAfterAFewSeconds(); CanceledStorageRetryKeepsSavedSessionIntent(); RevokedSessionCleanupRetriesAfterStorageRecovery(); StorageFailureKeepsVisibleAccount(); StorageFailureRetriesSavedSession(); ChallengeAndCancel(); AuthenticationRestoreAndSignOut(); FailedClearDoesNotSwitch(); SignInAgainKeepsTheAccount(); ExitHonorsClearWithoutStartingNewQr(); StorageFailureAndRevocation(); ConnectedLibraryAndOfflineRestart(); LicenseChangesRefreshTheLibrary(); OfflineRefreshFromTheLibraryReconnects(); ShutdownClearsLibraryBeforeSession(); RepeatedClearPreservesFirstIntent(); }
+int main() { GamePassStartupDoesNotRestoreSteam(); StaySignedInOffKeepsTheTokenInMemory(); TitleNamesCarryTheirStore(); NoSteamSessionWithOtherGamesOpensHome(); FailedRestoreWithOtherGamesOpensHome(); OtherRestoreFailuresWithOtherGamesOpenHome(); SteamSignOutKeepsOtherGames(); PasswordSignInWithGuardCode(); PasswordFailuresAndCancel(); SlowLicenseCheckShowsAfterAFewSeconds(); CanceledStorageRetryKeepsSavedSessionIntent(); RevokedSessionCleanupRetriesAfterStorageRecovery(); StorageFailureKeepsVisibleAccount(); StorageFailureRetriesSavedSession(); ChallengeAndCancel(); AuthenticationRestoreAndSignOut(); FailedClearDoesNotSwitch(); SignInAgainKeepsTheAccount(); ExitHonorsClearWithoutStartingNewQr(); StorageFailureAndRevocation(); ConnectedLibraryAndOfflineRestart(); LicenseChangesRefreshTheLibrary(); OfflineRefreshFromTheLibraryReconnects(); ShutdownClearsLibraryBeforeSession(); RepeatedClearPreservesFirstIntent(); }

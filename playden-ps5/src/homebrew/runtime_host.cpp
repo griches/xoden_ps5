@@ -2862,6 +2862,16 @@ std::string RuntimeHost::RunPrepare(Composition& c, const RuntimePrepareRequest&
         if (refreshed.state != rt::PackageActionState::kComplete) return refreshed.message;
         changed = true;
       }
+      // Registered titles keep artwork copies outside their source folder.
+      if (config_.sync_title_artwork) {
+        const auto native=c.coordinator->QueryOwnership(*existing);
+        if (native.available && native.installed && !native.collision && native.owned_manifest_matches) {
+          const auto sync=[&] {return config_.sync_title_artwork(existing->title_id);};
+          const bool synced=config_.as_root ? config_.as_root(sync) : sync();
+          Log("title artwork cache title="+existing->title_id+" synced="+std::to_string(synced));
+          if (!synced) return "The game setup was updated, but its PS5 Home artwork could not be refreshed. Try Update again.";
+        }
+      }
       // A game whose folder moved in 0.6 is published again for the new folder first, and an
       // owned publication again as unowned. A moved game whose publication can't be redone
       // (settings older than its title, a recipe Playden no longer has) stays as it is: the way
