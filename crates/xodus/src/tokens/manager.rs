@@ -14,6 +14,7 @@ mod keys {
     pub const USER_INFO: &str = "user-DA";
     pub const USER_SESSION: &str = "user-session";
     pub const PHONE_CANDIDATE: &str = "phone-sign-in-candidate";
+    pub const PHONE_SESSION: &str = "phone-user-session";
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -87,6 +88,8 @@ pub struct TokenManager {
     persistent: Arc<dyn TokenBackend>,
     ephemeral: Arc<dyn ExpiringTokenBackend>,
     device_renewal: Arc<tokio::sync::Mutex<()>>,
+    phone_renewal: Arc<tokio::sync::Mutex<()>>,
+    account_write: Arc<std::sync::Mutex<()>>,
     isolated: bool,
     #[cfg(unix)]
     renewal_root: Option<std::path::PathBuf>,
@@ -101,6 +104,8 @@ impl TokenManager {
             persistent,
             ephemeral,
             device_renewal: Arc::new(tokio::sync::Mutex::new(())),
+            phone_renewal: Arc::new(tokio::sync::Mutex::new(())),
+            account_write: Arc::new(std::sync::Mutex::new(())),
             isolated: false,
             #[cfg(unix)]
             renewal_root: None,
@@ -142,6 +147,8 @@ impl TokenManager {
     }
 
     pub fn remove_persistent(&self) -> Result<(), TokenStoreError> {
+        let _guard = self.account_write.lock().map_err(|_| TokenStoreError::WriteVerification)?;
+        self.persistent.remove(keys::PHONE_SESSION)?;
         self.remove_phone_candidate()?;
         self.persistent.remove(keys::DEVICE_TOKENS)?;
         self.persistent.remove(keys::USER_TOKENS)?;
@@ -168,6 +175,60 @@ impl TokenManager {
 
     pub fn remove_phone_candidate(&self) -> Result<(), TokenStoreError> {
         self.persistent.remove(keys::PHONE_CANDIDATE)
+    }
+
+    pub fn active_phone(&self) -> Result<Option<crate::api::live::device_code::Credentials>, TokenStoreError> {
+        self.persistent.get(keys::PHONE_SESSION)?.map(|bytes|
+            crate::api::live::device_code::Credentials::from_private_candidate_record(&bytes)
+                .map_err(|_| TokenStoreError::WriteVerification)).transpose()
+    }
+
+    /// An opaque account namespace, never a fabricated Store PUID or email.
+    pub fn active_account(&self) -> Result<String, TokenStoreError> {
+        if let Some(phone) = self.active_phone()? {
+            return Ok(format!("phone:{}", phone.user_id().ok_or(TokenStoreError::NotFound)?));
+        }
+        Ok(self.get_user()?.username)
+    }
+
+    /// Explicit library refresh may activate a verified phone login only after
+    /// sign-out. It must never silently replace a different saved account.
+    pub fn activate_phone_candidate(&self) -> Result<(), TokenStoreError> {
+        let _guard = self.account_write.lock().map_err(|_| TokenStoreError::WriteVerification)?;
+        if self.active_phone()?.is_some() { return Ok(()); }
+        match self.get_user() {
+            Err(TokenStoreError::NotFound) => {},
+            Err(error) => return Err(error),
+            Ok(_) => return Err(TokenStoreError::WriteVerification),
+        }
+        let candidate = self.phone_candidate()?.ok_or(TokenStoreError::NotFound)?;
+        Self::write_verified(&*self.persistent, keys::PHONE_SESSION, &candidate.private_candidate_record().map_err(|_| TokenStoreError::WriteVerification)?)
+    }
+
+    /// Refresh one active phone session at a time, preserving its account and
+    /// refusing to resurrect a session removed during an outstanding request.
+    pub async fn active_phone_ticket(&self, client: &reqwest::Client, scope: crate::api::live::device_code::Scope)
+        -> Result<Option<crate::api::live::device_code::Credentials>, TokenStoreError> {
+        use crate::api::live::device_code::{DeviceCodeClient, Scope};
+        let _renewal = self.phone_renewal.lock().await;
+        let Some(previous) = self.active_phone()? else { return Ok(None); };
+        let login = DeviceCodeClient::new(client.clone());
+        let fresh = login.refresh(&previous, Some(scope)).await.map_err(|_| TokenStoreError::DeviceAuthentication)?;
+        let saved = if matches!(scope, Scope::Xbox) { None } else {
+            Some(login.refresh(&fresh, Some(Scope::Xbox)).await.map_err(|_| TokenStoreError::DeviceAuthentication)?)
+        };
+        self.save_phone_refresh(&previous,saved.as_ref().unwrap_or(&fresh))?;
+        Ok(Some(fresh))
+    }
+
+    pub(crate) fn save_phone_refresh(&self, previous: &crate::api::live::device_code::Credentials,
+        fresh: &crate::api::live::device_code::Credentials) -> Result<(),TokenStoreError> {
+        if previous.user_id()!=fresh.user_id() { return Err(TokenStoreError::WriteVerification); }
+        let before=previous.private_candidate_record().map_err(|_| TokenStoreError::WriteVerification)?;
+        let bytes=fresh.private_candidate_record().map_err(|_| TokenStoreError::WriteVerification)?;
+        let _guard = self.account_write.lock().map_err(|_| TokenStoreError::WriteVerification)?;
+        if self.persistent.get(keys::PHONE_SESSION)?.as_deref() != Some(before.as_slice()) { return Err(TokenStoreError::NotFound); }
+        Self::write_verified(&*self.persistent, keys::PHONE_SESSION, &bytes)
     }
 
     pub fn get_device_license(&self) -> Result<Device, TokenStoreError> {

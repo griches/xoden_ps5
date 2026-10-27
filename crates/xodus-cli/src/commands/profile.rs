@@ -49,6 +49,19 @@ fn image_data(bytes: &[u8]) -> Option<String> {
 pub(super) async fn xbox_session(tokens: &TokenManager) -> Result<(reqwest::Client, String, String), &'static str> {
     let client = crate::transport::builder()?.redirect(reqwest::redirect::Policy::none())
         .timeout(super::session::REQUEST_TIMEOUT).user_agent("xodus-nexus-profile/1").build().map_err(|_| "http-client")?;
+    if let Some(phone) = tokens.active_phone_ticket(&client, xodus::api::live::device_code::Scope::Xbox).await.map_err(|_| "phone-session-refresh")? {
+        let account = tokens.active_account().map_err(|_| "account-changed")?;
+        let mut user = None;
+        for prefix in ["t=", "d="] {
+            if let Ok(value) = xodus::api::xbox::authenticate_xbox_user(&client, format!("{prefix}{}",phone.access_token())).await { user=Some(value);break; }
+        }
+        let user = user.ok_or("phone-xbox-user")?;
+        let xsts = xodus::api::xbox::request_xsts_token(&client,user.token,"http://xboxlive.com").await.map_err(|_| "phone-xsts")?;
+        let uhs=xsts.user_hash().ok_or("xsts-claim")?;
+        let authorization=format!("XBL3.0 x={uhs};{}",xsts.token);
+        if tokens.active_account().map_err(|_| "account-changed")? != account { return Err("account-changed"); }
+        return Ok((client,authorization,account));
+    }
     let (account, device, user) = super::session::prepare(tokens, &client).await.map_err(|stage| {
         super::session::diagnostic(stage); stage
     })?;
@@ -85,12 +98,12 @@ pub(super) async fn profile(tokens: &TokenManager) -> Result<Value, &'static str
             Err(_) => None,
         }
     } else { None };
-    if tokens.get_user().map_err(|_| "account-changed")?.username != account { return Err("account-changed"); }
+    if tokens.active_account().map_err(|_| "account-changed")? != account { return Err("account-changed"); }
     Ok(json!({ "schema": 1, "account": account, "gamertag": gamertag, "gamerpicDataUrl": image }))
 }
 
 pub async fn run(tokens: &TokenManager, json_output: bool) -> ExitCode {
-    let account = tokens.get_user().ok().map(|user|user.username);
+    let account = tokens.active_account().ok();
     let membership = async {
         match account.as_deref() {
             Some(account) => super::subscription::lookup(tokens, account).await,

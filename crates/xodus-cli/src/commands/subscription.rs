@@ -101,7 +101,7 @@ pub(super) async fn store_session(
     tokens: &TokenManager,
     account: &str,
 ) -> Result<(reqwest::Client, String), &'static str> {
-    if tokens.get_user().map_err(|_| "stored-account")?.username != account {
+    if tokens.active_account().map_err(|_| "stored-account")? != account {
         return Err("account-changed");
     }
     let client = crate::transport::builder()?
@@ -110,6 +110,10 @@ pub(super) async fn store_session(
         .user_agent("Xodus-Nexus-membership/0.2.3")
         .build()
         .map_err(|_| "http-client")?;
+    if let Some(phone) = tokens.active_phone_ticket(&client, xodus::api::live::device_code::Scope::Store).await.map_err(|_| "phone-session-refresh")? {
+        if tokens.active_account().map_err(|_| "account-changed")? != account { return Err("account-changed"); }
+        return Ok((client, format!("t={}", phone.access_token())));
+    }
     let (selected, device, user) = super::session::prepare(tokens, &client).await.map_err(|stage| {
         super::session::diagnostic(stage); stage
     })?;
@@ -133,7 +137,7 @@ pub(super) async fn store_session(
     .await
     .map_err(|error| super::session::classify(&error))
     }).await?;
-    if tokens.get_user().map_err(|_| "account-check")?.username != account { return Err("account-changed"); }
+    if tokens.active_account().map_err(|_| "account-check")? != account { return Err("account-changed"); }
     if let Some(stage) = super::session::rejection(&outcome) { return Err(stage); }
     let token: Token = match outcome {
         ExchangeUserTokenOutcome::Issued(
@@ -187,7 +191,7 @@ pub(super) async fn query(tokens: &TokenManager, account: &str) -> Result<(Value
         }
         bytes.extend_from_slice(&chunk);
     }
-    if tokens.get_user().map_err(|_| "account-check")?.username != account {
+    if tokens.active_account().map_err(|_| "account-check")? != account {
         return Err("account-changed");
     }
     let body: Value = serde_json::from_slice(&bytes).map_err(|_| "membership-json")?;
