@@ -147,5 +147,22 @@ int main() {
         assert(!std::filesystem::exists(partial) && !std::filesystem::exists(quarantine));
         assert(native.Snapshot()->partials.empty());
     }
+    // Installed content is admitted only from its prepared manifest, then
+    // removed without touching another game's content or any saves.
+    const auto installed = root/"games/xbox-9n5pkh0kw2l1";
+    const auto other = root/"games/xbox-9mxnd4pqlk3w";
+    std::filesystem::create_directories(installed); std::filesystem::create_directories(other);
+    Storage installed_store(installed.string()), other_store(other.string());
+    Put(installed_store,"Game.exe","content"); Put(other_store,"Other.exe","keep");
+    Put(store,"prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9N5PKH0KW2L1\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\"xbox-9n5pkh0kw2l1\",\"executable\":\"Game.exe\"},{\"productId\":\"9MXND4PQLK3W\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\"xbox-9mxnd4pqlk3w\",\"executable\":\"Other.exe\"}]}");
+    {
+        stores::xbox::Jobs uninstall(config); Wait(uninstall,"idle");
+        assert(!uninstall.Uninstall(GameId::Xbox("9NP1P1WFS0LB")));
+        assert(uninstall.Uninstall(GameId::Xbox("9N5PKH0KW2L1"))); Wait(uninstall,"cleaned");
+        assert(!std::filesystem::exists(installed));
+        assert(std::filesystem::exists(other/"Other.exe"));
+        assert(uninstall.Snapshot()->prepared.size() == 1 && uninstall.Snapshot()->prepared.front().game == GameId::Xbox("9MXND4PQLK3W"));
+    }
+    { stores::xbox::Jobs reload(config); Wait(reload,"idle"); assert(reload.Snapshot()->prepared.size() == 1); }
     std::filesystem::remove_all(root);
 }

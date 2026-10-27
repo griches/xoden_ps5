@@ -26,7 +26,8 @@ struct JobSnapshot {
     std::string phase = "loading", message, request_id;
     std::string worker_install_id, worker_title;
     bool native = false, active = false, cancelling = false;
-    GameId active_game;
+    GameId active_game, removing_game;
+    std::string removal_error;
     std::uint64_t done_bytes = 0, total_bytes = 0, bytes_per_second = 0;
     std::vector<PreparedGame> prepared;
     std::vector<GameId> partials;
@@ -46,16 +47,19 @@ public:
     ~Jobs();
     bool Discard(GameId game);
     bool Cancel(GameId game);
+    // Caller must first finish removing the stopped PS5 runtime title.
+    bool Uninstall(GameId game);
     bool Install(GameId game, std::string account_key, std::string market);
     std::shared_ptr<const JobSnapshot> Snapshot() const;
     void Shutdown();
 private:
-    struct Request { GameId game; std::string account, market; bool discard = false; };
+    struct Request { GameId game; std::string account, market; bool discard = false, uninstall = false; };
     void Run();
     void Load();
     void Execute(const Request& request);
     void ExecuteDiscard(GameId game);
     void ExecuteNative(GameId game);
+    void ExecuteUninstall(GameId game);
     void Publish(std::string phase, std::string message = {});
     JobConfig config_;
     Storage storage_;

@@ -1424,7 +1424,7 @@ void Controller::BeginUninstall(GameId id, bool delete_saves) {
   // one leaves the library instead, once its PS5 title is gone (its files stay, its bottle is kept).
   const auto* location = LocationOf(id);
   const bool external = location && !location->managed();
-  if (external && !(id.store == Store::kLocal && local_)) return;
+  if (external && !(id.store == Store::kLocal && local_) && !(id.store == Store::kXbox && xbox_jobs_)) return;
   if (external) delete_saves = false;
   if (!runtime_ && external) { local_->Remove(id.value); return; }
   // Without the runtime there is no PS5 title to remove: the download goes as before.
@@ -1483,6 +1483,13 @@ void Controller::TickUninstalls() {
   if (snapshot.status == RuntimeHostStatus::kStarting) return;
   // In the order they were asked for: the first that can go takes the one title removal at a time.
   for (const auto id : ids) {
+    if (id.store == Store::kXbox && xbox_jobs_) {
+      const auto removal = xbox_jobs_->Snapshot();
+      if (removal->removing_game == id) {
+        if (!removal->removal_error.empty()) { uninstalls_.Abandon(id); StopUninstall(id,removal->removal_error); }
+        continue;
+      }
+    }
     if (IsNumber(snapshot, snapshot.preparing_app, id)) continue;  // its title is removed once the preparation ends
     UninstallFacts facts;
     // Unknown records count as a title: the removal reads them again, and the game's files stay
@@ -1517,7 +1524,9 @@ void Controller::TickUninstalls() {
       case UninstallAction::Kind::kRemoveDownload:
         if (location && !location->managed()) {
           // Its outcome is watched: a refusal stops the uninstall (TickImports).
-          if (id.store == Store::kLocal && local_) {
+          if (id.store == Store::kXbox && xbox_jobs_) {
+            if (!xbox_jobs_->Uninstall(id)) { uninstalls_.Abandon(id); StopUninstall(id,"Xbox files could not be removed right now. Try uninstalling again."); }
+          } else if (id.store == Store::kLocal && local_) {
             if (const auto number = local_->Remove(id.value)) {
               import_requests_[number] = {ImportRequestKind::Remove, id};
             } else {
@@ -1799,7 +1808,7 @@ void Controller::TickXboxJobs() {
     if (game.account_key != account) continue;
     xbox_locations_.push_back({game.game,game.root,"internal",true,installs::InstalledLocation::Ownership::kExternal,{}});
     xbox_programs_[game.game] = game.executable;
-    if (runtime_) {
+    if (runtime_ && !uninstalls_.Step(game.game)) {
       const auto runtime = runtime_->Shared();
       const bool known = std::any_of(runtime->installs.begin(),runtime->installs.end(),[&](const auto& entry) { return entry.game == game.game; });
       if (!known && std::find(auto_prepare_.begin(),auto_prepare_.end(),game.game) == auto_prepare_.end()) auto_prepare_.push_back(game.game);
@@ -1814,6 +1823,7 @@ void Controller::TickInstalls() {
   }
   for (const auto& request : model_.TakeInstallRequests()) {
     if (request.game_id.store == Store::kXbox) {
+      if (request.kind == InstallRequestKind::Uninstall) { BeginUninstall(request.game_id,request.delete_saves); continue; }
       if (request.kind == InstallRequestKind::Cancel && xbox_jobs_) {
         if (!xbox_jobs_->Cancel(request.game_id) && (!model_.CanHandoffXbox() || !xbox_jobs_->Discard(request.game_id)))
           model_.ShowLayoutNotice("This partial download cannot be removed right now.");

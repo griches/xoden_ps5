@@ -15,6 +15,26 @@ using steam::json::Value;
 std::string Text(const Value& value, const char* key) {
     const auto* field = value.Find(key); return field && field->is_string() ? field->text() : std::string{};
 }
+std::string JsonQuote(const std::string& text) {
+    std::string out = "\"";
+    const char* hex = "0123456789abcdef";
+    for (unsigned char c : text) {
+        if (c == '"' || c == '\\') { out += '\\'; out += c; }
+        else if (c < 32) { out += "\\u00"; out += hex[c >> 4]; out += hex[c & 15]; }
+        else out += c;
+    }
+    return out + "\"";
+}
+std::string Encode(const Value& v) {
+    if (v.is_string()) return JsonQuote(v.text());
+    if (v.is_number()) return v.text();
+    if (v.is_bool()) return v.boolean() ? "true" : "false";
+    if (v.is_null()) return "null";
+    std::string out = v.is_array() ? "[" : "{"; bool first = true;
+    if (v.is_array()) for (const auto& value : v.array()) { if (!first) out += ','; first = false; out += Encode(value); }
+    else for (const auto& [key,value] : v.object()) { if (!first) out += ','; first = false; out += JsonQuote(key) + ':' + Encode(value); }
+    return out + (v.is_array() ? "]" : "}");
+}
 bool Hash(const std::string& value) {
     return value.size() == 64 && std::all_of(value.begin(),value.end(),[](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); });
 }
@@ -119,6 +139,7 @@ std::vector<GameId> PartialGames(Storage& storage, const std::string& root) {
         auto child = parent->OpenChild(name,platform::DirectoryPolicy::kApprovedTree);
         struct stat marker{};
         if (child && (deleting || (child->InspectChild(".nexus-streaming-v1.jsonl", &marker) && S_ISREG(marker.st_mode)) ||
+                      (child->InspectChild(".playden-xbox-uninstall", &marker) && S_ISREG(marker.st_mode)) ||
                       (child->InspectChild(".xodus-streaming-tmp.msixvc", &marker) && S_ISREG(marker.st_mode)))) games.push_back(*game);
     }
     closedir(listing);
@@ -166,6 +187,48 @@ bool Jobs::Discard(GameId game) {
     if (stopping_ || busy_ || state_->phase == "loading" || state_->phase == "handoff" ||
         std::find(state_->partials.begin(),state_->partials.end(),game) == state_->partials.end()) return false;
     busy_ = true; pending_ = Request{game,{}, {},true}; wake_.notify_one(); return true;
+}
+bool Jobs::Uninstall(GameId game) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopping_ || busy_ || state_->phase == "loading" || state_->phase == "handoff" ||
+        std::none_of(state_->prepared.begin(),state_->prepared.end(),[&](const auto& p) { return p.game == game; })) return false;
+    auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
+    next->removing_game = game; next->removal_error.clear(); next->phase = "uninstalling";
+    state_ = std::move(next); busy_ = true; pending_ = Request{game,{},{},false,true}; wake_.notify_one(); return true;
+}
+void Jobs::ExecuteUninstall(GameId game) {
+    auto identity = config_.hold_effective_uid ? config_.hold_effective_uid() : std::shared_ptr<void>{};
+    const auto fail = [this,game](const std::string& message) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
+        next->removing_game = game; next->removal_error = message; next->phase = "failed"; next->message = message;
+        state_ = std::move(next);
+    };
+    const auto manifest = Read(storage_,"prepared-games.json",2*1024*1024);
+    std::set<GameId> prepared;
+    if (!manifest || !PreparedManifest(storage_,&prepared) || !prepared.count(game)) { fail("Xbox install metadata could not be verified. Files were kept."); return; }
+    std::string updated = "{\"schema\":1,\"games\":["; bool first = true;
+    for (const auto& row : manifest->Find("games")->array()) {
+        if (!Hash(Text(row,"accountKey")) || !Program(Text(row,"executable"))) { fail("Xbox install metadata is invalid. Files were kept."); return; }
+        if (Text(row,"productId") == game.value) continue;
+        if (!first) updated += ','; first = false; updated += Encode(row);
+    }
+    updated += "]}";
+    const auto root = config_.games_root + "/" + ToInstallId(game);
+    auto directory = platform::ManagedDirectory::Open(root,platform::DirectoryPolicy::kApprovedTree);
+    if (!directory) { fail("The Xbox game folder could not be verified. Files were kept."); return; }
+    // Durable intent precedes manifest removal. A crash leaves a recognisable
+    // partial for managed cleanup, even when the download journal is absent.
+    Storage content(root);
+    const std::string intent = "Xbox uninstall requested after title removal\n";
+    if (!content.WriteAtomicPrivate(".playden-xbox-uninstall",Bytes(intent.begin(),intent.end())).ok() ||
+        !storage_.WriteAtomicPrivate("prepared-games.json",Bytes(updated.begin(),updated.end())).ok()) {
+        fail("The Xbox uninstall could not be saved. Files were kept."); return;
+    }
+    ExecuteDiscard(game);
+    const auto outcome = Snapshot();
+    if (outcome->phase != "cleaned") { Load(); fail(outcome->message); return; }
+    Load(); Publish("cleaned","Xbox game uninstalled and downloaded files deleted.");
 }
 void Jobs::ExecuteDiscard(GameId game) {
     auto identity = config_.hold_effective_uid ? config_.hold_effective_uid() : std::shared_ptr<void>{};
@@ -309,7 +372,7 @@ void Jobs::Run() {
         Request request;
         { std::unique_lock<std::mutex> lock(mutex_); wake_.wait(lock,[this] { return stopping_ || pending_.has_value(); });
           if (stopping_) return; request = std::move(*pending_); pending_.reset(); }
-        if (request.discard) ExecuteDiscard(request.game); else Execute(request);
+        if (request.uninstall) ExecuteUninstall(request.game); else if (request.discard) ExecuteDiscard(request.game); else Execute(request);
         std::lock_guard<std::mutex> lock(mutex_); busy_ = false;
         if (state_->active) {
             auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
