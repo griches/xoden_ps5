@@ -31,6 +31,7 @@ struct JobSnapshot {
     std::string worker_install_id, worker_title;
     bool native = false, active = false, cancelling = false;
     bool phone_test = false;
+    bool browser_signin = false;
     std::string sign_in_code, sign_in_url;
     // Set only by a successful download in this process, never by startup reload.
     GameId completed_game;
@@ -59,6 +60,7 @@ public:
     bool Pause(GameId game);
     bool Refresh(std::string market);
     bool TestPhoneSignIn(GameId game, std::string market);
+    bool BrowserSignIn(std::string market);
     bool SignOut(std::string market);
     // Caller must first finish removing the stopped PS5 runtime title.
     bool Uninstall(GameId game);
@@ -66,7 +68,7 @@ public:
     std::shared_ptr<const JobSnapshot> Snapshot() const;
     void Shutdown();
 private:
-    struct Request { GameId game; std::string account, market; bool discard = false, uninstall = false; std::string content; bool refresh = false, phone_test = false, signout = false; };
+    struct Request { GameId game; std::string account, market; bool discard = false, uninstall = false; std::string content; bool refresh = false, phone_test = false, signout = false, browser_signin = false; };
     void Run();
     void Load();
     void Execute(const Request& request);

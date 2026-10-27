@@ -357,5 +357,29 @@ int main() {
         assert(retained.Read(".nexus-streaming-v1.jsonl").ok());
         assert(!account.Snapshot()->completed_game.valid());
     }
+    // Browser authentication remains an account operation. Pairing evidence
+    // belongs to the exact request and success needs the native saved result.
+    std::atomic<bool> browser_pairing{false},browser_continue{false};
+    phone_config.native_run=[&](const auto& report,const auto&) {
+        const auto bytes=store.Read("job-request.json");assert(bytes.ok());
+        const auto request=steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));assert(request);
+        assert(request->Find("operation")->text()=="signin-browser");
+        assert(!request->Find("productId") && !request->Find("accountKey"));
+        const auto prefix="{\"schema\":1,\"requestId\":\""+request->Find("requestId")->text()+"\",\"operation\":\"signin-browser\",";
+        Put(store,"job-result.json",prefix+"\"status\":\"browser-pairing\",\"detail\":{\"fingerprint\":\""+std::string(64,'a')+"\"}}");
+        report(stores::xbox::NativeProgress{"browser-pairing","Pair with computer"});browser_pairing=true;
+        while(!browser_continue)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Put(store,"job-result.json",prefix+"\"status\":\"browser-sign-in-saved\",\"detail\":{\"browserSessionSaved\":true}}");
+        return stores::xbox::NativeResult::Complete;
+    };
+    {
+        stores::xbox::Jobs browser(phone_config);Wait(browser,"cancelled");
+        assert(browser.BrowserSignIn("GB"));
+        while(!browser_pairing)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(browser.Snapshot()->browser_signin && browser.Snapshot()->sign_in_code==std::string(16,'a'));
+        assert(!browser.Snapshot()->active_game.valid());browser_continue=true;Wait(browser,"browser-sign-in-saved");
+        assert(!browser.Snapshot()->active && !browser.Snapshot()->completed_game.valid());
+        assert(browser.Snapshot()->sign_in_code.empty());
+    }
     std::filesystem::remove_all(root);
 }

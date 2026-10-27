@@ -1803,8 +1803,15 @@ void Controller::TickXboxJobs() {
       model_.UpdateXboxPhoneSignIn("Select a PC game from your library and wait for the current operation to finish before testing phone sign-in.",{},{},false);
     else { xbox_phone_load_library_=!catalog; xbox_phone_refresh_started_=false; }
   }
+  if(model_.TakeXboxBrowserSignIn()) {
+    const auto catalog=xbox_library_->Snapshot();
+    if(!xbox_jobs_->BrowserSignIn(catalog?catalog->market:"GB"))
+      model_.UpdateXboxBrowserSignIn("Wait for the current operation to finish, then try Computer sign-in again.",{},false);
+    else {xbox_browser_load_library_=true;xbox_browser_refresh_started_=false;}
+  }
   if (model_.TakeXboxPhoneCancel()) {
     xbox_phone_load_library_=xbox_phone_refresh_started_=false;
+    xbox_browser_load_library_=xbox_browser_refresh_started_=false;
     xbox_jobs_->Cancel({});
   }
   if (model_.TakeXboxRefresh()) {
@@ -1815,6 +1822,10 @@ void Controller::TickXboxJobs() {
   if (xbox_phone_load_library_ && !xbox_phone_refresh_started_ && !state->active && state->phase=="phone-sign-in-verified") {
     const auto catalog=xbox_library_->Snapshot();
     if (xbox_jobs_->Refresh(catalog?catalog->market:"GB")) xbox_phone_refresh_started_=true;
+  }
+  if(xbox_browser_load_library_ && !xbox_browser_refresh_started_ && !state->active && state->phase=="browser-sign-in-saved") {
+    const auto catalog=xbox_library_->Snapshot();
+    if(xbox_jobs_->Refresh(catalog?catalog->market:"GB"))xbox_browser_refresh_started_=true;
   }
   const auto account = xbox_library_->AccountKey();
   if (state->phase == "handoff") { model_.HandoffXbox(); return; }
@@ -1829,6 +1840,14 @@ void Controller::TickXboxJobs() {
                 : "No Xbox account is connected to this console.";
   model_.UpdateXboxAccount(state->phase=="signed-out"?"":catalog ? catalog->gamertag : "",account_message,state->active);
   if (state->phone_test) model_.UpdateXboxPhoneSignIn(state->message,state->sign_in_code,state->sign_in_url,state->active);
+  if (state->browser_signin) model_.UpdateXboxBrowserSignIn(state->message,state->sign_in_code,state->active);
+  if(xbox_browser_load_library_) {
+    const bool finished=!state->active && (state->phase=="refreshed" || state->phase=="failed" || state->phase=="cancelled");
+    const auto message=state->phase=="refreshed"?"Signed in with Microsoft. Your library is ready.":
+      finished?state->message:xbox_browser_refresh_started_?"Signed in. Loading your library…":state->message;
+    model_.UpdateXboxBrowserSignIn(message,state->sign_in_code,!finished);
+    if(finished)xbox_browser_load_library_=xbox_browser_refresh_started_=false;
+  }
   if (xbox_phone_load_library_) {
     const bool finished=!state->active && (state->phase=="refreshed" || state->phase=="failed" || state->phase=="cancelled");
     const auto message=state->phase=="refreshed" ? "Signed in. Your library is ready. In-game sign-in is still being tested." :

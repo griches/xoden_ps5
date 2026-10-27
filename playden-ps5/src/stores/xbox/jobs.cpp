@@ -177,7 +177,7 @@ bool Jobs::Install(GameId game, std::string account_key, std::string market, std
     if (config_.native_run) {
         auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
         next->choices.clear(); next->choice_game = {};
-        next->phone_test=false;next->sign_in_code.clear();next->sign_in_url.clear();
+        next->phone_test=false;next->browser_signin=false;next->sign_in_code.clear();next->sign_in_url.clear();
         next->active = true; next->cancelling = false; next->active_game = game;
         next->done_bytes = next->total_bytes = next->bytes_per_second = 0;
         next->phase = "starting"; next->message = "Starting Xbox download…"; state_ = std::move(next);
@@ -190,7 +190,7 @@ bool Jobs::Refresh(std::string market) {
     if (!config_.native_run || stopping_ || busy_ || state_->phase == "loading") return false;
     cancel_requested_ = pause_requested_ = false;
     auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
-    next->phone_test=false;next->sign_in_code.clear();next->sign_in_url.clear();
+    next->phone_test=false;next->browser_signin=false;next->sign_in_code.clear();next->sign_in_url.clear();
     next->active = true; next->active_game = {}; next->phase = "refreshing";
     next->message = "Checking Xbox account and refreshing library…"; state_ = std::move(next);
     busy_ = true; pending_ = Request{{},{},std::move(market),false,false,{},true}; wake_.notify_one(); return true;
@@ -212,7 +212,7 @@ bool Jobs::TestPhoneSignIn(GameId game, std::string market) {
     if (!config_.native_run || stopping_ || busy_ || state_->phase == "loading") return false;
     cancel_requested_ = pause_requested_ = false;
     auto next=std::make_shared<JobSnapshot>(*state_); ++next->revision;
-    next->active=true; next->active_game={}; next->phone_test=true; next->cancelling=false;
+    next->active=true; next->active_game={}; next->phone_test=true;next->browser_signin=false; next->cancelling=false;
     next->sign_in_code.clear();next->sign_in_url.clear();next->phase="checking-sign-in";
     next->message="Preparing phone sign-in without changing your current account…";
     std::string content;
@@ -225,9 +225,20 @@ bool Jobs::SignOut(std::string market) {
     if (!config_.native_run || stopping_ || busy_ || state_->phase=="loading") return false;
     cancel_requested_=pause_requested_=false;
     auto next=std::make_shared<JobSnapshot>(*state_);++next->revision;
-    next->active=true;next->active_game={};next->phone_test=false;next->sign_in_code.clear();next->sign_in_url.clear();
+    next->active=true;next->active_game={};next->phone_test=false;next->browser_signin=false;next->sign_in_code.clear();next->sign_in_url.clear();
     next->phase="signing-out";next->message="Clearing the saved account…";state_=std::move(next);
     busy_=true;pending_=Request{{},{},std::move(market),false,false,{},false,false,true};wake_.notify_one();return true;
+}
+bool Jobs::BrowserSignIn(std::string market) {
+    if (market.size()!=2 || !std::all_of(market.begin(),market.end(),[](char c){return c>='A'&&c<='Z';})) return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!config_.native_run || stopping_ || busy_ || state_->phase=="loading") return false;
+    cancel_requested_=pause_requested_=false;
+    auto next=std::make_shared<JobSnapshot>(*state_);++next->revision;
+    next->active=true;next->active_game={};next->phone_test=false;next->browser_signin=true;next->cancelling=false;
+    next->sign_in_code.clear();next->sign_in_url.clear();next->phase="checking-sign-in";
+    next->message="Preparing Microsoft sign-in…";state_=std::move(next);
+    busy_=true;pending_=Request{{},{},std::move(market),false,false,{},false,false,false,true};wake_.notify_one();return true;
 }
 bool Jobs::Pause(GameId game) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -373,7 +384,23 @@ void Jobs::Load() {
         const auto phase = Text(*result,"status");
         next->active_game = GameId::Xbox(Text(*request,"productId"));
         next->phone_test = Text(*request,"operation") == "signin-test";
-        if (next->phone_test) {
+        next->browser_signin = Text(*request,"operation") == "signin-browser";
+        if (next->browser_signin) {
+            next->active_game={};next->request_id=Text(*request,"requestId");
+            const auto* detail=result->Find("detail");
+            const auto* matched=detail?detail->Find("browserSessionSaved"):nullptr;
+            if (phase=="browser-sign-in-saved" && matched && matched->is_bool() && matched->boolean()) {
+                next->phase=phase;next->message="Microsoft sign-in saved. Loading your library…";
+            } else {
+                next->phase=phase=="cancelled"?"cancelled":"failed";
+                const auto code=detail?Text(*detail,"code"):std::string{};
+                next->message=phase=="cancelled"?"Sign-in cancelled. Your saved account and games were kept.":
+                    code=="browser-account-mismatch"?"That Microsoft account does not match your PS5 account. Try again with the same account.":
+                    code=="phone-sign-in-required"?"Sign in with Microsoft to connect your account.":
+                    code=="browser-sign-in-expired"?"Sign-in expired. Try again for a new pairing code.":
+                    "Microsoft sign-in did not finish. Your saved account was kept; try again.";
+            }
+        } else if (next->phone_test) {
             next->active_game={}; next->request_id=Text(*request,"requestId");
             const auto* detail=result->Find("detail");
             const auto* licensed=detail?detail->Find("pcLicenseVerified"):nullptr;
@@ -440,6 +467,12 @@ void Jobs::Load() {
 }
 void Jobs::Execute(const Request& request) {
     auto identity = config_.hold_effective_uid ? config_.hold_effective_uid() : std::shared_ptr<void>{};
+    if (request.browser_signin) {
+        const auto id=RandomUuid();if(!id){Publish("failed","A computer sign-in request could not be created.");return;}
+        const auto text="{\"schema\":1,\"requestId\":\""+*id+"\",\"operation\":\"signin-browser\",\"market\":\""+request.market+"\"}";
+        if(!storage_.WriteAtomicPrivate("job-request.json",Bytes(text.begin(),text.end())).ok()){Publish("failed","The computer sign-in request could not be saved.");return;}
+        ExecuteNative({},*id);return;
+    }
     if (request.signout) {
         const auto id=RandomUuid();if(!id){Publish("failed","A sign-out request could not be created.");return;}
         const auto text="{\"schema\":1,\"requestId\":\""+*id+"\",\"operation\":\"signout\",\"market\":\""+request.market+"\"}";
@@ -510,6 +543,13 @@ void Jobs::ExecuteNative(GameId game, const std::string& request_id) {
                 if (!c.empty() && c.size()<=32 && std::all_of(c.begin(),c.end(),[](unsigned char ch){return (ch>='A'&&ch<='Z')||(ch>='a'&&ch<='z')||(ch>='0'&&ch<='9')||ch=='-';}) &&
                     (u=="https://www.microsoft.com/link" || u=="https://microsoft.com/link")) {code=c;url=u;}
             }
+        }
+        if (progress.phase=="browser-pairing") {
+            const auto record=Read(storage_,"job-result.json",8192);
+            const auto* detail=record?record->Find("detail"):nullptr;
+            if(record && Schema(*record) && Text(*record,"requestId")==request_id && Text(*record,"operation")=="signin-browser" &&
+                Text(*record,"status")=="browser-pairing" && detail && Hash(Text(*detail,"fingerprint")))
+                code=Text(*detail,"fingerprint").substr(0,16);
         }
         std::lock_guard<std::mutex> lock(mutex_);
         auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;

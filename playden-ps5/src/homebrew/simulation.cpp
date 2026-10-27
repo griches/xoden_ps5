@@ -498,7 +498,7 @@ std::string action_label(const std::string& key) {
         {"inject-logs-ready", "Inject ready logs"}, {"account-auth", "Authentication"},
         {"account-last-sync", "Last library sync"}, {"account-sync", "Sync now"},
         {"account-recover", "Reconnect account"}, {"account-switch", "Switch account"},
-        {"xbox-refresh", "Refresh Xbox library"}, {"xbox-phone-test", "Phone sign-in"}, {"xbox-phone-done", "Done"}, {"xbox-signout", "Sign out"}, {"account-reauth", "Sign in again"}, {"job-resume-all", "Resume all"}, {"job-clear-completed", "Clear completed"},
+        {"xbox-refresh", "Refresh Xbox library"}, {"xbox-phone-test", "Phone sign-in"}, {"xbox-browser-signin", "Sign in with Microsoft"}, {"xbox-phone-done", "Done"}, {"xbox-signout", "Sign out"}, {"account-reauth", "Sign in again"}, {"job-resume-all", "Resume all"}, {"job-clear-completed", "Clear completed"},
         {"prep-clear-completed", "Clear completed"}, {"storage-close", "Close"}, {"collection-new", "New collection"}, {"collection-manage", "Manage collections"},
         {"about-version", "Version"}, {"self-update-install", "Download and install"},
         {"self-update-restart", "Restart Playden"}, {"self-update-cancel", "Cancel update"},
@@ -1886,6 +1886,19 @@ void Simulation::UpdateXboxPhoneSignIn(std::string message,std::string code,std:
     for (auto& modal:state_.navigation.modals) if (modal.id=="phone-sign-in") {
         modal.link=valid_code?url:std::string{};
         modal.body=valid_code?"Scan the QR code, then enter: "+code+"\nThis verifies sign-in and PC game access.":std::move(message);
+        modal.action_keys={busy?"cancel":"xbox-phone-done"};modal.focused_action=0;
+    }
+    rebuild_view();
+}
+void Simulation::UpdateXboxBrowserSignIn(std::string message,std::string code,bool busy) {
+    xbox_browser_busy_=busy;
+    const bool valid=code.size()==16 && std::all_of(code.begin(),code.end(),[](unsigned char c){return (c>='0'&&c<='9')||(c>='a'&&c<='f');});
+    for(auto& c:code)if(c>='a'&&c<='f')c=char(c-'a'+'A');
+    for(auto& modal:state_.navigation.modals) if(modal.id=="browser-sign-in") {
+        modal.link.clear();
+        modal.body=valid?"On your computer, open:\nhttp://127.0.0.1:47832\nEnter your PS5 address and this pairing code:\n"+
+            code.substr(0,4)+" "+code.substr(4,4)+" "+code.substr(8,4)+" "+code.substr(12,4)+
+            "\nSign in to Microsoft. Your PS5 saves the result automatically.":std::move(message);
         modal.action_keys={busy?"cancel":"xbox-phone-done"};modal.focused_action=0;
     }
     rebuild_view();
@@ -3884,7 +3897,7 @@ void Simulation::rebuild_view() {
     } else if (!state_.navigation.modals.empty()) {
         const auto& modal = state_.navigation.modals.back();
         view_.title = modal.title;
-        if (modal.id == "xbox-account" || modal.id == "phone-sign-in" || modal.id == "compatibility") view_.subtitle = modal.body;
+        if (modal.id == "xbox-account" || modal.id == "phone-sign-in" || modal.id == "browser-sign-in" || modal.id == "compatibility") view_.subtitle = modal.body;
         if (modal.id == "logs") {
             view_.subtitle = state_.log_context;
             if (state_.log_state == LogState::Loading) row("logs-loading", RowKind::Status, "Loading fixture logs…", "").enabled = false;
@@ -5560,6 +5573,7 @@ void Simulation::open_modal(ModalEntry modal) {
 void Simulation::close_modal() {
     if (state_.navigation.modals.empty()) return;
     if (state_.navigation.modals.back().id=="phone-sign-in" && xbox_phone_busy_) xbox_phone_cancel_=true;
+    if (state_.navigation.modals.back().id=="browser-sign-in" && xbox_browser_busy_) xbox_phone_cancel_=true;
     const auto opener = state_.navigation.modals.back().opener_focus_key;
     // Step 2 opened from a game's page (no step 1 under it) was for that game only.
     if (state_.navigation.modals.back().id == "import-storage" &&
@@ -6875,10 +6889,16 @@ void Simulation::activate() {
         xbox_discard_game_ = {}; close_modal();
     } else if (live() && action_name == "xbox-account") {
         ModalEntry modal{"xbox-account","Xbox account",state_.navigation.focus_key,
-            xbox_account_busy_ ? std::vector<std::string>{"cancel"} : std::vector<std::string>{"xbox-refresh","xbox-phone-test","xbox-signout","cancel"},0,false};
+            xbox_account_busy_ ? std::vector<std::string>{"cancel"} : std::vector<std::string>{"xbox-browser-signin","xbox-refresh","xbox-signout","cancel"},0,false};
         modal.body = xbox_account_message_;
-        modal.body += " Phone sign-in checks PC game access and loads your library when no account is connected. In-game sign-in is still being tested.";
+        modal.body += " Microsoft sign-in connects your account, authorises games and loads your library.";
         open_modal(std::move(modal));
+    } else if (live() && action_name=="xbox-browser-signin") {
+        if(!xbox_account_busy_) {
+            close_modal();xbox_browser_requested_=true;xbox_browser_busy_=true;
+            ModalEntry modal{"browser-sign-in","Microsoft sign-in",state_.navigation.focus_key,{"cancel"},0,false};
+            modal.body="Preparing secure Microsoft sign-in…";open_modal(std::move(modal));
+        }
     } else if (live() && action_name=="xbox-phone-test") {
         if (!xbox_account_busy_) {
             close_modal();xbox_phone_requested_=true;xbox_phone_busy_=true;

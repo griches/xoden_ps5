@@ -48,11 +48,14 @@ namespace {
 std::string Message(const std::string& phase) {
     if (phase == "refreshing") return "Refreshing Xbox library…";
     if (phase == "checking-account") return "Checking Xbox access…";
-    if (phase == "checking-sign-in") return "Preparing phone sign-in…";
+    if (phase == "checking-sign-in") return "Preparing Microsoft sign-in…";
     if (phase == "signing-out") return "Clearing the saved account…";
     if (phase == "sign-in-code") return "Enter the code on your phone to sign in.";
     if (phase == "checking-game-access") return "Checking phone sign-in and PC game access…";
     if (phase == "checking-installed-games") return "Checking installed games for this account…";
+    if (phase == "browser-pairing") return "Open the sign-in page on your computer and enter the pairing code.";
+    if (phase == "browser-signing-in") return "Complete Microsoft sign-in on your computer…";
+    if (phase == "checking-browser-access") return "Checking the Microsoft account and saving sign-in…";
     if (phase == "resolving") return "Finding the PC download…";
     if (phase == "metadata") return "Reading game data…";
     if (phase == "downloading") return "Downloading Xbox game";

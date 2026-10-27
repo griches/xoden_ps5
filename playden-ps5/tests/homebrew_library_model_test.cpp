@@ -3224,28 +3224,16 @@ void xbox_account_help_is_visible_without_authenticating() {
     check(model.TakeXboxRefresh(), "account refresh can be requested without starting interactive login");
 }
 
-void xbox_phone_signin_code_is_transient_and_closing_requests_cancellation() {
-    auto model=make_live();
-    model.UpdateXboxAccount("Working account","Saved account",false);
-    for(int i=0;i<4;++i) model.action("r1");
-    activate(model,"settings-xbox-account");activate(model,"xbox-phone-test");
-    check(model.TakeXboxPhoneTest() && !model.TakeXboxPhoneTest(),"phone sign-in sends one request");
-    model.UpdateXboxPhoneSignIn("Waiting","TEST-CODE","https://www.microsoft.com/link",true);
-    check(model.view().subtitle.find("TEST-CODE")!=std::string::npos && model.state().navigation.modals.back().link=="https://www.microsoft.com/link",
-          "validated short code and Microsoft QR destination reach the native dialog");
-    model.UpdateXboxPhoneSignIn("Invalid code hidden","SECRET-CODE","https://foreign.invalid/link",true);
-    check(model.view().subtitle.find("SECRET-CODE")==std::string::npos && model.view().subtitle.find("foreign.invalid")==std::string::npos,
-          "foreign verification links never display");
-    check(model.state().navigation.modals.back().link.empty(),"invalid provider data clears the previous QR destination");
-    model.action("circle");
-    check(model.TakeXboxPhoneCancel() && !model.TakeXboxPhoneCancel(),"closing a live phone sheet cancels the worker once");
-    model.UpdateXboxPhoneSignIn("Cancelled",{},{},false);
-    activate(model,"settings-xbox-account");activate(model,"xbox-phone-test");
-    model.TakeXboxPhoneTest();
-    model.UpdateXboxPhoneSignIn("PC license verified; current account unchanged",{},{},false);
-    check(model.state().navigation.modals.back().link.empty(),"finished phone checks have no QR destination");
-    activate(model,"xbox-phone-done");
-    check(!model.TakeXboxPhoneCancel(),"closing a finished phone test does not cancel or alter an account");
+void xbox_signin_offers_only_the_full_authorisation_route() {
+    auto model=make_live();model.UpdateXboxAccount("Account","Saved account",false);
+    for(int i=0;i<4;++i)model.action("r1");
+    activate(model,"settings-xbox-account");
+    bool sign_in=false;
+    for(const auto& row:model.view().rows) {
+        check(row.action!="xbox-phone-test","phone-only authorisation is not a user option");
+        if(row.action=="xbox-browser-signin") {sign_in=true;check(row.title=="Sign in with Microsoft","single sign-in uses the product label");}
+    }
+    check(sign_in,"full Microsoft authorisation is the sole sign-in route");
 }
 void xbox_signout_is_an_explicit_account_action() {
     auto model=make_live();model.UpdateXboxAccount("Working account","Saved account",false);
@@ -3254,12 +3242,26 @@ void xbox_signout_is_an_explicit_account_action() {
     check(model.TakeXboxSignOut() && !model.TakeXboxSignOut(),"sign-out sends exactly one account reset request");
     check(model.state().navigation.modals.empty(),"sign-out returns to Settings without deleting game data in the UI");
 }
+void xbox_browser_pairing_is_transient_and_cancellable() {
+    auto model=make_live();model.UpdateXboxAccount("Account","Saved account",false);
+    for(int i=0;i<4;++i)model.action("r1");
+    activate(model,"settings-xbox-account");activate(model,"xbox-browser-signin");
+    check(model.TakeXboxBrowserSignIn() && !model.TakeXboxBrowserSignIn(),"browser sign-in requests one account operation");
+    model.UpdateXboxBrowserSignIn("Pairing","0123456789abcdef",true);
+    check(model.view().subtitle.find("0123 4567 89AB CDEF")!=std::string::npos,"browser fingerprint is grouped for pairing");
+    check(model.view().subtitle.find("http://127.0.0.1:47832")!=std::string::npos,"sign-in displays the page address without helper jargon");
+    check(model.state().navigation.modals.back().link.empty(),"browser pairing never pretends to be a Microsoft device-code link");
+    model.UpdateXboxBrowserSignIn("Invalid code hidden","untrusted-value",true);
+    check(model.view().subtitle.find("untrusted-value")==std::string::npos,"invalid browser pairing data is hidden");
+    model.action("circle");check(model.TakeXboxPhoneCancel(),"closing active browser sign-in requests cancellation");
+}
 
 int main() {
     gamepass_mode_migrates_the_old_xbox_category();
     xbox_account_help_is_visible_without_authenticating();
-    xbox_phone_signin_code_is_transient_and_closing_requests_cancellation();
+    xbox_signin_offers_only_the_full_authorisation_route();
     xbox_signout_is_an_explicit_account_action();
+    xbox_browser_pairing_is_transient_and_cancellable();
     xbox_install_does_not_wait_for_steam();
     xbox_search_covers_the_complete_catalog();
     live_import_sheet_sends_requests();

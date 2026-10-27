@@ -103,11 +103,11 @@ int main(int argc,char** argv) {
       phone.UpdateXboxAccount({},"Not connected",false);
       for(int i=0;i<4;++i) assert(phone.action("r1"));
       assert(phone.action("focus:settings-xbox-account") && phone.action("cross"));
-      assert(phone.action("focus:xbox-phone-test") && phone.action("cross"));
-      phone.UpdateXboxPhoneSignIn("Waiting","TEST-CODE","https://www.microsoft.com/link",true);
-      assert(phone.state().navigation.modals.back().link=="https://www.microsoft.com/link");
+      assert(phone.action("focus:xbox-browser-signin") && phone.action("cross"));
+      phone.UpdateXboxBrowserSignIn("Waiting","0123456789abcdef",true);
+      assert(phone.state().navigation.modals.back().link.empty());
       for(int i=0;i<16;++i) renderer.draw(phone,1920,1080);
-      assert(renderer.capture_png(output/"phone-signin-qr.png",1920,1080));
+      assert(renderer.capture_png(output/"microsoft-signin-pairing.png",1920,1080));
     }
     {
       Simulation missing({}, {}, ModelMode::Live);
