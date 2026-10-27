@@ -1,7 +1,9 @@
 //! Resumable byte ranges with bounded recovery and URL-free errors.
 use bytes::Bytes;
+use futures_util::stream::FuturesOrdered;
 use futures_util::{Stream, StreamExt};
 use reqwest::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_RANGE, RANGE};
+use std::future::Future;
 use std::{pin::Pin, time::Duration};
 use tokio::time::{Instant, sleep, timeout};
 
@@ -258,6 +260,158 @@ fn valid_range(response: &reqwest::Response, start: u64, end: u64) -> Option<(u6
     (first == start && last >= first && last <= end && total > last).then_some((last, total))
 }
 
+// A large game is often one file. File-level concurrency cannot fill that
+// transfer's link, so fetch bounded adjacent ranges concurrently and hand them
+// to the existing decrypt/checkpoint writer in order. No detached tasks, disk
+// staging, out-of-order writes or new resume format are involved.
+const PARALLEL_RANGE_BYTES: u64 = 2 * 1024 * 1024;
+const PARALLEL_RANGE_COUNT: usize = 4;
+type RangeFuture = Pin<Box<dyn Future<Output = Result<(Bytes, u64), TransferError>> + Send>>;
+
+pub(crate) enum SegmentReader {
+    Single(RangeReader),
+    Parallel(OrderedRanges),
+}
+impl SegmentReader {
+    pub fn new(client: &reqwest::Client, url: &str, start: u64, end: u64, policy: Policy) -> Self {
+        let length = end.checked_sub(start).and_then(|n| n.checked_add(1));
+        if length.is_some_and(|n| n >= PARALLEL_RANGE_BYTES * PARALLEL_RANGE_COUNT as u64) {
+            Self::Parallel(OrderedRanges::new(
+                client,
+                url,
+                start,
+                end,
+                policy,
+                PARALLEL_RANGE_BYTES,
+                PARALLEL_RANGE_COUNT,
+            ))
+        } else {
+            Self::Single(RangeReader::new(client, url, start, end, policy))
+        }
+    }
+    pub fn disconnect(&mut self) {
+        match self {
+            Self::Single(reader) => reader.disconnect(),
+            Self::Parallel(reader) => reader.disconnect(),
+        }
+    }
+    pub async fn next(&mut self) -> Result<Option<Bytes>, TransferError> {
+        match self {
+            Self::Single(reader) => reader.next().await,
+            Self::Parallel(reader) => reader.next().await,
+        }
+    }
+}
+
+pub(crate) struct OrderedRanges {
+    client: reqwest::Client,
+    url: String,
+    position: u64,
+    end: u64,
+    next_start: Option<u64>,
+    chunk_bytes: u64,
+    parallel: usize,
+    policy: Policy,
+    requests: FuturesOrdered<RangeFuture>,
+    pending: Bytes,
+    total: Option<u64>,
+    failure: Option<TransferError>,
+}
+impl OrderedRanges {
+    fn new(
+        client: &reqwest::Client,
+        url: &str,
+        start: u64,
+        end: u64,
+        policy: Policy,
+        chunk_bytes: u64,
+        parallel: usize,
+    ) -> Self {
+        Self {
+            client: client.clone(),
+            url: url.into(),
+            position: start,
+            end,
+            next_start: (start <= end).then_some(start),
+            chunk_bytes,
+            parallel,
+            policy,
+            requests: FuturesOrdered::new(),
+            pending: Bytes::new(),
+            total: None,
+            failure: None,
+        }
+    }
+    fn disconnect(&mut self) {
+        // Only bytes already delivered to the caller count. Discard speculative
+        // bytes and connections; a pause resumes at the exact delivery offset.
+        self.requests = FuturesOrdered::new();
+        self.pending = Bytes::new();
+        self.next_start = (self.position <= self.end).then_some(self.position);
+        self.failure = None;
+    }
+    fn fill(&mut self) {
+        // Include the chunk currently being delivered in the memory budget:
+        // four requests/chunks total, at most 8 MiB per active large file.
+        let occupied = usize::from(!self.pending.is_empty());
+        while self.requests.len() + occupied < self.parallel {
+            let Some(start) = self.next_start else {
+                break;
+            };
+            let end = start.saturating_add(self.chunk_bytes - 1).min(self.end);
+            self.next_start = (end < self.end).then(|| end + 1);
+            let mut reader = RangeReader::new(&self.client, &self.url, start, end, self.policy);
+            self.requests.push_back(Box::pin(async move {
+                let mut bytes = Vec::new();
+                bytes
+                    .try_reserve_exact((end - start + 1) as usize)
+                    .map_err(|_| TransferError::new("transfer-memory", 0))?;
+                while let Some(chunk) = reader.next().await? {
+                    bytes.extend_from_slice(&chunk);
+                }
+                let total = reader
+                    .total
+                    .ok_or(TransferError::new("transfer-range", 206))?;
+                Ok((Bytes::from(bytes), total))
+            }));
+        }
+    }
+    async fn next(&mut self) -> Result<Option<Bytes>, TransferError> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        if self.pending.is_empty() {
+            self.fill();
+            match self.requests.next().await {
+                None => return Ok(None),
+                Some(Ok((bytes, total))) if self.total.is_none_or(|old| old == total) => {
+                    self.total = Some(total);
+                    self.pending = bytes;
+                }
+                result => {
+                    let error = match result {
+                        Some(Err(error)) => error,
+                        _ => TransferError::new("transfer-range", 206),
+                    };
+                    self.requests = FuturesOrdered::new();
+                    self.failure = Some(error);
+                    return Err(error);
+                }
+            }
+        }
+        // Keep the existing caller's page-sized work and progress cadence.
+        // The aggregate bandwidth limiter was already applied while fetching.
+        let length = self.pending.len().min(16 * 1024);
+        let bytes = self.pending.split_to(length);
+        self.position += length as u64;
+        Ok(Some(bytes))
+    }
+}
+
 #[cfg(test)]
 #[path = "streaming_http_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "parallel_http_tests.rs"]
+mod parallel_tests;
