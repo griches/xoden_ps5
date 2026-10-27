@@ -3135,7 +3135,6 @@ void xbox_install_does_not_wait_for_steam() {
     check(!has_row(model,"details-xbox-discard"),"completed cleanup removes its action");
     const std::string content = "11111111-1111-4111-8111-111111111111";
     model.UpdateXboxPackages(id,{{content,"PC edition",1024}});
-    activate(model,"details-install");
     check(has_row(model,"xbox-package-0"),"package selection opens in Playden");
     activate(model,"xbox-package-0");
     const auto choice = model.TakeInstallRequests();

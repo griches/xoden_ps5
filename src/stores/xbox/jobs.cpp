@@ -412,7 +412,10 @@ void Jobs::Execute(const Request& request) {
             Text(*previous,"accountKey") == request.account && Text(*previous,"market") == request.market &&
             ContentId(Text(*previous,"contentId"))) content = Text(*previous,"contentId");
     }
-    const auto text = "{\"schema\":1,\"requestId\":\"" + *id + "\",\"operation\":\"install\",\"market\":\"" + request.market +
+    const auto snapshot = Snapshot();
+    const std::string operation = config_.native_run && content.empty() &&
+        std::find(snapshot->partials.begin(),snapshot->partials.end(),request.game) == snapshot->partials.end() ? "plan" : "install";
+    const auto text = "{\"schema\":1,\"requestId\":\"" + *id + "\",\"operation\":\"" + operation + "\",\"market\":\"" + request.market +
         "\",\"accountKey\":\"" + request.account + "\",\"productId\":\"" + request.game.value + "\"" + (content.empty() ? "" : ",\"contentId\":\"" + content + "\"") + "}";
     if (!content.empty() && !storage_.WriteAtomicPrivate("selection-" + ToInstallId(request.game) + ".json",Bytes(text.begin(),text.end())).ok()) {
         Publish("failed","The selected Xbox package could not be saved. Download has not started."); return;

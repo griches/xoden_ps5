@@ -234,6 +234,21 @@ int main() {
         assert(!account.Refresh("invalid")); assert(account.Refresh("GB")); Wait(account,"refreshed");
         assert(!account.Snapshot()->request_id.empty()); assert(!account.Snapshot()->completed_game.valid());
     }
+    // New native installs resolve a plan without creating download content.
+    // Only an explicit package selection authorizes the actual install request.
+    native_config.native_run = [&](const auto&,const auto&) {
+        const auto bytes = store.Read("job-request.json"); assert(bytes.ok());
+        const auto request = steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));
+        assert(request);
+        assert(request->Find("operation")->text() == (request->Find("contentId") ? "install" : "plan"));
+        assert(!std::filesystem::exists(root/"games/xbox-9n5pkh0kw2l1"));
+        return stores::xbox::NativeResult::Failed;
+    };
+    {
+        stores::xbox::Jobs planning(native_config); Wait(planning,"refreshed");
+        assert(planning.Install(GameId::Xbox("9N5PKH0KW2L1"),std::string(64,'a'),"GB")); Wait(planning,"failed");
+        assert(planning.Install(GameId::Xbox("9N5PKH0KW2L1"),std::string(64,'a'),"GB","11111111-1111-4111-8111-111111111111")); Wait(planning,"failed");
+    }
     // Only bounded, matching, supported PC package choices reach the UI.
     Put(store,"job-request.json",R"({"schema":1,"requestId":"choice","operation":"install","market":"GB","productId":"9N5PKH0KW2L1"})");
     Put(store,"job-result.json",R"({"schema":1,"requestId":"choice","status":"package-choice","detail":{"rootProductId":"9N5PKH0KW2L1","market":"GB","choices":[{"contentId":"11111111-1111-4111-8111-111111111111","title":"PC edition","platform":"Windows.Desktop","packageFormat":"MSIXVC","supported":true,"downloadBytes":1234},{"contentId":"22222222-2222-4222-8222-222222222222","title":"Console edition","platform":"XboxOne","packageFormat":"MSIXVC","supported":true}]}})");

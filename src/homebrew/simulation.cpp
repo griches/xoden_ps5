@@ -1870,7 +1870,15 @@ void Simulation::UpdateXboxAccount(std::string name, std::string message, bool b
 }
 
 void Simulation::UpdateXboxPackages(GameId game, std::vector<XboxPackageOption> choices) {
+    const bool changed = game != xbox_package_game_ || choices.size() != xbox_packages_.size() ||
+        !std::equal(choices.begin(),choices.end(),xbox_packages_.begin(),[](const auto& a,const auto& b) { return a.content_id == b.content_id; });
     xbox_package_game_ = game; xbox_packages_ = std::move(choices);
+    if (changed && !xbox_packages_.empty() && !state_.editor.active && state_.navigation.modals.empty()) {
+        std::vector<std::string> actions;
+        for (std::size_t i = 0; i < xbox_packages_.size(); ++i) actions.push_back("xbox-package-" + std::to_string(i));
+        actions.push_back("cancel");
+        open_modal({"xbox-packages","Choose a PC package",state_.navigation.focus_key,std::move(actions),0,false});
+    }
     rebuild_view();
 }
 
@@ -7569,7 +7577,11 @@ void Simulation::activate() {
         if (has_resettable(record.overrides)) { clear_keeping_start_choices(&record.overrides); ++record.revision; }
         refresh_game_settings(); save_profile();
     }
-    else if (action_name == "note") open_modal({"compatibility", "Compatibility and note", "note", {"rating-untested", "rating-works", "rating-playable", "rating-broken", "edit-note", "cancel"}, 0, false});
+    else if (action_name == "note") {
+        ModalEntry modal{"compatibility", "Compatibility and note", "note", {"rating-untested", "rating-works", "rating-playable", "rating-broken", "edit-note", "cancel"}, 0, false};
+        modal.body = "Your rating and note stay on this console. They are not submitted to Playden or any compatibility database.";
+        open_modal(std::move(modal));
+    }
     else if (action_name.rfind("rating-", 0) == 0) {
         const auto value = action_name.substr(7);
         state_.library.ratings[state_.navigation.selected_game_id] = value == "works" ? Compatibility::Works : value == "playable" ? Compatibility::Playable : value == "broken" ? Compatibility::Broken : Compatibility::Untested;
@@ -8585,7 +8597,7 @@ std::vector<std::string> Simulation::game_settings_actions() const {
     if (expanded_settings_sections_.count("section-advanced")) {
         rows(G::kAdvanced);
         actions.push_back("effective-command");
-        actions.push_back("export-recipe");
+        if (state_.navigation.selected_game_id.steam_app()) actions.push_back("export-recipe");
     }
     actions.push_back("reset-settings");
     actions.push_back("cancel");
