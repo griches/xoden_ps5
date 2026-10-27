@@ -1055,3 +1055,42 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   code. Screenshot /tmp/gamepass-scoped-renewal-login.png. Requested Gary's
   approval; no active account adoption claimed. Pad CLOSED immediately after
   starting the test. Remote Play remains OFF.
+
+### QR code requested for native phone sign-in (19:32Z)
+
+- Gary requested a QR code to open the Microsoft login page from the TV.
+  Reused the pinned QR encoder and existing link dialog; the validated Microsoft
+  URL is its sole payload and the short code remains visible. Foreign/invalid
+  links, cancelled and completed jobs clear the QR destination. Removed wording
+  that incorrectly implied an account was still connected after reset.
+- Model and actual OpenGL graphical checks passed (2/2, 20.09 s). Inspected
+  synthetic-live-library/phone-signin-qr.png and independently decoded its QR
+  with Apple Vision: exact https://www.microsoft.com/link. PS5 build passed,
+  binary SHA256 27af815ec4d539a08c46fcad4612356af85f808146bb0352e2734c81aec366b9.
+- Previous pending device-code job cancelled through its UI and fully drained
+  at 19:32:12Z (native state 6) before replacement. No account was adopted.
+  Full frontend regression suite for QR change running; console QR acceptance
+  and fresh native phone approval pending.
+
+- QR build deployed with backup console-backups/20261027-phone-signin-qr.
+  New native phone test started on console after restart, screenshot
+  /tmp/gamepass-native-phone-qr-console.png. Independently decoded the actual
+  console screenshot with Apple Vision: exact https://www.microsoft.com/link.
+  Code and Cancel button fit visibly; no old-account-connected claim remains.
+  Asked Gary to scan this new QR and approve. Pad CLOSED, Remote Play OFF.
+
+- Frontend f8a530d commits the QR change. Full host suite passed 153/153
+  in 138.71 s. Console QR and short code remain waiting for user approval;
+  no approval or successful credential save is claimed.
+
+- Backend cbc4968 prepares the next persistence check: signin-test reuses and
+  genuinely refreshes an already verified saved phone candidate instead of
+  demanding another approval. Sign-out still removes it and starts fresh.
+  CLI 79/79, device-code 9/9, native cross-build and PS5 app build passed.
+  Prepared binary SHA256
+  61e2fbab9299fd4309f555d829f6670cc58e97fce391d750fd5501a78ac2c5f5.
+  NOT DEPLOYED: keep the current QR challenge alive while Gary approves it.
+  Console remains on deployed 27af815e QR build; no native success yet as of
+  latest log check. Next: await approval, inspect terminal result, then deploy
+  prepared persistence-check build and repeat Test phone sign-in after restart.
+  Do not ask for another approval if the candidate was saved successfully.
