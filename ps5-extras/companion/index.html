@@ -6,7 +6,7 @@
 </style>
 <header><div class="tag">Playden companion · Xbox PC games</div><h1>Your Game Pass library.</h1>
 <p>Browse on this Mac. Install on your PS5. Play through Playden.</p><div id="account">Checking your Microsoft account…</div>
-<div class="row"><button id="login">Sign in with Microsoft</button><button id="refresh">Refresh library</button></div></header>
+<div class="row"><button id="login">Sign in with Microsoft</button><button id="cancel-login" hidden>Cancel sign-in</button><button id="refresh">Refresh library</button></div></header>
 <main><div id="notice" role="status"></div><div id="progress" hidden></div>
 <div class="row"><input id="search" type="search" aria-label="Search Game Pass library" placeholder="Search Game Pass library…"><label><input id="supported" type="checkbox"> Supported PC packages only</label><span id="count"></span></div>
 <p class="muted"><a href="http://127.0.0.1:47833" target="_blank" rel="noopener">Open installation progress</a></p><div id="grid"></div><button id="more" hidden>Retry loading remaining games</button>
@@ -25,6 +25,7 @@ function updateSize(){const c=choices.find(c=>c.contentId===$('choice').value);$
 $('choice').onchange=updateSize;$('search').oninput=render;$('supported').onchange=render;$('more').onclick=()=>page().catch(notice);$('refresh').onclick=refresh;$('close').onclick=()=>$('details').close();
 $('login').onclick=async()=>{try{await api('login',{});notice('Checking your Microsoft sign-in…')}catch(e){notice(e)}};
 $('install').onclick=async()=>{try{await api('install',{productId:current.productId,contentId:$('choice').value});$('details').close();notice('Installation started.')}catch(e){notice(e)}};
-async function poll(){try{const j=await api('job');const previous=working;working=j.busy;$('progress').hidden=j.stage==='idle';$('progress').textContent=[j.title,j.stage.replaceAll('-',' '),j.message,Number.isFinite(j.done)?bytes(j.done)+' / '+bytes(j.total):''].filter(Boolean).join(' · ');$('refresh').disabled=working||loading;$('login').disabled=working;if(previous!==working)render();if(previous&&!working&&j.stage==='signed-in')await refresh()}catch(e){notice(e)}setTimeout(poll,1500)}
+$('cancel-login').onclick=async()=>{try{await api('login/cancel',{});notice('Cancelling sign-in…')}catch(e){notice(e)}};
+async function poll(){try{const j=await api('job');const previous=working;working=j.busy;$('cancel-login').hidden=!j.canCancelSignIn;$('progress').hidden=j.stage==='idle';$('progress').textContent=[j.title,j.stage.replaceAll('-',' '),j.message,Number.isFinite(j.done)?bytes(j.done)+' / '+bytes(j.total):''].filter(Boolean).join(' · ');$('refresh').disabled=working||loading;$('login').disabled=working;if(previous!==working)render();if(previous&&!working&&j.stage==='signed-in')await refresh()}catch(e){notice(e)}setTimeout(poll,1500)}
 refresh();poll();
 </script></html>

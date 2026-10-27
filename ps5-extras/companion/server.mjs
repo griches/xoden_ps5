@@ -5,6 +5,8 @@ import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Backend, command, binary, market } from './backend.mjs';
 
+import { signIn } from './sign-in.mjs';
+
 const backend = new Backend();
 const port = Number(process.env.XBOX_COMPANION_PORT ?? 47831);
 const origin = `http://127.0.0.1:${port}`;
@@ -23,6 +25,7 @@ try {
   if (['failed', 'installed', 'signed-in'].includes(previous.stage)) job = previous;
 } catch { /* No completed task yet. */ }
 let busy = false;
+let loginAbort;
 
 function send(res, code, value) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store',
@@ -125,7 +128,7 @@ const server = createServer(async (req, res) => {
     if (req.headers['x-companion-token'] !== token || (req.headers.origin && req.headers.origin !== origin))
       return send(res, 403, { error: 'Open the companion from its local address.' });
     if (req.method === 'GET') {
-      if (url.pathname === '/api/job') return send(res, 200, { ...job, busy });
+      if (url.pathname === '/api/job') return send(res, 200, { ...job, busy, canCancelSignIn: !!loginAbort });
       if (busy) return send(res, 409, { error: 'Wait for the current task to finish.' });
       if (url.pathname === '/api/account') return send(res, 200, await backend.status(url.searchParams.has('refresh')));
       if (url.pathname === '/api/library') return send(res, 200, await backend.page(url.searchParams.get('cursor') ?? undefined, url.searchParams.has('refresh')));
@@ -134,20 +137,20 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST') {
       const input = await body(req);
       if (url.pathname === '/api/login') {
+        if (busy) return send(res, 409, { error: 'Wait for the current task to finish.' });
+        const controller = new AbortController();
+        loginAbort = controller;
         launch(async () => {
-          const existing = await backend.status(true);
-          if (existing.signedIn && existing.pcGamePass) {
-            job = { stage: 'signed-in', message: 'Your saved Microsoft sign-in is valid. PC Game Pass verified.' };
-            return;
-          }
-          job.stage = 'signing-in';
-          job.message = 'Complete sign-in in the separate Xodus login window on this Mac.';
-          await command(['login'], { timeout: 10 * 60000, onLine() {} });
-          backend.library.reset();
-          const status = await backend.status(true);
-          if (!status.signedIn) throw Error('Sign-in did not finish.');
-          job = { stage: 'signed-in', message: 'Signed in. Refresh your library.' };
+          try { await signIn({ backend, command, signal: controller.signal, report: update => { job = update; } }); }
+          catch (error) {
+            if (controller.signal.aborted) job = { stage: 'cancelled', message: 'Sign-in cancelled. You can try again.' };
+            else throw error;
+          } finally { if (loginAbort === controller) loginAbort = undefined; }
         });
+        return send(res, 202, { ok: true });
+      }
+      if (url.pathname === '/api/login/cancel') {
+        loginAbort?.abort();
         return send(res, 202, { ok: true });
       }
       if (url.pathname === '/api/install') {

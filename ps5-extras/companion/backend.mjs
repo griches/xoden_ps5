@@ -5,10 +5,14 @@ import { CatalogService, AccountLibrary, parseSubscription, readInstallPlan, ins
 export const binary = fileURLToPath(new URL('../../../xodus-ps5-backend/target/release/xodus-cli', import.meta.url));
 export const market = 'GB';
 
-export function command(args, { timeout = 65000, executable = binary, onLine } = {}) {
+export function command(args, { timeout = 65000, executable = binary, onLine, signal } = {}) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(Error('Sign-in cancelled.')); return; }
     const child = spawn(executable, args, { stdio: ['ignore', 'pipe', 'pipe'], shell: false });
     let stdout = '', buffer = '', size = 0, failure;
+    const abort = () => { failure = Error('Sign-in cancelled.'); child.kill('SIGKILL'); };
+    signal?.addEventListener('abort', abort, { once: true });
+    const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); };
     const timer = setTimeout(() => { failure = Error('The account service timed out. Try again.'); child.kill('SIGKILL'); }, timeout);
     child.stdout.on('data', chunk => {
       size += chunk.length;
@@ -39,9 +43,9 @@ export function command(args, { timeout = 65000, executable = binary, onLine } =
       }
       if (diagnostics.length > 256000) diagnostics = '';
     });
-    child.once('error', () => { clearTimeout(timer); reject(Error('Could not start the Xodus backend.')); });
+    child.once('error', () => { cleanup(); reject(Error('Could not start the Xodus backend.')); });
     child.once('close', code => {
-      clearTimeout(timer);
+      cleanup();
       if (failure) reject(failure);
       else if (code !== 0) reject(Error(transferFailure ?? `Xodus ${args[0]} did not complete. No specific diagnostic was supplied.`));
       else resolve(stdout);
@@ -87,7 +91,7 @@ export class Backend {
         this.profile = profile;
       } catch { this.profile = undefined; }
     }
-    return { signedIn: !!this.account, gamertag: this.profile?.gamertag,
+    return { signedIn: !!this.account, sessionVerified: !!this.account && this.profile?.account === this.account, gamertag: this.profile?.gamertag,
       pcGamePass: pcSubscription(this.profile), subscription: parseSubscription(this.profile?.subscription),
       market, console: process.env.PS5_HOST ?? '192.168.0.174' };
   }
