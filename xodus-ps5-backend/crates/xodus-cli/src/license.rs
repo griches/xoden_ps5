@@ -117,6 +117,28 @@ fn license_material(tokens: &TokenManager, block: &str) -> Result<(DeviceKey, SP
     Ok((key, game_splicense))
 }
 
+/// Validate a separate Store-scoped phone candidate using an existing device.
+/// Does not read, renew, remove or replace the active user's STS session.
+pub async fn get_candidate_license(
+    client: &reqwest::Client, tokens: &TokenManager,
+    candidate: &xodus::api::live::device_code::Credentials, content: String, market: String,
+) -> Result<(DeviceKey,SPLicense),String> {
+    let Token::Legacy(device) = tokens.get_device_sts_token().map_err(|_| "Existing device sign-in is required.")? else {
+        return Err("Existing device sign-in has an unsupported format.".into());
+    };
+    let response = xodus::api::live::exchange_device_token(client,device,
+        "{d6d5a677-0872-4ab0-9442-bb792fce85c5}".into(),"www.microsoft.com".into(),
+        Some(soap::PolicyReference::mbi_ssl())).await.map_err(|_| "Microsoft device-ticket request failed.")?;
+    let Token::Compact(device_ticket) = Token::try_from(response).map_err(|_| "Invalid Microsoft device ticket.")? else {
+        return Err("Unsupported Microsoft device ticket.".into());
+    };
+    let user_reference = candidate.user_id().ok_or("Microsoft returned no account reference.")?;
+    let ticket = xodus::models::secrets::licensing_ticket(format!("t={}",candidate.access_token()));
+    let (_,license) = xodus::licensing::content::get_license_content(client,device_ticket,ticket,user_reference.into(),content,market)
+        .await.map_err(|error| error.to_string())?;
+    license_material(tokens,&license.splicense_block)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

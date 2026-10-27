@@ -130,3 +130,28 @@ Playden delegates to its existing validated volume query, which preserves its
 console-space reserve and mount validation. Failure is an error, never unlimited
 space. The link-only probe supplies a failing placeholder; it must not be used
 as a downloader. `XODUS_NATIVE_TITLE` excludes that placeholder in Playden.
+
+## Isolated phone sign-in validation
+
+The private job protocol accepts `signin-test` with a Microsoft product ID,
+market, and optional explicit PC content ID. An ambiguous package fails before
+requesting a phone code. The native job publishes only Microsoft's short user
+code/link in private job-result detail, polls for approval, verifies Xbox profile
+and marketplace tickets, obtains a Store-scoped PC content license and
+authenticates its key. It saves a separate phone candidate and reports
+`phone-sign-in-verified`; this does not replace the active account or establish
+in-game runtime acceptance. Existing device credentials are copied into memory
+for validation; no additional device is provisioned.
+
+Native credential IO now uses HostFileBackend with the existing RON/keyring
+encoding. Its Store has no automatic backing-file save. Each successful write
+requires the host import `xodus_ps5_commit_keyring` to publish through the app's
+policy-checked atomic private-file writer. Failed commits roll back the in-memory
+entry and Drop never writes. The host callback receives sensitive bytes solely
+for that commit. The link-only payload refuses writes. Synthetic regression
+tests cover compatibility, restart reads, failed commit/rollback, no global
+keyring changes, and refusal of public, symlinked, invalid or oversized stores.
+
+Fresh first-time device provisioning and adopting a phone candidate as the main
+account remain outside this test operation. Do not sign out the working console
+account while game-runtime validation is unfinished.

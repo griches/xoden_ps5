@@ -291,3 +291,39 @@ async fn device_code_title_refresh_rejects_invalid_clients_and_missing_bound_ref
     ));
     task.await.unwrap();
 }
+
+#[test]
+fn device_code_private_candidate_restores_real_expiry_and_rejects_foreign_fields() {
+    let session = credentials(&tokens(), None, Scope::Xbox).unwrap();
+    let bytes = session.private_candidate_record().unwrap();
+    let fresh = Credentials::from_private_candidate_record(&bytes).unwrap();
+    assert_eq!(fresh.access_token(), session.access_token());
+    assert_eq!(fresh.user_id(), session.user_id());
+    assert!(fresh.expires_in() <= session.expires_in() && fresh.expires_in().as_secs() > 3500);
+    let mut record: Value = serde_json::from_slice(&bytes).unwrap();
+    record["expires_at"] = json!(chrono::Utc::now().timestamp() - 10);
+    let expired =
+        Credentials::from_private_candidate_record(&serde_json::to_vec(&record).unwrap()).unwrap();
+    assert!(expired.expires_in().is_zero());
+    for (field, value) in [
+        ("schema", json!(2)),
+        ("client_id", json!("0000000041180A5D")),
+        ("user_id", json!("")),
+        ("refresh_token", json!("bad\nsecret")),
+        ("expires_at", json!(chrono::Utc::now().timestamp() + 90000)),
+        ("foreign", json!("never-accept")),
+    ] {
+        let mut bad = record.clone();
+        bad[field] = value;
+        assert!(
+            Credentials::from_private_candidate_record(&serde_json::to_vec(&bad).unwrap()).is_err()
+        );
+    }
+    assert!(Credentials::from_private_candidate_record(&vec![0; RESPONSE_LIMIT + 1]).is_err());
+    assert!(
+        credentials(&tokens(), None, Scope::Store)
+            .unwrap()
+            .private_candidate_record()
+            .is_err()
+    );
+}

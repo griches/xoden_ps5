@@ -56,11 +56,13 @@ pub unsafe extern "C" fn xodus_job_start(config: *const JobConfig, config_size: 
         // Playden. Refuse a missing store: never create a new anonymous session.
         let metadata = std::fs::symlink_metadata(&keyring).map_err(|_| "sign-in-required")?;
         if !metadata.file_type().is_file() { return Err("credential-file"); }
-        xodus_cli::init_file_secrets(keyring.to_str().ok_or("credential-path")?).map_err(|_| "credential-store")?;
+        unsafe extern "C" {fn xodus_ps5_commit_keyring(bytes:*const u8,len:usize)->i32;}
+        let tokens=xodus_cli::TokenManager::with_host_file(&keyring,std::sync::Arc::new(|bytes|
+            unsafe {xodus_ps5_commit_keyring(bytes.as_ptr(),bytes.len())==0})).map_err(|_| "credential-store")?;
         let client = xodus_cli::http_client_builder()?.redirect(xodus_cli::RedirectPolicy::none())
             .connect_timeout(Duration::from_secs(20)).read_timeout(Duration::from_secs(30))
             .build().map_err(|_| "http-client")?;
-        Ok((client, xodus_cli::TokenManager::with_keychain_and_memory()))
+        Ok((client, tokens))
     });
     let Ok(job) = job else { return -4; };
     registry.generation = id;

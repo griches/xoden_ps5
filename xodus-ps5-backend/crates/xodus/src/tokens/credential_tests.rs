@@ -73,6 +73,41 @@ fn user(name: &str) -> User {
 fn session_tokens(value: &str) -> HashMap<String, Token> {
     HashMap::from([(super::PASSPORT_STS.into(), Token::Compact(value.into()))])
 }
+
+fn phone_candidate() -> crate::api::live::device_code::Credentials {
+    crate::api::live::device_code::Credentials::from_private_candidate_record(&serde_json::to_vec(&serde_json::json!({
+        "schema":1,"client_id":"000000004424da1f","access_token":"synthetic-access",
+        "refresh_token":"synthetic-refresh","user_id":"new-phone-user",
+        "expires_at":chrono::Utc::now().timestamp()+3600})).unwrap()).unwrap()
+}
+
+#[test]
+fn credential_phone_candidate_never_replaces_active_account_and_logout_clears_both() {
+    let (backend, manager) = setup();
+    manager.save_user_session(user("old-active"),session_tokens("old-active-token")).unwrap();
+    let before = backend.values.lock().unwrap().clone();
+    assert!(manager.phone_candidate().unwrap().is_none());
+    manager.save_phone_candidate(&phone_candidate()).unwrap();
+    assert_eq!(manager.phone_candidate().unwrap().unwrap().user_id(),Some("new-phone-user"));
+    assert_eq!(manager.get_user().unwrap().puid,"old-active");
+    assert!(matches!(manager.get_user_sts_token().unwrap(),Token::Compact(t) if t=="old-active-token"));
+    for (key, value) in before { assert_eq!(backend.values.lock().unwrap().get(&key),Some(&value)); }
+    manager.remove_persistent().unwrap();
+    assert!(manager.phone_candidate().unwrap().is_none());
+    assert!(manager.get_user().is_err());
+}
+
+#[test]
+fn credential_phone_candidate_failed_write_preserves_working_account() {
+    for fault in ["missing","empty","different"] {
+        let (backend, manager) = setup();
+        manager.save_user_session(user("old-active"),session_tokens("old-active-token")).unwrap();
+        *backend.fault.lock().unwrap() = Some(fault);
+        assert!(manager.save_phone_candidate(&phone_candidate()).is_err());
+        assert_eq!(manager.get_user().unwrap().puid,"old-active");
+        assert!(matches!(manager.get_user_sts_token().unwrap(),Token::Compact(t) if t=="old-active-token"));
+    }
+}
 #[test]
 fn credential_login_session_is_one_verified_value_and_never_merges_old_accounts_tokens() {
     let (backend, manager) = setup();
