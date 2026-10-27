@@ -1,9 +1,10 @@
 # Native PS5 downloader boundary — in development
 
 This crate is the C interface being built for Playden's native Xbox downloader.
-It currently inspects a single 4096-byte XVD package header. It does **not** sign
-in, check entitlement, download, decrypt, extract, or launch a game. A successful
-header parse does not establish signature validity or ownership.
+Its default build inspects a single 4096-byte XVD package header. The optional
+`job-engine` build also exposes a worker lifecycle, using the shared authenticated
+job implementation. Neither build has console runtime acceptance yet. A
+successful header parse does not establish signature validity or ownership.
 
 The exported ABI uses fixed-size fields, a version and a caller-provided output
 size. Errors leave the caller's output unchanged. Header timestamps that overflow
@@ -55,13 +56,12 @@ size. This is **not** a complete platform ABI audit. The link probe supplies two
 versioned stat aliases, a thread-name adapter, and an empty backtrace module
 iterator. None of these have console runtime acceptance yet.
 
-`entropy_decl.h` only lets the TLS dependency compile. It does not implement
-`getentropy`: a verified entropy adapter is mandatory before networking can be
-linked/executed. Certificate trust configuration, socket/thread/runtime behaviour,
-account refresh, package extraction, bounded progress, cooperative cancellation,
-and native Playden job integration remain unfinished. Keep using the existing
-worker until those requirements have been implemented and tested; do not claim
-this probe is a working native downloader.
+The optional full-engine probe (`--job-engine`) now links with the SDK's
+`libSceRandom` through bounded `getentropy`/`getrandom` adapters. Adapter contract
+and failure handling pass a host mock test; real console entropy, sockets,
+threads and runtime execution still need acceptance. Directory-entry and event
+layouts are asserted in both C and Rust before their versioned libc aliases are
+linked. Keep using the existing worker until native console acceptance passes.
 
 ## Embedded engine checkpoint
 
@@ -70,7 +70,7 @@ library, without CLI startup, GUI creation or signal handlers. The host supplies
 the client, token manager and private roots. Subscription and entitlement checks
 remain in the shared job runner. Typed progress callbacks omit paths, URLs and
 credentials; phase callbacks follow successful durable job-result publication.
-The default C interface remains header-only; no C job lifecycle is exposed yet.
+The default C interface remains header-only; the optional C job API is described below.
 
 Verification: 73 shared-library tests pass. The CLI suite passes 125 tests with
 one existing case-sensitive-path test failing on this Mac; that same test also
@@ -86,4 +86,24 @@ and only then releases the lease and exposes a terminal snapshot. It never delet
 partial files itself. A host regression test holds a simulated file operation open
 and verifies the lease and unpublished cancellation remain until that operation
 finishes. The runtime supports the existing NTFS parser's `block_in_place` bridge.
-This lifecycle is not yet wired to the C ABI or Playden UI.
+This lifecycle is now exposed through the optional C ABI, but is not yet wired into Playden.
+
+## Optional C job API
+
+`xodus_job_start/poll/cancel/release` use generation IDs, bounded snapshots and
+caller-supplied output sizes. The host supplies approved absolute private storage
+roots and its packaged PEM CA bundle. Certificate validation remains enabled;
+empty/invalid bundles and attempts to switch trust anchors are rejected. Internal
+account/catalogue clients share the configured trust. Existing credentials are
+required; this interface does not launch sign-in UI or create an anonymous store.
+The host must keep the library loaded and wait for a terminal snapshot before
+cleanup or releasing a handle. Cancellation preserves partial files for the
+host's managed cleanup policy. Completed means the job protocol finished, not
+necessarily that a game is installed: package choice is a separate result.
+
+Host verification: 74 shared engine tests and 5 native boundary/lifecycle tests
+pass. The C lifecycle test verifies worker startup, setup failure, exclusive
+handles, polling, release and stale-handle rejection. The full optional job
+engine now compiles and links into `xodus-job-probe.elf` for the adapted PS5
+target. This is a link result, not console download acceptance. The probe build
+script never deploys or runs it.

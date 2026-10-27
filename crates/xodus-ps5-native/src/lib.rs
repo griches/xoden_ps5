@@ -165,3 +165,9 @@ mod tests {
 
 #[cfg(feature = "job-engine")]
 pub mod job;
+
+#[cfg(feature = "job-engine")]
+mod job_ffi;
+
+#[cfg(target_os = "freebsd")]
+mod abi_checks;

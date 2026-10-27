@@ -193,7 +193,7 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
         let profile = super::profile::profile(tokens).await?;
         if profile["account"] != account { return Err("account-changed"); }
         let ids: Vec<_> = entries.keys().filter(|id| entitled(id, &entries, chrono::Utc::now().timestamp())).cloned().collect();
-        let public = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).timeout(Duration::from_secs(30)).build().map_err(|_| "catalog-client")?;
+        let public = crate::transport::builder()?.redirect(reqwest::redirect::Policy::none()).timeout(Duration::from_secs(30)).build().map_err(|_| "catalog-client")?;
         let mut rows = Vec::new();
         for chunk in ids.chunks(60) {
             state(root, req, "refreshing", json!({"completed":rows.len(),"totalEntitlements":ids.len()}))?;

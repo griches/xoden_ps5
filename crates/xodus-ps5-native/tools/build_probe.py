@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--llvm-config', type=Path, required=True)
     parser.add_argument('--work-dir', type=Path, required=True)
     parser.add_argument('--toolchain', default='nightly')
+    parser.add_argument('--job-engine', action='store_true', help='link the full job lifecycle probe (never deploy)')
     args = parser.parse_args()
     crate = Path(__file__).resolve().parents[1]
     workspace = crate.parents[1]
@@ -62,10 +63,12 @@ def main():
         CFLAGS_x86_64_unknown_freebsd='-include '+shlex.quote(str(crate/'tools/entropy_decl.h')),
         RUSTFLAGS='-Ztls-model=emulated --cfg libc_unstable_freebsd_version="11"')
     run(['cargo','+'+args.toolchain,'build','--manifest-path',workspace/'Cargo.toml','-p','xodus-ps5-native',
+         *(['--features','job-engine'] if args.job_engine else []),
          '--locked','-Zbuild-std=std,panic_abort','--target','x86_64-unknown-freebsd','--release'],env=env)
-    output = work/'xodus-header-probe.elf'
-    run([sdk/'bin/prospero-clang','-Wl,--gc-sections','-I',crate/'include',crate/'tests/c_api.c',
+    output = work/('xodus-job-probe.elf' if args.job_engine else 'xodus-header-probe.elf')
+    run([sdk/'bin/prospero-clang','-Wl,--gc-sections',*(['-DXODUS_JOB_ENGINE'] if args.job_engine else []),'-I',crate/'include',crate/'tests/c_api.c',
          crate/'tools/probe_compat.c',work/'target/x86_64-unknown-freebsd/release/libxodus_ps5_native.a',
+         *([crate/'tools/ps5_entropy.c','-lSceRandom'] if args.job_engine else []),
          '-lunwind','-o',output],env=env)
     print('Built only; not deployed or executed:',output)
 

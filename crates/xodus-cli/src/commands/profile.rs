@@ -47,7 +47,7 @@ fn image_data(bytes: &[u8]) -> Option<String> {
 }
 
 pub(super) async fn xbox_session(tokens: &TokenManager) -> Result<(reqwest::Client, String, String), &'static str> {
-    let client = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none())
+    let client = crate::transport::builder()?.redirect(reqwest::redirect::Policy::none())
         .timeout(super::session::REQUEST_TIMEOUT).user_agent("xodus-nexus-profile/1").build().map_err(|_| "http-client")?;
     let (account, device, user) = super::session::prepare(tokens, &client).await.map_err(|stage| {
         super::session::diagnostic(stage); stage

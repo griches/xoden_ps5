@@ -5,6 +5,7 @@
 //! client, token manager and approved private roots. The job runner retains its
 //! live subscription/entitlement checks and atomic prepared-game publication.
 mod job_observer;
+mod transport;
 #[path = "embedded_commands.rs"]
 mod commands;
 mod license;
@@ -22,3 +23,6 @@ pub use job_observer::{DownloadProgress, JobObserver, Observer};
 pub use commands::ps5_job::run_observed as run_playden_job_observed;
 
 pub use commands::ps5_job::JobLease;
+
+pub use transport::{configure as configure_embedded_trust, builder as http_client_builder};
+pub use reqwest::redirect::Policy as RedirectPolicy;

@@ -104,7 +104,7 @@ pub(super) async fn store_session(
     if tokens.get_user().map_err(|_| "stored-account")?.username != account {
         return Err("account-changed");
     }
-    let client = reqwest::Client::builder()
+    let client = crate::transport::builder()?
         .redirect(reqwest::redirect::Policy::none())
         .timeout(super::session::REQUEST_TIMEOUT)
         .user_agent("Xodus-Nexus-membership/0.2.3")

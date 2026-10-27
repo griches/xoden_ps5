@@ -23,6 +23,31 @@ typedef struct XodusPackageHeader {
 int32_t xodus_inspect_package_header(const uint8_t *bytes, size_t length,
                                     XodusPackageHeader *output, size_t output_size,
                                     uint32_t abi_version);
+/* Optional job-engine feature. Host supplies approved absolute storage roots
+ * and its packaged CA bundle. Start copies paths and schedules IO on a worker.
+ * No request-controlled paths. Existing private xodus-keyring.ron is required.
+ * Keep the library loaded until a terminal poll and successful release.
+ * Return codes: 0 success; -1 arguments/ABI; -2 stale handle; -3 busy;
+ * -4 worker unavailable. On error output arguments remain unchanged. */
+typedef struct XodusJobConfig {
+    const uint8_t *root; size_t root_len;
+    const uint8_t *games; size_t games_len;
+    const uint8_t *trust; size_t trust_len;
+} XodusJobConfig;
+typedef struct XodusJobSnapshot {
+    uint32_t abi_version, struct_size, state, flags;
+    uint64_t completed_bytes, total_bytes, bytes_per_second, sequence;
+    char phase[32], error[32];
+} XodusJobSnapshot;
+/* States 1 starting, 2 running, 3 stopping; terminal: 4 complete, 5 failed,
+ * 6 cancelled. Only terminal permits cleanup. Complete means job protocol
+ * finished: read job-result.json to distinguish prepared/package-choice/etc.
+ * Flags: bit 0 total known, bit 1 paused. Strings contain no credentials/URLs.
+ * Cancel preserves partial files; release refuses a nonterminal job. */
+int32_t xodus_job_start(const XodusJobConfig *, size_t, uint32_t, uint64_t *handle);
+int32_t xodus_job_poll(uint64_t handle, XodusJobSnapshot *, size_t, uint32_t);
+int32_t xodus_job_cancel(uint64_t handle);
+int32_t xodus_job_release(uint64_t handle);
 #ifdef __cplusplus
 }
 #endif
