@@ -23,6 +23,8 @@ std::string XboxBridgeDiagnostics(std::string_view log) {
         else if (line.find("Phone runtime refresh network failure")!=line.npos) marker="phone-refresh-network";
         else if (line.find("Phone runtime refresh invalid response")!=line.npos) marker="phone-refresh-response";
         else if (line.find("Phone runtime CA bundle")!=line.npos) marker="phone-trust-unavailable";
+        else if (line.find("Phone game application refresh granted")!=line.npos) marker="game-application-granted";
+        else if (line.find("Phone game application refresh rejected")!=line.npos) marker="game-application-rejected";
         else if (line.find("Microsoft rejected the phone runtime ticket")!=line.npos) marker="phone-ticket-rejected";
         else if (line.find("Microsoft rejected the runtime device ticket")!=line.npos) marker="device-ticket-rejected";
         else if (line.find("Active phone session is invalid")!=line.npos) marker="invalid-phone-session";
