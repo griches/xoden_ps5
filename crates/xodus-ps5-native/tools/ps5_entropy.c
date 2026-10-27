@@ -1,30 +1,27 @@
-/* PS5 TLS/Rust entropy adapter. Uses the SDK's libSceRandom entry point;
- * never libc arc4random (which can abort) or a non-cryptographic fallback. */
+/* PS5 TLS/Rust entropy adapter. Uses the kernel random device already used by
+ * Playden. Never libc arc4random or a non-cryptographic fallback. */
 #include <errno.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#if defined(__FreeBSD__) || defined(XODUS_TEST_RANDOM_MODULE)
-#include <pthread.h>
-extern int sceKernelLoadStartModule(const char *, size_t, const void *, unsigned int, const void *, int *);
-extern int sceKernelDlsym(int, const char *, void **);
-static pthread_once_t random_once = PTHREAD_ONCE_INIT;
-static int random_status;
-int xodus_ps5_entropy_status(void) { return random_status; }
-static int (*random_fill)(uint8_t *, size_t);
-static void load_random(void) {
-    int result = 0;
-    const int handle = sceKernelLoadStartModule("/system/common/lib/libSceRandom.sprx",0,NULL,0,NULL,&result);
-    random_status = handle;
-    void *symbol = NULL;
-    if (handle >= 0 && (random_status = sceKernelDlsym(handle,"sceRandomGetRandomNumber",&symbol)) == 0 && symbol)
-        random_fill = (int (*)(uint8_t *, size_t))symbol;
-}
+#if defined(__FreeBSD__) || defined(XODUS_TEST_RANDOM_DEVICE)
+#include <fcntl.h>
+#include <unistd.h>
+int xodus_ps5_entropy_status(void) { return errno; }
 static int random_bytes(uint8_t *buffer, size_t size) {
-    if (pthread_once(&random_once,load_random) != 0 || !random_fill) return -1;
-    return random_fill(buffer,size);
+    const int fd = open("/dev/urandom",O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    size_t done = 0;
+    while (done < size) {
+        const ssize_t count = read(fd,buffer + done,size - done);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) { const int error = count == 0 ? EIO : errno; close(fd); errno = error; return -1; }
+        done += (size_t)count;
+    }
+    close(fd);
+    return 0;
 }
 #else
 extern int sceRandomGetRandomNumber(uint8_t *buffer, size_t size);
