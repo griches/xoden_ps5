@@ -376,6 +376,15 @@ void Jobs::Load() {
         else if (phase == "cancelled" && !next->partials.empty()) { next->phase = "cancelled"; next->message = "Download paused. Resume to continue, or cancel to delete its files."; }
         else if (phase != "prepared" && phase != "complete" && phase != "cancelled") { next->phase = "failed"; next->message = "The Xbox operation was interrupted. Choose Install to resume it."; }
     }
+    if (std::find(next->partials.begin(),next->partials.end(),next->active_game) != next->partials.end()) {
+        const auto checkpoint = Read(storage_,("progress-" + ToInstallId(next->active_game) + ".json").c_str(),4096);
+        if (checkpoint && Schema(*checkpoint) && Text(*checkpoint,"productId") == next->active_game.value) {
+            const auto* done = checkpoint->Find("doneBytes"); const auto* total = checkpoint->Find("totalBytes");
+            if (done && total && done->AsUint64() && total->AsUint64() && *done->AsUint64() <= *total->AsUint64()) {
+                next->done_bytes = *done->AsUint64(); next->total_bytes = *total->AsUint64();
+            }
+        }
+    }
     std::lock_guard<std::mutex> lock(mutex_); state_ = std::move(next);
 }
 void Jobs::Execute(const Request& request) {
@@ -432,6 +441,11 @@ void Jobs::ExecuteNative(GameId game, const std::string& request_id) {
     // The runner's contract guarantees no outstanding file writes here. Reload
     // prepared/partial admission before any cleanup, including late cancellation.
     const auto previous = Snapshot();
+    if (game.valid() && result != NativeResult::Complete && previous->total_bytes && previous->done_bytes <= previous->total_bytes) {
+        const auto checkpoint = "{\"schema\":1,\"productId\":\"" + game.value + "\",\"doneBytes\":" +
+            std::to_string(previous->done_bytes) + ",\"totalBytes\":" + std::to_string(previous->total_bytes) + "}";
+        storage_.WriteAtomicPrivate("progress-" + ToInstallId(game) + ".json",Bytes(checkpoint.begin(),checkpoint.end()));
+    }
     Load();
     const auto loaded = Snapshot();
     if (std::find(loaded->partials.begin(),loaded->partials.end(),game) != loaded->partials.end()) {

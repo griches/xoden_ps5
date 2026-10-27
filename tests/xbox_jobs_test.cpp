@@ -159,12 +159,20 @@ int main() {
         assert(!native.Cancel(game));
         for (int i=0;i<2000 && !saw_cancel;++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
         assert(saw_cancel && std::filesystem::exists(partial/"content.bin"));
+        const auto pending_request = store.Read("job-request.json"); assert(pending_request.ok());
+        const auto pending_value = steam::json::Parse(std::string(pending_request.value().begin(),pending_request.value().end()));
+        Put(store,"job-result.json","{\"schema\":1,\"requestId\":\"" + pending_value->Find("requestId")->text() + "\",\"productId\":\"9NP1P1WFS0LB\",\"status\":\"cancelled\"}");
         allow_drain = true; Wait(native,"cancelled");
         assert(std::filesystem::exists(partial/"content.bin"));
         assert(native.Snapshot()->partials.size() == 1);
         const auto request = store.Read("job-request.json"); assert(request.ok());
         const auto value = steam::json::Parse(std::string(request.value().begin(),request.value().end()));
         assert(value->Find("contentId")->text() == "11111111-1111-4111-8111-111111111111");
+    }
+    {
+        stores::xbox::Jobs recovered(native_config); Wait(recovered,"cancelled");
+        // A reopened app restores the paused byte counters without network IO.
+        assert(recovered.Snapshot()->done_bytes == 40 && recovered.Snapshot()->total_bytes == 100);
     }
     // Another operation cannot erase the selected edition used by Resume.
     Put(store,"job-request.json",R"({"schema":1,"requestId":"refresh","operation":"refresh","market":"GB"})");
