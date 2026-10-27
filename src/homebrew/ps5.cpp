@@ -9,6 +9,8 @@
 #include "steam/install_volumes.h"
 #include "stores/local/copy_runner.h"
 #include "stores/local/library_source.h"
+#include "stores/xbox/library_source.h"
+#include "platform/managed_directory.h"
 #include "app/diagnostic_log.h"
 #include "platform/ps5/title_registry.h"
 #include "platform/ps5/title_remover.h"
@@ -149,6 +151,22 @@ struct UsbKeyboard {
 
 std::string title_root = "/app0";
 std::string log_root = "/app0/logs";
+// Explicit developer request only; the dedicated capture folder is cleaned by
+// DevLoop after retrieval. Never write to the console's media gallery directly.
+void capture_devloop(playden::homebrew::Render& renderer, int width, int height) {
+    static unsigned frames = 0;
+    if (++frames % 8 || unlink((title_root + "/devloop-shot").c_str()) != 0) return;
+    using namespace playden::platform;
+    auto root = ManagedDirectory::Open(title_root, DirectoryPolicy::kApprovedTree);
+    if (!root) return;
+    auto captures = root->OpenChild("devloop-captures", DirectoryPolicy::kApprovedTree, true, 0777);
+    if (!captures) return;
+    const auto name = "frame-" + std::to_string(hui::sys::monotonic_us()) + ".png";
+    const int fd = captures->CreateExclusiveFile(name, 0666);
+    if (fd < 0) return;
+    close(fd);
+    if (captures->Validate()) renderer.capture_png(captures->path() / name, width, height);
+}
 // Settings › Downloads for slow networks, read by the install worker when a download starts.
 std::atomic<bool> downloads_slow_network{false};
 // Development requests are processed in file order on the first frame.
@@ -684,6 +702,7 @@ int main() {
         playden::stores::Registry stores;
         stores.Add(std::make_unique<playden::stores::SteamAccount>(auth, sessions, auth_log));
         stores.Add(std::make_unique<playden::stores::SteamLibrarySource>(library_service));
+        stores.Add(std::make_unique<playden::stores::xbox::XboxLibrarySource>("/data/playden/xbox"));
         stores.Add(std::make_unique<playden::stores::SteamDetailsSource>(app_details));
         // Imported games: imports.json next to installs.json in the runtime state folder; their
         // folders in /data/playden-import and playden/import on each drive (a drive counts while mounted).
@@ -836,6 +855,7 @@ int main() {
                 static_cast<float>(now - last_render_us) / 1000000.0F;
             last_render_us = now;
             renderer.draw(simulation, display.width(), display.height(), frame_dt);
+            capture_devloop(renderer, display.width(), display.height());
             const auto drawn = hui::sys::monotonic_us();
             if (!display.swap()) break;
             // Frames over 50 ms are logged with where the time went (milliseconds), at most a few hundred per run.

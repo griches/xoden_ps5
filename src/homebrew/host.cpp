@@ -9,6 +9,7 @@
 #include "steam/install_volumes.h"
 #include "stores/local/copy_runner.h"
 #include "stores/local/library_source.h"
+#include "stores/xbox/library_source.h"
 #include "app/diagnostic_log.h"
 #include "runtime/settings_storage.h"
 #include "homebrew/input_adapter.hpp"
@@ -572,6 +573,7 @@ int main(int argc, char** argv) {
         stores = std::make_unique<playden::stores::Registry>();
         stores->Add(std::make_unique<playden::stores::SteamAccount>(*auth, *sessions, auth_log));
         stores->Add(std::make_unique<playden::stores::SteamLibrarySource>(*library_service));
+        stores->Add(std::make_unique<playden::stores::xbox::XboxLibrarySource>((options->data_directory / "xbox").string()));
         stores->Add(std::make_unique<playden::stores::SteamDetailsSource>(*app_details));
         // Imported games: <data>/playden-import is the drop folder, playden/import on each extra drive.
         playden::stores::local::LocalLibraryConfig import_config;
