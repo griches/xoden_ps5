@@ -68,7 +68,7 @@ def main():
     output = work/('xodus-job-probe.elf' if args.job_engine else 'xodus-header-probe.elf')
     run([sdk/'bin/prospero-clang','-Wl,--gc-sections',*(['-DXODUS_JOB_ENGINE'] if args.job_engine else []),'-I',crate/'include',crate/'tests/c_api.c',
          crate/'tools/probe_compat.c',work/'target/x86_64-unknown-freebsd/release/libxodus_ps5_native.a',
-         *([crate/'tools/ps5_entropy.c','-lSceRandom'] if args.job_engine else []),
+         *([crate/'tools/ps5_entropy.c','-Wl,--wrap=arc4random_buf'] if args.job_engine else []),
          '-lunwind','-o',output],env=env)
     print('Built only; not deployed or executed:',output)
 

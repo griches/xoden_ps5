@@ -82,7 +82,12 @@ fn worker(
     trace(b"xodus-native: opening lease\n");
     let lease = JobLease::open(&root, &games, Some(mailbox.clone()))?;
     trace(b"xodus-native: building runtime\n");
-    let runtime = Builder::new_multi_thread().worker_threads(2).enable_all().max_blocking_threads(4).build().map_err(|_| "job-runtime")?;
+    let runtime = Builder::new_multi_thread().worker_threads(2).enable_all().max_blocking_threads(4).build().map_err(|error| match error.raw_os_error() {
+        Some(1) => "job-runtime-eperm", Some(12) => "job-runtime-enomem",
+        Some(22) => "job-runtime-einval", Some(24) => "job-runtime-emfile",
+        Some(45) => "job-runtime-enotsup", Some(78) => "job-runtime-enosys",
+        _ => "job-runtime",
+    })?;
     trace(b"xodus-native: runtime ready\n");
     let result = run_drained(runtime, async {
         trace(b"xodus-native: setup starting\n");

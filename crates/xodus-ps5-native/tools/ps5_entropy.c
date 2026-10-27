@@ -50,6 +50,6 @@ ssize_t getrandom(void *buffer, size_t length, unsigned int flags) {
 
 /* Rust's FreeBSD std uses this for HashMap/Tokio seeds, independently of
  * getrandom. Its void API cannot report entropy failure: fail closed. */
-void arc4random_buf(void *buffer, size_t length) {
+void __wrap_arc4random_buf(void *buffer, size_t length) {
     if (fill(buffer,length) != 0) abort();
 }

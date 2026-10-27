@@ -6,7 +6,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 xodus = { path = "../xodus" }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
 reqwest = { workspace = true }
 chrono = { workspace = true }
 tracing = { workspace = true }

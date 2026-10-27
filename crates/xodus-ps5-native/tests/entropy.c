@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/types.h>
-void arc4random_buf(void *, size_t);
+void __wrap_arc4random_buf(void *, size_t);
 int getentropy(void *, size_t);
 ssize_t getrandom(void *, size_t, unsigned int);
 static int fail, calls;
@@ -24,10 +24,10 @@ int main(void) {
     assert(getentropy(NULL,1) == -1 && errno == EFAULT && calls == 8);
     assert(getrandom(bytes,257,0) == 257 && calls == 17 && bytes[256] == 0xa5);
     assert(getrandom(bytes,1,1) == -1 && errno == EINVAL && calls == 17);
-    arc4random_buf(NULL,0);
+    __wrap_arc4random_buf(NULL,0);
     assert(calls == 17);
     memset(bytes,0,sizeof(bytes));
-    arc4random_buf(bytes,sizeof(bytes));
+    __wrap_arc4random_buf(bytes,sizeof(bytes));
     assert(calls == 26);
     for (int i = 0; i < 257; ++i) assert(bytes[i] == 0xa5);
     fail = 1;
