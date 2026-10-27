@@ -99,12 +99,13 @@ struct Service {
 }
 
 fn service_main(key: String) {
+    let phone_test = std::env::var("XODUS_TEST_PHONE_LOGIN").as_deref() == Ok("1");
     let tokens_path = token_file();
     log(format!(
         "start pid {} port {PORT} tokens {tokens_path}",
         std::process::id()
     ));
-    let store = match keyring_core::sample::Store::new_with_backing(&tokens_path) {
+    let store = match load_store(&tokens_path,phone_test) {
         Ok(store) => store,
         Err(err) => return log(format!("token store: {err}")),
     };
@@ -138,7 +139,7 @@ fn service_main(key: String) {
             device: tokio::sync::Mutex::new(None),
             // Explicit test mode only. It never falls back to the working
             // account and never saves this process's keyring snapshot.
-            phone_test: std::env::var("XODUS_TEST_PHONE_LOGIN").as_deref() == Ok("1"),
+            phone_test,
             phone: tokio::sync::Mutex::new(None),
         });
         loop {
@@ -151,6 +152,16 @@ fn service_main(key: String) {
             }
         }
     });
+}
+
+fn load_store(path: &str, read_only: bool) -> Result<Arc<keyring_core::sample::Store>,Error> {
+    if !read_only { return Ok(keyring_core::sample::Store::new_with_backing(path)?); }
+    use std::io::Read;
+    let file=std::fs::File::open(path)?;
+    if !file.metadata()?.is_file() || file.metadata()?.len()>8*1024*1024 { return Err("Invalid phone-test credential file".into()); }
+    let mut bytes=Vec::new();file.take(8*1024*1024+1).read_to_end(&mut bytes)?;
+    if bytes.len()>8*1024*1024 { return Err("Invalid phone-test credential file".into()); }
+    Ok(keyring_core::sample::Store::new_internal(ron::de::from_bytes(&bytes).map_err(|_| "Invalid phone-test credential file")?,None))
 }
 
 impl Service {
@@ -245,7 +256,12 @@ impl Service {
             .await
             .map_err(|_| "Microsoft rejected the phone runtime scope")?;
         let expiry = chrono::Utc::now().timestamp() + fresh.expires_in().as_secs() as i64;
-        let token = format!("t={}", fresh.access_token());
+        let mut token = None;
+        for prefix in ["t=", "d="] {
+            let ticket=format!("{prefix}{}", fresh.access_token());
+            if xodus::api::xbox::authenticate_xbox_user(&self.client,ticket.clone()).await.is_ok() { token=Some(ticket);break; }
+        }
+        let token=token.ok_or("Microsoft rejected the phone runtime ticket")?;
         *held = Some(fresh);
         let device = self.device_token().await?;
         let response = xodus::api::live::exchange_device_token(
@@ -385,6 +401,23 @@ impl Service {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn phone_test_store_drop_never_rewrites_the_shared_credential_snapshot() {
+        use keyring_core::api::CredentialStoreApi;
+        let name=format!("xodus-readonly-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+        let root=std::env::temp_dir().join(name);
+        std::fs::create_dir(&root).unwrap();
+        let path=root.join("synthetic.ron");
+        let empty=keyring_core::sample::Store::new_internal(Default::default(),None);
+        let before=ron::ser::to_string(&empty.creds).unwrap();
+        std::fs::write(&path,&before).unwrap();
+        let store=load_store(path.to_str().unwrap(),true).unwrap();
+        store.build("synthetic","entry",None).unwrap().set_secret(b"synthetic-only").unwrap();
+        drop(store);
+        assert_eq!(std::fs::read(&path).unwrap(),before.as_bytes());
+        std::fs::remove_file(path).unwrap();std::fs::remove_dir(root).unwrap();
+    }
 
     fn service() -> Service {
         // Never create Windows-style log filenames or access a real keyring.
