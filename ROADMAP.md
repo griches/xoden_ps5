@@ -5,16 +5,17 @@ test evidence; this page tracks outstanding functionality.
 
 ## Priorities
 
-- [ ] Fresh Microsoft sign-in on PS5, using a phone/device-code flow if its
-  credentials can support the PC game licensing requirements.
-- [ ] Complete native phone sign-in and game-runtime validation. OAuth, Xbox
-  profile/marketplace tickets, Store refresh and a real MIO PC content license
-  with authenticated content-key unpack passed. Direct refresh into MIO's own
-  MSA client was rejected; the runtime exchange needs more work. Gary requested
-  full sign-out, which passed on the console and cleared user credentials and
-  the cached library. Do not restore the old session. The fresh native phone
-  flow now displays a QR code and short code; awaiting user approval, then
-  verify saved candidate persistence, activation, refresh, expiry and runtime.
+- [ ] Complete the single **Sign in with Microsoft** flow for account, library,
+  licensing and game authorisation. The PS5 performs the original browser
+  broker exchange through a paired local computer page and saves one session;
+  library loading follows automatically. The separate phone/computer choice
+  has been removed. Live browser approval reaches Xbox verification, which
+  still needs acceptance; in-game authentication remains unverified.
+- [ ] Verify sign-in persistence, expiry, account changes and game runtime end
+  to end. Earlier device-code login proved library, subscription and PC licence
+  access but not MIO's game grant. It is not the user-facing sign-in route.
+  Preserve installed games/saves and never restore the previously cleared
+  session as a substitute for fresh approval.
 - [ ] Continue tuning direct-download throughput. Deployed bounded parallel
   ranges measured 12.3–15.5 MB/s during MIO, including a single-large-file window,
   compared with earlier 6.3 MB/s on Elder Gods. These are different games, not
