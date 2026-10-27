@@ -77,7 +77,7 @@ std::vector<SettingDefinition> BuildCatalogue() {
   list.push_back(Text("extra_arguments", "Extra arguments", "Added after the arguments the game needs.",
                       "[application] arguments", G::kGame));
   // Display.
-  list.push_back(Choice("resolution", "Resolution", "Size of the game's screen. Higher is sharper and slower.",
+  list.push_back(Choice("resolution", "Resolution", "Maximum resolution offered inside the game. Restart the game after changing it. Higher is sharper and slower.",
                         "[display] desktop", G::kDisplay,
                         {{"1280x720", "1280×720", "Smoother frame rate in heavy scenes. Softer on a 4K TV."},
                          {"1920x1080", "1920×1080", "Full HD."},
