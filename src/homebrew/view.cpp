@@ -1534,26 +1534,32 @@ class Render::Impl
         const std::size_t installed = std::count_if(
             state.installations.begin(), state.installations.end(),
             [&state](const Installation &installation) {
-                return installation.installed_bytes > 0 || !state.simulation_mode;
-            }) + state.external_games.size();
+                return in_app_catalog(state,installation.game_id) && (installation.installed_bytes > 0 || !state.simulation_mode);
+            }) + std::count_if(state.external_games.begin(),state.external_games.end(),
+                              [&state](const LiveExternalGame& game) { return in_app_catalog(state,game.game_id); });
+        const auto member_count = [&state](const auto& members) {
+            return std::count_if(members.begin(),members.end(),[&state](GameId id) { return in_app_catalog(state,id); });
+        };
+        const auto all_count = std::count_if(state.games.begin(),state.games.end(),
+                                             [&state](const Game& game) { return in_app_catalog(state,game.id); });
         std::vector<RailEntry> entries = {
             {"rail-installed", "Installed", std::to_string(installed), state.library.scope == "installed"},
-            {"rail-all", "All", std::to_string(state.games.size()), state.library.scope == "all"},
-            {"rail-favorites", "Favorites", std::to_string(state.library.favorites.size()),
+            {"rail-all", "All", std::to_string(all_count), state.library.scope == "all"},
+            {"rail-favorites", "Favorites", std::to_string(member_count(state.library.favorites)),
              state.library.scope == "favorites"},
-            {"rail-hidden", "Hidden", std::to_string(state.library.hidden.size()), state.library.scope == "hidden"}};
-        if (has_imported_games(state))
+            {"rail-hidden", "Hidden", std::to_string(member_count(state.library.hidden)), state.library.scope == "hidden"}};
+        if (!state.gamepass_only && has_imported_games(state))
             entries.push_back({"rail-imported", "Imported",
                                std::to_string(std::count_if(state.games.begin(), state.games.end(),
                                                             [](const Game &game) { return game.id.store == Store::kLocal; })),
                                state.library.scope == "imported"});
         const auto xbox_games = std::count_if(state.games.begin(), state.games.end(),
                                                [](const Game& game) { return game.id.store == Store::kXbox; });
-        if (xbox_games)
+        if (!state.gamepass_only && xbox_games)
             entries.push_back({"rail-xbox", "Xbox", std::to_string(xbox_games), state.library.scope == "xbox"});
         for (const Collection &collection : state.library.collections)
             entries.push_back({"rail-" + collection.id, collection.name,
-                               std::to_string(collection.members.size()),
+                               std::to_string(member_count(collection.members)),
                                state.library.scope == collection.id});
         entries.push_back({"rail-new-collection", "New collection", "+", false});
         const auto selected_entry = std::find_if(entries.begin(), entries.end(),

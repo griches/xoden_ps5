@@ -3182,6 +3182,18 @@ void xbox_search_covers_the_complete_catalog() {
     check(std::find(scopes.begin(), scopes.end(), "xbox") != scopes.end(), "Xbox has its own library rail");
 }
 
+void gamepass_mode_migrates_the_old_xbox_category() {
+    auto model = make_live();
+    model.SetGamePassOnly(true);
+    auto& state = const_cast<playden::homebrew::State&>(model.state());
+    state.library.scope = "xbox";
+    model.UpdateXboxAccount("Player", "Saved account", false);
+    check(state.library.scope == "all", "old Xbox category becomes All in the Game Pass app");
+    check(model.HasGamesBeyondSteam(), "Game Pass app does not require a Steam account to open");
+    check(!has_row(model,"home-connect") && !has_row(model,"home-import"),
+          "empty Game Pass Home does not offer Steam or imported games");
+}
+
 void xbox_account_help_is_visible_without_authenticating() {
     auto model = make_live();
     model.UpdateXboxAccount("", "No Xbox account is connected to this console.", false);
@@ -3194,6 +3206,7 @@ void xbox_account_help_is_visible_without_authenticating() {
 }
 
 int main() {
+    gamepass_mode_migrates_the_old_xbox_category();
     xbox_account_help_is_visible_without_authenticating();
     xbox_install_does_not_wait_for_steam();
     xbox_search_covers_the_complete_catalog();

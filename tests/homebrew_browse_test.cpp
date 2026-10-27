@@ -403,10 +403,51 @@ void continue_playing_ends_in_more(const std::filesystem::path& fixtures)
           "a shelf of exactly 20 games has no More cell");
 }
 
+void gamepass_mode_excludes_steam_from_every_shelf_and_scope(const std::filesystem::path& fixtures)
+{
+    State state = fixture_state(fixtures);
+    Game xbox = state.games.front();
+    xbox.id = playden::GameId::Xbox("9N5PKH0KW2L1");
+    xbox.title = "Xbox fixture";
+    xbox.playtime_minutes = 10;
+    xbox.last_played = 2000;
+    const auto steam = state.games.front().id;
+    state.games.push_back(xbox);
+    state.gamepass_only = true;
+    state.library = {};
+    state.library.favorites = {steam,xbox.id};
+    state.library.collections.push_back({"mixed","Mixed",true,{steam,xbox.id}});
+    Installation installed{}; installed.game_id = xbox.id; installed.installed_bytes = 100;
+    state.installations.push_back(installed);
+    Job downloading{}; downloading.game_id = xbox.id; downloading.state = JobState::Downloading;
+    state.jobs.push_back(downloading);
+    for (const auto& scope : {"all","installed","favorites","mixed"}) {
+        state.library.scope = scope;
+        const auto games = filtered_games(state);
+        check(games.size() == 1 && games.front()->id == xbox.id,
+              "Game Pass scope excludes Steam games even with mixed saved data");
+    }
+    state.library.hidden = {steam,xbox.id}; state.library.scope = "hidden";
+    check(filtered_games(state).size() == 1 && filtered_games(state).front()->id == xbox.id,
+          "Hidden only includes games in the app catalog");
+    state.library.hidden.clear();
+    const auto projected = shelves(state);
+    check(projected.size() >= 4, "mixed fixture exercises continue, download, installed and favorites shelves");
+    for (const auto& shelf : projected)
+        for (auto id : shelf.game_ids) check(id == xbox.id, "Home shelves exclude Steam history and collections");
+    const auto scopes = library_rail_scopes(state);
+    check(std::find(scopes.begin(),scopes.end(),"xbox") == scopes.end() &&
+          std::find(scopes.begin(),scopes.end(),"imported") == scopes.end(),
+          "single-store app has no separate Xbox or imported category");
+    state.gamepass_only = false; state.library.scope = "all";
+    check(filtered_games(state).size() > 1, "regular Playden still supports the combined catalog");
+}
+
 int main(int argc, char** argv)
 {
     check(argc == 2, "fixture directory argument is required");
     const std::filesystem::path fixtures(argv[1]);
+    gamepass_mode_excludes_steam_from_every_shelf_and_scope(fixtures);
     live_unicode_query();
     filtering_uses_real_fixture(fixtures);
     all_sorts_keep_unknown_values_last(fixtures);

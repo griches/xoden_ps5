@@ -292,6 +292,7 @@ int main() {
 #else
         playden::homebrew::Simulation simulation({}, {}, playden::homebrew::ModelMode::Live);
 #endif
+        simulation.SetGamePassOnly(true);
         {
             std::vector<playden::runtime::SettingsPreset> presets;
             std::vector<playden::runtime::GameRecipe> recipes;

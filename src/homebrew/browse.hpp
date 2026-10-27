@@ -33,6 +33,7 @@ struct ShelfWindow {
     int count = 0;
 };
 
+[[nodiscard]] bool in_app_catalog(const State& state, GameId id) noexcept;
 [[nodiscard]] std::vector<const Game*> filtered_games(const State& state);
 [[nodiscard]] std::vector<Shelf> shelves(const State& state);
 [[nodiscard]] ShelfWindow shelf_window(int item_count, int focused_item,

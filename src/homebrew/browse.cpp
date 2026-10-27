@@ -19,7 +19,7 @@ constexpr int kLibraryColumns = 6;
 bool catalog_available(const State& state)
 {
     // Steam's catalog needs its account; another store's games (imported ones) are listed signed out too.
-    return state.account().cache_available || state.account().authentication == AuthState::SignedIn ||
+    return state.gamepass_only || state.account().cache_available || state.account().authentication == AuthState::SignedIn ||
            state.account().authentication == AuthState::Offline ||
            std::any_of(state.games.begin(), state.games.end(), [](const Game& game) { return game.id.store != Store::kSteam; });
 }
@@ -75,7 +75,7 @@ const Game* find_game(const State& state, GameId id)
 void append_known(const State& state, Shelf& shelf, GameId id, std::set<GameId>& seen)
 {
     const Game* game = find_game(state, id);
-    if (game != nullptr && !state.library.hidden.contains(id) && seen.insert(id).second)
+    if (game != nullptr && in_app_catalog(state,id) && !state.library.hidden.contains(id) && seen.insert(id).second)
         shelf.game_ids.push_back(id);
 }
 
@@ -99,6 +99,11 @@ void select_game(State& state, GameId id, int index)
 
 } // namespace
 
+bool in_app_catalog(const State& state, GameId id) noexcept
+{
+    return !state.gamepass_only || id.store == Store::kXbox;
+}
+
 std::vector<const Game*> filtered_games(const State& state)
 {
     std::vector<const Game*> result;
@@ -117,6 +122,7 @@ std::vector<const Game*> filtered_games(const State& state)
     const Collection* collection = selected_collection(state);
     for (const Game& game : state.games)
     {
+        if (!in_app_catalog(state,game.id)) continue;
         if (state.library.scope == "installed" && !installed(state, game.id))
             continue;
         if (state.library.scope == "favorites" && !state.library.favorites.contains(game.id))
@@ -204,7 +210,7 @@ std::vector<Shelf> shelves(const State& state)
     Shelf continued{"continue", "Continue playing", {}};
     std::vector<const Game*> played;
     for (const Game& game : state.games)
-        if (!state.library.hidden.contains(game.id) && game.playtime_minutes.value_or(0) > 0)
+        if (in_app_catalog(state,game.id) && !state.library.hidden.contains(game.id) && game.playtime_minutes.value_or(0) > 0)
             played.push_back(&game);
     std::stable_sort(played.begin(), played.end(), [](const Game* left, const Game* right) {
         return optional_descending(left->last_played, right->last_played);
@@ -254,7 +260,7 @@ std::vector<Shelf> shelves(const State& state)
 
     Shelf favorites{"favorites", "Favorites", {}};
     for (const Game& game : state.games)
-        if (state.library.favorites.contains(game.id) && !state.library.hidden.contains(game.id))
+        if (in_app_catalog(state,game.id) && state.library.favorites.contains(game.id) && !state.library.hidden.contains(game.id))
             favorites.game_ids.push_back(game.id);
     append_shelf(result, std::move(favorites));
 
@@ -264,7 +270,7 @@ std::vector<Shelf> shelves(const State& state)
             continue;
         Shelf shelf{"collection-" + collection.id, collection.name, {}};
         for (const Game& game : state.games)
-            if (collection.members.contains(game.id) && !state.library.hidden.contains(game.id))
+            if (in_app_catalog(state,game.id) && collection.members.contains(game.id) && !state.library.hidden.contains(game.id))
                 shelf.game_ids.push_back(game.id);
         append_shelf(result, std::move(shelf));
     }
@@ -292,9 +298,9 @@ bool has_imported_games(const State& state)
 std::vector<std::string> library_rail_scopes(const State& state)
 {
     std::vector<std::string> result{"installed", "all", "favorites", "hidden"};
-    if (has_imported_games(state))
+    if (!state.gamepass_only && has_imported_games(state))
         result.push_back("imported");
-    if (std::any_of(state.games.begin(), state.games.end(), [](const Game& game) { return game.id.store == Store::kXbox; }))
+    if (!state.gamepass_only && std::any_of(state.games.begin(), state.games.end(), [](const Game& game) { return game.id.store == Store::kXbox; }))
         result.push_back("xbox");
     for (const Collection& collection : state.library.collections)
         result.push_back(collection.id);

@@ -1864,6 +1864,13 @@ void Simulation::open_release_notes(bool after_update) {
     open_modal(std::move(notes));
 }
 
+void Simulation::SetGamePassOnly(bool enabled) {
+    state_.gamepass_only = enabled;
+    if (enabled && (state_.library.scope == "xbox" || state_.library.scope == "imported")) state_.library.scope = "all";
+    reconcile_library_selection(state_);
+    rebuild_view();
+}
+
 void Simulation::UpdateXboxAccount(std::string name, std::string message, bool busy) {
     xbox_account_name_ = std::move(name); xbox_account_message_ = std::move(message); xbox_account_busy_ = busy;
     rebuild_view();
@@ -2269,6 +2276,7 @@ void Simulation::queue_service_action(ServiceAction action, Store store) {
 }
 
 bool Simulation::beyond_steam() const {
+    if (state_.gamepass_only) return true;
     for (const auto& [store, account] : state_.accounts)
         if (store != Store::kSteam &&
             (account.authentication == AuthState::SignedIn || account.authentication == AuthState::Offline)) return true;
@@ -3806,6 +3814,10 @@ std::vector<const Game*> Simulation::visible_games() const {
 }
 
 void Simulation::rebuild_view() {
+    if (state_.gamepass_only && (state_.library.scope == "xbox" || state_.library.scope == "imported")) {
+        state_.library.scope = "all";
+        if (state_.navigation.library_rail_focused) state_.navigation.focus_key = "rail-all";
+    }
     // The Library left for another tab: the order "More" showed ends with that visit.
     if (state_.navigation.route != Route::Library && state_.navigation.route != Route::Details)
         state_.library.view_sort.clear();
@@ -4703,12 +4715,14 @@ void Simulation::rebuild_view() {
         }
         // Signed out with only other stores' games (imported ones) listed, Steam is still offered, and
         // Home is about those games rather than the account.
-        const bool connect = state_.account().authentication != AuthState::SignedIn && !steam_shown;
+        const bool connect = !state_.gamepass_only && state_.account().authentication != AuthState::SignedIn && !steam_shown;
         if (connect && !view_.rows.empty() && state_.account().authentication != AuthState::Offline) view_.subtitle = "Your library";
         if (view_.rows.empty()) {
             row("home-library", RowKind::Action, "Open Library", "library");
-            row("home-import", RowKind::Action, "Import games", "import-manage");
+            if (state_.gamepass_only) row("home-account", RowKind::Action, "Game Pass account", "xbox-account");
+            else row("home-import", RowKind::Action, "Import games", "import-manage");
         }
+        if (state_.gamepass_only) view_.subtitle = "Your Game Pass library";
         if (connect) row("home-connect", RowKind::Action, "Connect a store", "connect");
         auto add_shelf = [this](const playden::homebrew::Shelf& source, int shelf_index) {
             ViewData::Shelf shelf;
@@ -4741,7 +4755,7 @@ void Simulation::rebuild_view() {
         view_.subtitle = std::to_string(games.size()) + " games";
         if (state_.library_loading) view_.subtitle += live() ? " · Refreshing library…" : " · Refreshing fixture library…";
         else if (live() && state_.library_offline) view_.subtitle += " · Cached library";
-        if (live() && !state_.account().error.empty()) view_.subtitle += " · " + state_.account().error;
+        if (live() && !state_.gamepass_only && !state_.account().error.empty()) view_.subtitle += " · " + state_.account().error;
         const std::size_t window_size = 24;
         const std::size_t selected = static_cast<std::size_t>(std::max(0, state_.navigation.selected_index));
         view_.first_index = games.size() <= window_size ? 0 : std::min(selected > window_size / 2 ? selected - window_size / 2 : 0, games.size() - window_size);

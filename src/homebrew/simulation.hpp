@@ -582,6 +582,7 @@ struct State {
     }
     std::uint64_t account_generation = 1; // Invalidates account-scoped presentation resources.
     std::vector<Game> games;
+    bool gamepass_only = false;  // App presentation; existing Steam data stays available to Playden.
     UserLibrary library;
     std::vector<Installation> installations;
     std::vector<Job> jobs;
@@ -729,6 +730,7 @@ public:
     void SetSystemKeyboardAvailable(bool available) { system_keyboard_available_ = available; }
     void tick(int ticks = 1);
     void SetControllerConnected(bool connected);
+    void SetGamePassOnly(bool enabled);
     void SetWallClock(std::int64_t unix_seconds);
     void UpdateAccount(AccountUpdate update);
     // Another store has a signed-in account or games: Steam's sign-in screen need not take over.
