@@ -17,12 +17,14 @@ const RESPONSE_LIMIT: usize = 64 * 1024;
 pub enum Scope {
     Xbox,
     Store,
+    XboxSignin,
 }
 impl Scope {
     fn wire(self) -> &'static str {
         match self {
             Self::Xbox => "service::user.auth.xboxlive.com::MBI_SSL",
             Self::Store => "service::www.microsoft.com::MBI_SSL",
+            Self::XboxSignin => "xboxlive.signin",
         }
     }
 }
@@ -71,6 +73,7 @@ pub struct Credentials {
     user_id: Option<String>,
     expires_in: Duration,
     scope: Scope,
+    client_id: String,
 }
 impl Credentials {
     pub fn access_token(&self) -> &str {
@@ -262,11 +265,45 @@ impl DeviceCodeClient {
         scope: Option<Scope>,
     ) -> Result<Credentials, Error> {
         let scope = scope.unwrap_or(previous.scope);
+        self.refresh_for_client(previous, &previous.client_id, scope)
+            .await
+    }
+
+    /// Isolated runtime compatibility probe. Microsoft must grant this game's
+    /// application identity; a successful app-level login alone is insufficient.
+    /// The result remains separate and cannot rewrite the original session.
+    pub async fn refresh_for_title(
+        &self,
+        previous: &Credentials,
+        client_id: &str,
+        full_trust: bool,
+    ) -> Result<Credentials, Error> {
+        if client_id.len() != 16 || !client_id.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(Error::Response);
+        }
+        self.refresh_for_client(
+            previous,
+            client_id,
+            if full_trust {
+                Scope::Xbox
+            } else {
+                Scope::XboxSignin
+            },
+        )
+        .await
+    }
+
+    async fn refresh_for_client(
+        &self,
+        previous: &Credentials,
+        client_id: &str,
+        scope: Scope,
+    ) -> Result<Credentials, Error> {
         let (status, body) = self
             .post(
                 &self.token,
                 &[
-                    ("client_id", CLIENT_ID),
+                    ("client_id", client_id),
                     ("grant_type", "refresh_token"),
                     ("refresh_token", &previous.refresh_token),
                     ("scope", scope.wire()),
@@ -280,7 +317,11 @@ impl DeviceCodeClient {
         if status != 200 {
             return Err(Error::Rejected);
         }
+        if client_id != previous.client_id && body.get("refresh_token").is_none() {
+            return Err(Error::Response);
+        }
         let mut fresh = credentials(&body, Some(&previous.refresh_token), scope)?;
+        fresh.client_id = client_id.into();
         if previous.user_id.is_some()
             && fresh.user_id.is_some()
             && previous.user_id != fresh.user_id
@@ -334,6 +375,7 @@ fn credentials(body: &Value, fallback: Option<&str>, scope: Scope) -> Result<Cre
         user_id,
         expires_in: seconds(body, "expires_in", 86400)?,
         scope,
+        client_id: CLIENT_ID.into(),
     })
 }
 

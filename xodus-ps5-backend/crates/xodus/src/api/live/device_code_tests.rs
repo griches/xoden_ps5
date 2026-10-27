@@ -229,3 +229,65 @@ async fn device_code_bounds_responses_and_rejects_refresh_account_changes() {
     assert_eq!(previous.user_id(), Some("synthetic-user"));
     task.await.unwrap();
 }
+
+#[tokio::test]
+async fn device_code_title_refresh_binds_client_scope_and_keeps_app_session_separate() {
+    let previous = credentials(&tokens(), None, Scope::Xbox).unwrap();
+    let mut title = tokens();
+    title["refresh_token"] = json!("synthetic-title-refresh");
+    let (client, task) = server(vec![
+        (200, title.to_string()),
+        (200, title.to_string()),
+        (400, json!({"error":"invalid_grant"}).to_string()),
+    ])
+    .await;
+    let fresh = client
+        .refresh_for_title(&previous, "0000000041180A5D", false)
+        .await
+        .unwrap();
+    assert_eq!(fresh.client_id, "0000000041180A5D");
+    assert_eq!(previous.client_id, CLIENT_ID);
+    assert_eq!(previous.refresh_token(), "synthetic-refresh-secret");
+    let _ = client.refresh(&fresh, None).await.unwrap();
+    assert!(matches!(
+        client
+            .refresh_for_title(&previous, "0000000041180A5D", true)
+            .await,
+        Err(Error::Rejected)
+    ));
+    let requests = task.await.unwrap();
+    assert!(requests[0].contains("client_id=0000000041180A5D"));
+    assert!(requests[0].contains("scope=xboxlive.signin"));
+    assert!(requests[1].contains("client_id=0000000041180A5D"));
+    assert!(requests[1].contains("refresh_token=synthetic-title-refresh"));
+    assert!(requests[2].contains("scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL"));
+}
+
+#[tokio::test]
+async fn device_code_title_refresh_rejects_invalid_clients_and_missing_bound_refresh() {
+    let previous = credentials(&tokens(), None, Scope::Xbox).unwrap();
+    let mut missing = tokens();
+    missing.as_object_mut().unwrap().remove("refresh_token");
+    let mut other = tokens();
+    other["user_id"] = json!("different-account");
+    let (client, task) = server(vec![(200, missing.to_string()), (200, other.to_string())]).await;
+    for invalid in ["", "not-a-client-id!!", "0000000041180A5D&scope=other"] {
+        assert!(matches!(
+            client.refresh_for_title(&previous, invalid, false).await,
+            Err(Error::Response)
+        ));
+    }
+    assert!(matches!(
+        client
+            .refresh_for_title(&previous, "0000000041180A5D", false)
+            .await,
+        Err(Error::Response)
+    ));
+    assert!(matches!(
+        client
+            .refresh_for_title(&previous, "0000000041180A5D", false)
+            .await,
+        Err(Error::Response)
+    ));
+    task.await.unwrap();
+}
