@@ -42,11 +42,13 @@ enum class RuntimeState { Unavailable, Checking, Ready, Failed };
 enum class LogState { Loading, Ready, Failed };
 enum class InstallRequestKind { Install, Pause, Resume, DownloadNow, MoveUp, MoveDown, Cancel, Uninstall, SetDefaultVolume,
                                 DismissCompleted, ClearCompleted };
+struct XboxPackageOption { std::string content_id, title; std::uint64_t download_bytes = 0; };
 struct InstallRequest {
     InstallRequestKind kind = InstallRequestKind::Install;
     GameId game_id;
     std::string volume_id;  // SetDefaultVolume; Install: this install's drive (empty: the default)
     bool delete_saves = false;  // Uninstall only: also delete the game's kept saves and settings
+    std::string xbox_content_id;
 };
 // Game maintenance the details page offers (simulated in fixture mode).
 enum class MaintenanceKind { ApplySettings, ClearShaderCache, Repair, BackupSaves, RecreateBottle, UpdateRuntime };
@@ -794,6 +796,9 @@ public:
     void UpdateRuntimeProblem(const std::string& raw);
     // Live mode: a one-line note from startup's data layout move (a step held back this start).
     void ShowLayoutNotice(const std::string& text);
+    void UpdateXboxAccount(std::string name, std::string message, bool busy);
+    bool TakeXboxRefresh() { const bool requested = xbox_refresh_requested_; xbox_refresh_requested_ = false; return requested; }
+    void UpdateXboxPackages(GameId game, std::vector<XboxPackageOption> choices);
     void UpdateXboxPartials(std::vector<GameId> games, bool busy);
     void UpdateXboxDownload(std::optional<LiveInstallJob> job, std::string message);
     bool CanHandoffXbox() const;
@@ -886,6 +891,10 @@ public:
 
 private:
     std::vector<GameId> xbox_partials_;
+    GameId xbox_package_game_;
+    std::string xbox_account_name_, xbox_account_message_;
+    bool xbox_account_busy_ = false, xbox_refresh_requested_ = false;
+    std::vector<XboxPackageOption> xbox_packages_;
     GameId xbox_discard_game_;
     bool xbox_cleanup_busy_ = false;
     std::optional<Job> xbox_native_job_;

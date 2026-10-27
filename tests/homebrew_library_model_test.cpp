@@ -3133,6 +3133,15 @@ void xbox_install_does_not_wait_for_steam() {
           "cleanup prevents a competing install");
     model.UpdateXboxPartials({},false);
     check(!has_row(model,"details-xbox-discard"),"completed cleanup removes its action");
+    const std::string content = "11111111-1111-4111-8111-111111111111";
+    model.UpdateXboxPackages(id,{{content,"PC edition",1024}});
+    activate(model,"details-install");
+    check(has_row(model,"xbox-package-0"),"package selection opens in Playden");
+    activate(model,"xbox-package-0");
+    const auto choice = model.TakeInstallRequests();
+    check(choice.size() == 1 && choice.front().game_id == id && choice.front().xbox_content_id == content,"selected package keeps its product binding");
+    model.UpdateXboxPackages({},{});
+
     playden::homebrew::LiveInstallJob native; native.game_id = id; native.state = playden::homebrew::JobState::Downloading;
     native.done_bytes = 40; native.total_bytes = 100; native.bytes_per_second = 9;
     model.UpdateXboxDownload(native,"Downloading Xbox game");
@@ -3142,7 +3151,11 @@ void xbox_install_does_not_wait_for_steam() {
           model.state().jobs.front().completed_bytes == 40,"Steam refresh preserves native Xbox progress");
     activate(model,"details-download");
     activate(model,"job-xbox-9n5pkh0kw2l1");
-    check(!has_row(model,"job-pause-xbox-9n5pkh0kw2l1"),"Xbox does not offer unsupported pause controls");
+    check(has_row(model,"job-pause-xbox-9n5pkh0kw2l1"),"Xbox offers pause without deleting files");
+    activate(model,"job-pause-xbox-9n5pkh0kw2l1");
+    const auto pause = model.TakeInstallRequests();
+    check(pause.size() == 1 && pause.front().kind == playden::homebrew::InstallRequestKind::Pause,"Xbox pause reaches native service");
+    activate(model,"job-xbox-9n5pkh0kw2l1");
     activate(model,"job-cancel-xbox-9n5pkh0kw2l1");
     check(model.TakeInstallRequests().empty(),"native cancel requires confirmation");
     activate(model,"confirm-destructive");

@@ -1786,23 +1786,39 @@ const installs::InstalledLocation* Controller::LocationOf(GameId id) const {
 }
 void Controller::TickXboxJobs() {
   if (!xbox_jobs_ || !xbox_library_) return;
+  if (model_.TakeXboxRefresh()) {
+    const auto catalog = xbox_library_->Snapshot();
+    if (!xbox_jobs_->Refresh(catalog ? catalog->market : "GB")) model_.ShowLayoutNotice("Wait for the current Xbox operation to finish before refreshing.");
+  }
   const auto state = xbox_jobs_->Snapshot();
   const auto account = xbox_library_->AccountKey();
   if (state->phase == "handoff") { model_.HandoffXbox(); return; }
   if (state->revision == xbox_revision_ && account == xbox_account_key_) return;
   if (runtime_ && runtime_->Shared()->status == RuntimeHostStatus::kStarting) return;
   xbox_revision_ = state->revision; xbox_account_key_ = account;
+  const auto catalog = xbox_library_->Snapshot();
+  model_.UpdateXboxAccount(catalog ? catalog->gamertag : "",state->message,state->active);
+  if (state->phase == "refreshed" && !state->request_id.empty() && state->request_id != xbox_refreshed_request_) {
+    xbox_refreshed_request_ = state->request_id;
+    if (library_) library_->Refresh(Store::kXbox);
+  }
   model_.UpdateXboxPartials(state->partials,state->phase == "cleaning" || state->active);
+  std::vector<XboxPackageOption> choices;
+  for (const auto& choice : state->choices) choices.push_back({choice.content_id,choice.title,choice.download_bytes});
+  model_.UpdateXboxPackages(state->choice_game,std::move(choices));
   std::optional<LiveInstallJob> xbox_download;
-  if (state->native && state->active) {
-    LiveInstallJob job; job.game_id = state->active_game;
-    job.state = state->cancelling ? JobState::Pausing : JobState::Downloading;
+  if (state->native && ((state->active && state->active_game.valid()) || (!state->partials.empty() && (state->phase == "cancelled" || state->phase == "failed")))) {
+    LiveInstallJob job; job.game_id = state->active || std::find(state->partials.begin(),state->partials.end(),state->active_game) != state->partials.end()
+        ? state->active_game : state->partials.front();
+    job.state = !state->active ? (state->phase == "failed" ? JobState::Failed : JobState::Paused) : state->cancelling ? JobState::Pausing : JobState::Downloading;
     job.done_bytes = state->done_bytes; job.total_bytes = state->total_bytes;
     job.bytes_per_second = state->bytes_per_second; job.volume_id = "internal";
+    if (state->bytes_per_second && state->total_bytes > state->done_bytes)
+      job.eta_seconds = static_cast<int>(std::min<std::uint64_t>((state->total_bytes-state->done_bytes)/state->bytes_per_second,2147483647));
     xbox_download = std::move(job);
   }
   model_.UpdateXboxDownload(std::move(xbox_download),state->message);
-  if (!state->message.empty() && (state->phase == "failed" || state->phase == "cleaned")) model_.ShowLayoutNotice(state->message);
+  if (!state->message.empty() && (state->phase == "failed" || state->phase == "cleaned" || state->phase == "package-choice")) model_.ShowLayoutNotice(state->message);
   xbox_locations_.clear(); xbox_programs_.clear();
   for (const auto& game : state->prepared) {
     if (game.account_key != account) continue;
@@ -1828,12 +1844,16 @@ void Controller::TickInstalls() {
   for (const auto& request : model_.TakeInstallRequests()) {
     if (request.game_id.store == Store::kXbox) {
       if (request.kind == InstallRequestKind::Uninstall) { BeginUninstall(request.game_id,request.delete_saves); continue; }
+      if (request.kind == InstallRequestKind::Pause && xbox_jobs_) {
+        if (!xbox_jobs_->Pause(request.game_id)) model_.ShowLayoutNotice("This Xbox download cannot be paused right now.");
+        continue;
+      }
       if (request.kind == InstallRequestKind::Cancel && xbox_jobs_) {
         if (!xbox_jobs_->Cancel(request.game_id) && (!model_.CanHandoffXbox() || !xbox_jobs_->Discard(request.game_id)))
           model_.ShowLayoutNotice("This partial download cannot be removed right now.");
         continue;
       }
-      if (request.kind != InstallRequestKind::Install || !xbox_jobs_ || !xbox_library_ || !runtime_) {
+      if ((request.kind != InstallRequestKind::Install && request.kind != InstallRequestKind::Resume) || !xbox_jobs_ || !xbox_library_ || !runtime_) {
         model_.ShowLayoutNotice("The Xbox download service is unavailable for this action."); continue;
       }
       if (!model_.CanHandoffXbox()) { model_.ShowLayoutNotice("Wait for the current game setup to finish before installing an Xbox game."); continue; }
@@ -1845,7 +1865,7 @@ void Controller::TickInstalls() {
                entry.state == runtime::PreparationState::kReady && !entry.recovery_pending;
       });
       if (!worker_ready) { model_.ShowLayoutNotice("The Xbox download worker needs to be set up before installing games."); continue; }
-      if (!catalog || !xbox_jobs_->Install(request.game_id,catalog->account_key,catalog->market))
+      if (!catalog || !xbox_jobs_->Install(request.game_id,catalog->account_key,catalog->market,request.xbox_content_id))
         model_.ShowLayoutNotice("An Xbox download is already starting, or the Xbox account needs refreshing.");
       else model_.ShowLayoutNotice(job->native ? "Xbox download started. View progress in Downloads." : "Opening the Xbox download screen. Playden will return when it finishes.");
       continue;

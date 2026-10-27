@@ -11,6 +11,7 @@ using namespace playden;
 namespace {
 void Wait(stores::xbox::Jobs& jobs, const char* phase) {
     for (int i=0;i<2000;++i) { if (jobs.Snapshot()->phase == phase) return; std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+    fprintf(stderr,"Expected phase %s, got %s\n",phase,jobs.Snapshot()->phase.c_str());
     assert(false);
 }
 void Put(Storage& store,const char* name,const std::string& text) { assert(store.WriteAtomicPrivate(name,Bytes(text.begin(),text.end())).ok()); }
@@ -147,6 +148,37 @@ int main() {
         assert(!std::filesystem::exists(partial) && !std::filesystem::exists(quarantine));
         assert(native.Snapshot()->partials.empty());
     }
+    // Pause drains IO just like cancel, but retains content and offers recovery.
+    saw_cancel = false; allow_drain = false;
+    {
+        stores::xbox::Jobs native(native_config); Wait(native,"idle");
+        const auto game = GameId::Xbox("9NP1P1WFS0LB");
+        assert(!native.Install(game,std::string(64,'a'),"GB","bad-content"));
+        assert(native.Install(game,std::string(64,'a'),"GB","11111111-1111-4111-8111-111111111111"));
+        Wait(native,"downloading"); assert(native.Pause(game));
+        assert(!native.Cancel(game));
+        for (int i=0;i<2000 && !saw_cancel;++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(saw_cancel && std::filesystem::exists(partial/"content.bin"));
+        allow_drain = true; Wait(native,"cancelled");
+        assert(std::filesystem::exists(partial/"content.bin"));
+        assert(native.Snapshot()->partials.size() == 1);
+        const auto request = store.Read("job-request.json"); assert(request.ok());
+        const auto value = steam::json::Parse(std::string(request.value().begin(),request.value().end()));
+        assert(value->Find("contentId")->text() == "11111111-1111-4111-8111-111111111111");
+    }
+    // Another operation cannot erase the selected edition used by Resume.
+    Put(store,"job-request.json",R"({"schema":1,"requestId":"refresh","operation":"refresh","market":"GB"})");
+    native_config.native_run = [&](const auto&,const auto&) {
+        const auto bytes = store.Read("job-request.json"); assert(bytes.ok());
+        const auto request = steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));
+        assert(request->Find("contentId")->text() == "11111111-1111-4111-8111-111111111111");
+        return stores::xbox::NativeResult::Failed;
+    };
+    {
+        stores::xbox::Jobs native(native_config); Wait(native,"idle");
+        assert(native.Install(GameId::Xbox("9NP1P1WFS0LB"),std::string(64,'a'),"GB")); Wait(native,"failed");
+    }
+    std::filesystem::remove_all(partial);
     // Fresh completion requests preparation, while startup only inventories files.
     native_config.native_run = [&](const auto&, const auto&) {
         std::filesystem::create_directories(root/"games"/"xbox-9n5pkh0kw2l1");
@@ -179,5 +211,29 @@ int main() {
         assert(uninstall.Snapshot()->prepared.size() == 1 && uninstall.Snapshot()->prepared.front().game == GameId::Xbox("9MXND4PQLK3W"));
     }
     { stores::xbox::Jobs reload(config); Wait(reload,"idle"); assert(reload.Snapshot()->prepared.size() == 1); }
+    // Refresh uses the native service without download identity or cleanup.
+    native_config.native_run = [&](const auto& report,const auto&) {
+        const auto bytes = store.Read("job-request.json"); assert(bytes.ok());
+        const auto request = steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));
+        assert(request && request->Find("operation")->text() == "refresh");
+        assert(!request->Find("productId") && !request->Find("accountKey"));
+        report(stores::xbox::NativeProgress{"refreshing","Refreshing Xbox library"});
+        Put(store,"job-result.json","{\"schema\":1,\"requestId\":\"" + request->Find("requestId")->text() + "\",\"operation\":\"refresh\",\"status\":\"complete\"}");
+        return stores::xbox::NativeResult::Complete;
+    };
+    {
+        stores::xbox::Jobs account(native_config); Wait(account,"idle");
+        assert(!account.Refresh("invalid")); assert(account.Refresh("GB")); Wait(account,"refreshed");
+        assert(!account.Snapshot()->request_id.empty()); assert(!account.Snapshot()->completed_game.valid());
+    }
+    // Only bounded, matching, supported PC package choices reach the UI.
+    Put(store,"job-request.json",R"({"schema":1,"requestId":"choice","operation":"install","market":"GB","productId":"9N5PKH0KW2L1"})");
+    Put(store,"job-result.json",R"({"schema":1,"requestId":"choice","status":"package-choice","detail":{"rootProductId":"9N5PKH0KW2L1","market":"GB","choices":[{"contentId":"11111111-1111-4111-8111-111111111111","title":"PC edition","platform":"Windows.Desktop","packageFormat":"MSIXVC","supported":true,"downloadBytes":1234},{"contentId":"22222222-2222-4222-8222-222222222222","title":"Console edition","platform":"XboxOne","packageFormat":"MSIXVC","supported":true}]}})");
+    {
+        stores::xbox::Jobs choices(config); Wait(choices,"package-choice");
+        const auto snapshot = choices.Snapshot();
+        assert(snapshot->choice_game == GameId::Xbox("9N5PKH0KW2L1"));
+        assert(snapshot->choices.size() == 1 && snapshot->choices[0].download_bytes == 1234);
+    }
     std::filesystem::remove_all(root);
 }

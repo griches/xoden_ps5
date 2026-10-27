@@ -35,6 +35,14 @@ std::string Encode(const Value& v) {
     else for (const auto& [key,value] : v.object()) { if (!first) out += ','; first = false; out += JsonQuote(key) + ':' + Encode(value); }
     return out + (v.is_array() ? "]" : "}");
 }
+bool ContentId(const std::string& value) {
+    if (value.size() != 36) return false;
+    for (std::size_t i = 0; i < value.size(); ++i) {
+        if (i == 8 || i == 13 || i == 18 || i == 23) { if (value[i] != '-') return false; }
+        else if (!((value[i] >= '0' && value[i] <= '9') || (value[i] >= 'a' && value[i] <= 'f'))) return false;
+    }
+    return true;
+}
 bool Hash(const std::string& value) {
     return value.size() == 64 && std::all_of(value.begin(),value.end(),[](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); });
 }
@@ -160,26 +168,45 @@ void Jobs::Publish(std::string phase, std::string message) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision; next->phase = std::move(phase); next->message = std::move(message); state_ = std::move(next);
 }
-bool Jobs::Install(GameId game, std::string account_key, std::string market) {
-    if (!game.valid() || game.store != Store::kXbox || !Hash(account_key) || market.size() != 2 ||
+bool Jobs::Install(GameId game, std::string account_key, std::string market, std::string content_id) {
+    if ((!content_id.empty() && !ContentId(content_id)) || !game.valid() || game.store != Store::kXbox || !Hash(account_key) || market.size() != 2 ||
         !std::all_of(market.begin(),market.end(),[](char c) { return c >= 'A' && c <= 'Z'; })) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     if (stopping_ || busy_ || state_->phase == "loading" || state_->phase == "handoff" || (!config_.native_run && state_->worker_title.empty())) return false;
-    cancel_requested_ = false;
+    cancel_requested_ = pause_requested_ = false;
     if (config_.native_run) {
         auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
+        next->choices.clear(); next->choice_game = {};
         next->active = true; next->cancelling = false; next->active_game = game;
         next->done_bytes = next->total_bytes = next->bytes_per_second = 0;
         next->phase = "starting"; next->message = "Starting Xbox download…"; state_ = std::move(next);
     }
-    busy_ = true; pending_ = Request{std::move(game),std::move(account_key),std::move(market)}; wake_.notify_one(); return true;
+    busy_ = true; pending_ = Request{std::move(game),std::move(account_key),std::move(market),false,false,std::move(content_id)}; wake_.notify_one(); return true;
+}
+bool Jobs::Refresh(std::string market) {
+    if (market.size() != 2 || !std::all_of(market.begin(),market.end(),[](char c) { return c >= 'A' && c <= 'Z'; })) return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!config_.native_run || stopping_ || busy_ || state_->phase == "loading") return false;
+    cancel_requested_ = pause_requested_ = false;
+    auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
+    next->active = true; next->active_game = {}; next->phase = "refreshing";
+    next->message = "Checking Xbox account and refreshing library…"; state_ = std::move(next);
+    busy_ = true; pending_ = Request{{},{},std::move(market),false,false,{},true}; wake_.notify_one(); return true;
 }
 bool Jobs::Cancel(GameId game) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!config_.native_run || !busy_ || !state_->active || state_->active_game != game || cancel_requested_) return false;
+    if (!config_.native_run || !busy_ || !state_->active || state_->active_game != game || cancel_requested_ || pause_requested_) return false;
     cancel_requested_ = true;
     auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
     next->cancelling = true; next->phase = "stopping"; next->message = "Stopping download before deleting files…";
+    state_ = std::move(next); return true;
+}
+bool Jobs::Pause(GameId game) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!config_.native_run || !busy_ || !state_->active || state_->active_game != game || cancel_requested_ || pause_requested_) return false;
+    pause_requested_ = true;
+    auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
+    next->cancelling = true; next->phase = "stopping"; next->message = "Pausing download; keeping downloaded files…";
     state_ = std::move(next); return true;
 }
 bool Jobs::Discard(GameId game) {
@@ -316,14 +343,50 @@ void Jobs::Load() {
     const auto result = Read(storage_,"job-result.json",1024*1024);
     if (request && result && Schema(*request) && Schema(*result) && Text(*request,"requestId") == Text(*result,"requestId")) {
         const auto phase = Text(*result,"status");
-        if (phase == "failed") { next->phase = "failed"; next->message = "The Xbox download did not finish. Choose Install to retry."; }
-        else if (phase == "package-choice") { next->phase = "failed"; next->message = "This offer has multiple PC packages. Automatic selection is unavailable."; }
+        next->active_game = GameId::Xbox(Text(*request,"productId"));
+        if (phase == "failed") {
+            next->phase = "failed"; next->message = "The Xbox download did not finish. Resume to retry; downloaded files were kept.";
+            const auto* detail = result->Find("detail");
+            const auto code = detail ? Text(*detail,"code") : std::string{};
+            if (code == "sign-in-required") next->message = "Sign in to Xbox before downloading. Your saved sign-in is missing or expired.";
+            else if (code == "account-changed") next->message = "The Xbox account changed. Refresh your Xbox library before downloading.";
+            else if (code == "active-pc-subscription-required") next->message = "An active PC Game Pass or Game Pass Ultimate subscription is required.";
+            else if (code == "game-entitlement-required") next->message = "This Xbox account does not currently have access to this game.";
+            else if (code == "package-resolution") next->message = "The Store could not find this game's PC packages. Try again.";
+        }
+        else if (phase == "package-choice") {
+            next->phase = "package-choice"; next->choice_game = GameId::Xbox(Text(*request,"productId"));
+            const auto* detail = result->Find("detail");
+            const auto* choices = detail ? detail->Find("choices") : nullptr;
+            std::set<std::string> seen;
+            if (next->choice_game.valid() && detail && Text(*detail,"rootProductId") == next->choice_game.value &&
+                Text(*detail,"market") == Text(*request,"market") && choices && choices->is_array() && choices->array().size() <= 128) {
+                for (const auto& choice : choices->array()) {
+                    const auto cid = Text(choice,"contentId"), title = Text(choice,"title");
+                    const auto* supported = choice.Find("supported");
+                    if (!supported || !supported->is_bool() || !supported->boolean() || !ContentId(cid) || title.empty() || title.size() > 1024 ||
+                        Text(choice,"platform") != "Windows.Desktop" || Text(choice,"packageFormat") != "MSIXVC" || !seen.insert(cid).second) continue;
+                    const auto* bytes = choice.Find("downloadBytes");
+                    next->choices.push_back({cid,title,bytes ? bytes->AsUint64().value_or(0) : 0});
+                }
+            }
+            next->message = next->choices.empty() ? "This offer has no supported PC packages." : "Choose a PC package to install.";
+        }
+        else if (phase == "complete" && Text(*request,"operation") == "refresh") { next->phase = "refreshed"; next->request_id = Text(*request,"requestId"); next->message = "Xbox account checked and library refreshed."; }
+        else if (phase == "cancelled" && !next->partials.empty()) { next->phase = "cancelled"; next->message = "Download paused. Resume to continue, or cancel to delete its files."; }
         else if (phase != "prepared" && phase != "complete" && phase != "cancelled") { next->phase = "failed"; next->message = "The Xbox operation was interrupted. Choose Install to resume it."; }
     }
     std::lock_guard<std::mutex> lock(mutex_); state_ = std::move(next);
 }
 void Jobs::Execute(const Request& request) {
     auto identity = config_.hold_effective_uid ? config_.hold_effective_uid() : std::shared_ptr<void>{};
+    if (request.refresh) {
+        const auto id = RandomUuid();
+        if (!id) { Publish("failed","An Xbox account request could not be created."); return; }
+        const auto text = "{\"schema\":1,\"requestId\":\"" + *id + "\",\"operation\":\"refresh\",\"market\":\"" + request.market + "\"}";
+        if (!storage_.WriteAtomicPrivate("job-request.json",Bytes(text.begin(),text.end())).ok()) { Publish("failed","The Xbox account request could not be saved."); return; }
+        ExecuteNative({},*id); return;
+    }
     struct stat pending{};
     const auto quarantine = config_.games_root + "/.delete-" + ToInstallId(request.game);
     if (lstat(quarantine.c_str(),&pending) == 0 || errno != ENOENT) {
@@ -333,8 +396,18 @@ void Jobs::Execute(const Request& request) {
     const auto id = RandomUuid();
     if (!id) { Publish("failed","A download request could not be created."); return; }
     // Every interpolated value has a strict ASCII identity grammar.
+    std::string content = request.content;
+    if (content.empty()) {
+        const auto previous = Read(storage_,("selection-" + ToInstallId(request.game) + ".json").c_str(),4096);
+        if (previous && Schema(*previous) && Text(*previous,"productId") == request.game.value &&
+            Text(*previous,"accountKey") == request.account && Text(*previous,"market") == request.market &&
+            ContentId(Text(*previous,"contentId"))) content = Text(*previous,"contentId");
+    }
     const auto text = "{\"schema\":1,\"requestId\":\"" + *id + "\",\"operation\":\"install\",\"market\":\"" + request.market +
-        "\",\"accountKey\":\"" + request.account + "\",\"productId\":\"" + request.game.value + "\"}";
+        "\",\"accountKey\":\"" + request.account + "\",\"productId\":\"" + request.game.value + "\"" + (content.empty() ? "" : ",\"contentId\":\"" + content + "\"") + "}";
+    if (!content.empty() && !storage_.WriteAtomicPrivate("selection-" + ToInstallId(request.game) + ".json",Bytes(text.begin(),text.end())).ok()) {
+        Publish("failed","The selected Xbox package could not be saved. Download has not started."); return;
+    }
     if (!storage_.WriteAtomicPrivate("job-request.json",Bytes(text.begin(),text.end())).ok()) { Publish("failed","The Xbox download request could not be saved."); return; }
     if (config_.native_run) { ExecuteNative(request.game,*id); return; }
     const auto worker = Snapshot()->worker_title;
@@ -353,12 +426,20 @@ void Jobs::ExecuteNative(GameId game, const std::string& request_id) {
         if (!next->cancelling) { next->phase = progress.phase; next->message = progress.message; }
         next->done_bytes = progress.done_bytes; next->total_bytes = progress.total_bytes;
         next->bytes_per_second = progress.bytes_per_second; state_ = std::move(next);
-    },[this] { std::lock_guard<std::mutex> lock(mutex_); return stopping_ || cancel_requested_; });
+    },[this] { std::lock_guard<std::mutex> lock(mutex_); return stopping_ || cancel_requested_ || pause_requested_; });
     bool discard = false;
     { std::lock_guard<std::mutex> lock(mutex_); discard = cancel_requested_; }
     // The runner's contract guarantees no outstanding file writes here. Reload
     // prepared/partial admission before any cleanup, including late cancellation.
+    const auto previous = Snapshot();
     Load();
+    const auto loaded = Snapshot();
+    if (std::find(loaded->partials.begin(),loaded->partials.end(),game) != loaded->partials.end()) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
+        next->active_game = game; next->done_bytes = previous->done_bytes; next->total_bytes = previous->total_bytes;
+        state_ = std::move(next);
+    }
     if (result == NativeResult::Complete) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (std::any_of(state_->prepared.begin(),state_->prepared.end(),[&](const auto& entry) { return entry.game == game; })) {

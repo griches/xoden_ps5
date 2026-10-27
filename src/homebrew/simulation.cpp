@@ -498,7 +498,7 @@ std::string action_label(const std::string& key) {
         {"inject-logs-ready", "Inject ready logs"}, {"account-auth", "Authentication"},
         {"account-last-sync", "Last library sync"}, {"account-sync", "Sync now"},
         {"account-recover", "Reconnect account"}, {"account-switch", "Switch account"},
-        {"account-reauth", "Sign in again"}, {"job-resume-all", "Resume all"}, {"job-clear-completed", "Clear completed"},
+        {"xbox-refresh", "Refresh Xbox library"}, {"account-reauth", "Sign in again"}, {"job-resume-all", "Resume all"}, {"job-clear-completed", "Clear completed"},
         {"prep-clear-completed", "Clear completed"}, {"storage-close", "Close"}, {"collection-new", "New collection"}, {"collection-manage", "Manage collections"},
         {"about-version", "Version"}, {"self-update-install", "Download and install"},
         {"self-update-restart", "Restart Playden"}, {"self-update-cancel", "Cancel update"},
@@ -1864,6 +1864,16 @@ void Simulation::open_release_notes(bool after_update) {
     open_modal(std::move(notes));
 }
 
+void Simulation::UpdateXboxAccount(std::string name, std::string message, bool busy) {
+    xbox_account_name_ = std::move(name); xbox_account_message_ = std::move(message); xbox_account_busy_ = busy;
+    rebuild_view();
+}
+
+void Simulation::UpdateXboxPackages(GameId game, std::vector<XboxPackageOption> choices) {
+    xbox_package_game_ = game; xbox_packages_ = std::move(choices);
+    rebuild_view();
+}
+
 void Simulation::UpdateXboxPartials(std::vector<GameId> games, bool busy) {
     xbox_partials_ = std::move(games); xbox_cleanup_busy_ = busy; rebuild_view();
 }
@@ -1874,7 +1884,7 @@ void Simulation::UpdateXboxDownload(std::optional<LiveInstallJob> live_job, std:
     if (live_job) {
         Job job; job.id = ToKey(live_job->game_id); job.game_id = live_job->game_id;
         job.state = live_job->state; job.completed_bytes = live_job->done_bytes; job.total_bytes = live_job->total_bytes;
-        job.bytes_per_second = live_job->bytes_per_second; job.volume_id = "internal"; job.state_text = std::move(message);
+        job.bytes_per_second = live_job->bytes_per_second; job.eta_seconds = live_job->eta_seconds; job.volume_id = "internal"; job.state_text = std::move(message);
         xbox_native_job_ = job; state_.jobs.push_back(std::move(job));
     }
     rebuild_view();
@@ -4376,6 +4386,15 @@ void Simulation::rebuild_view() {
                     }
                 }
             }
+            else if (modal.id == "xbox-packages" && action_key.rfind("xbox-package-", 0) == 0) {
+                const auto index = static_cast<std::size_t>(std::stoul(action_key.substr(13)));
+                if (index < xbox_packages_.size()) {
+                    const auto& option = xbox_packages_[index];
+                    item.title = option.title;
+                    item.subtitle = "PC package · " + option.content_id.substr(0,8);
+                    item.value = option.download_bytes ? format_bytes(option.download_bytes) : "Size checked before download";
+                }
+            }
             else if (modal.id == "steam-programs" && action_key.rfind("steam-program-", 0) == 0) {
                 const auto index = static_cast<std::size_t>(std::stoul(action_key.substr(14)));
                 if (index < steam_programs_shown_.size()) {
@@ -4868,7 +4887,7 @@ void Simulation::rebuild_view() {
                 status.progress = job->total_bytes == 0 ? 0.0F : static_cast<float>(job->completed_bytes) / static_cast<float>(job->total_bytes);
             } else if (game->id.store == Store::kXbox) {
                 const bool partial = std::find(xbox_partials_.begin(),xbox_partials_.end(),game->id) != xbox_partials_.end();
-                auto& install = row("details-install", RowKind::Action, partial ? "Resume download" : "Install", "xbox-install");
+                auto& install = row("details-install", RowKind::Action, game->id == xbox_package_game_ && !xbox_packages_.empty() ? "Choose package" : partial ? "Resume download" : "Install", "xbox-install");
                 install.enabled = !xbox_cleanup_busy_;
                 install.value = "Check PC package";
                 install.subtitle = "To Console storage · Xbox checks access and available packages";
@@ -5192,6 +5211,9 @@ void Simulation::rebuild_view() {
             added.section = section;
             return added;
         };
+        auto& xbox = add("settings-xbox-account",RowKind::Action,"Xbox account","xbox-account");
+        xbox.value = xbox_account_name_.empty() ? "Not connected" : xbox_account_name_;
+        xbox.subtitle = xbox_account_message_.empty() ? "Check Xbox access and refresh your library" : xbox_account_message_;
         auto& account = add("settings-account", RowKind::Action, "Account", "account");
         account.value = state_.account().display_name;
         account.subtitle = state_.account().authentication == AuthState::Offline ? "Cached library · Offline"
@@ -6518,7 +6540,7 @@ void Simulation::activate() {
         const auto id = selected.key.substr(4);
         const auto* job = find_job(state_, id);
         std::vector<std::string> actions;
-        if (job && job->game_id.store != Store::kXbox && (job->state == JobState::Downloading || job->state == JobState::Verifying)) actions.push_back("job-pause-" + id);
+        if (job && (job->state == JobState::Downloading || job->state == JobState::Verifying)) actions.push_back("job-pause-" + id);
         if (job && (job->state == JobState::Paused || job->state == JobState::Interrupted)) actions.push_back("job-resume-" + id);
         const auto waiting = std::count_if(state_.jobs.begin(), state_.jobs.end(), [](const Job& other) {
             return other.state == JobState::Paused || other.state == JobState::Interrupted;
@@ -6804,10 +6826,32 @@ void Simulation::activate() {
         if (!xbox_cleanup_busy_ && std::find(xbox_partials_.begin(),xbox_partials_.end(),xbox_discard_game_) != xbox_partials_.end())
             pending_install_requests_.push_back({InstallRequestKind::Cancel,xbox_discard_game_});
         xbox_discard_game_ = {}; close_modal();
+    } else if (live() && action_name == "xbox-account") {
+        ModalEntry modal{"xbox-account","Xbox account",state_.navigation.focus_key,
+            xbox_account_busy_ ? std::vector<std::string>{"cancel"} : std::vector<std::string>{"xbox-refresh","cancel"},0,false};
+        modal.body = xbox_account_message_;
+        if (xbox_account_name_.empty()) modal.body += " Microsoft sign-in currently needs the Xodus sign-in window on your computer. After connecting that account to the console, choose Refresh Xbox library.";
+        open_modal(std::move(modal));
+    } else if (live() && action_name == "xbox-refresh") {
+        if (!xbox_account_busy_) xbox_refresh_requested_ = true;
+        close_modal();
     } else if (live() && action_name == "xbox-install") {
         const auto id = state_.navigation.detail_id.value_or(state_.navigation.selected_game_id);
-        if (id.valid() && id.store == Store::kXbox)
+        if (id == xbox_package_game_ && !xbox_packages_.empty()) {
+            std::vector<std::string> actions;
+            for (std::size_t i = 0; i < xbox_packages_.size(); ++i) actions.push_back("xbox-package-" + std::to_string(i));
+            actions.push_back("cancel");
+            open_modal({"xbox-packages","Choose a PC package",state_.navigation.focus_key,std::move(actions),0,false});
+        } else if (id.valid() && id.store == Store::kXbox)
             pending_install_requests_.push_back({InstallRequestKind::Install, id});
+    } else if (live() && action_name.rfind("xbox-package-",0) == 0) {
+        const auto index = static_cast<std::size_t>(std::stoul(action_name.substr(13)));
+        if (!xbox_cleanup_busy_ && index < xbox_packages_.size()) {
+            InstallRequest request{InstallRequestKind::Install,xbox_package_game_};
+            request.xbox_content_id = xbox_packages_[index].content_id;
+            pending_install_requests_.push_back(std::move(request));
+        }
+        close_modal();
     } else if (live() && action_name == "live-install") {
         const auto id = state_.navigation.detail_id.value_or(state_.navigation.selected_game_id);
         // Install at once when the game fits the default drive (or its size is checked later);

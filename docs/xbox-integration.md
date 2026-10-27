@@ -400,3 +400,38 @@ Native package SHA256 4335a0e781cb73b8f2252c12852ad2633a4794bb43d5ee6b8e6100e54d
 backup console-backups/20261027-wingdk. All 152 host tests pass (145.44s), including
 new WinGDK and bounded DLL-copy coverage. xbox_jobs, game_probe and xbox_runtime
 also each passed five consecutive runs after fixing the cleanup snapshot race.
+
+
+## Account, package choices and download controls — 2026-10-27
+
+The WinGDK build reached actual A Game About Digging A Hole gameplay: movement,
+look and digging were verified. Save/reload remains untested. The later controller
+problem was the test virtual pad remaining open; it has been closed and DevTools
+quit cleanly. Remote Play remained off.
+
+The next build adds Settings → Xbox account → Refresh Xbox library. This runs the
+existing native account/entitlement/catalogue refresh and reloads its published
+catalogue. Missing sign-in, account changes, missing PC subscription, missing game
+entitlement and package-resolution failures have distinct messages. This is account
+refresh, **not fresh Microsoft sign-in**. Xodus currently requires its hosted
+Microsoft webview/TokenBroker exchange; Playden has no equivalent browser bridge.
+The existing computer sign-in remains necessary. Do not claim phone/device-code
+login or a PS5-only fresh sign-in flow has been implemented.
+
+An ambiguous offer now exposes Choose package on its details page. The picker
+shows supported PC MSIXVC choices and advertised download sizes where available.
+Only the chosen content ID is submitted; the backend resolves and validates it
+again against the offer and current entitlement. Selected editions are persisted
+per game, account and market so refresh/another request does not erase Resume's
+choice. Unsupported console packages are not offered.
+
+Downloads now offers Pause (retain partial files), Resume and the existing
+confirmed Cancel (delete partial files after native IO drains). Paused/failed
+partial jobs remain visible in Downloads; orphan partials can still be managed
+from each game's details. Progress includes estimated time when byte totals and
+speed are known. Multiple simultaneous Xbox transfers/queueing are not added.
+
+Host regressions cover package selection through UI to request, unsupported
+package exclusion, pause retaining files after IO drain, cancel deleting after
+drain, selected-package recovery across another request and native account
+refresh. PS5 package builds; these new controls have not been exercised on-console.

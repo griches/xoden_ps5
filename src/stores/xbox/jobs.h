@@ -21,6 +21,10 @@ enum class NativeResult { Complete, Failed, Cancelled };
 using NativeRunner = std::function<NativeResult(
     const std::function<void(const NativeProgress&)>&,
     const std::function<bool()>&)>;
+struct PackageChoice {
+    std::string content_id, title;
+    std::uint64_t download_bytes = 0;
+};
 struct JobSnapshot {
     std::uint64_t revision = 0;
     std::string phase = "loading", message, request_id;
@@ -28,7 +32,8 @@ struct JobSnapshot {
     bool native = false, active = false, cancelling = false;
     // Set only by a successful download in this process, never by startup reload.
     GameId completed_game;
-    GameId active_game, removing_game;
+    GameId active_game, removing_game, choice_game;
+    std::vector<PackageChoice> choices;
     std::string removal_error;
     std::uint64_t done_bytes = 0, total_bytes = 0, bytes_per_second = 0;
     std::vector<PreparedGame> prepared;
@@ -49,13 +54,15 @@ public:
     ~Jobs();
     bool Discard(GameId game);
     bool Cancel(GameId game);
+    bool Pause(GameId game);
+    bool Refresh(std::string market);
     // Caller must first finish removing the stopped PS5 runtime title.
     bool Uninstall(GameId game);
-    bool Install(GameId game, std::string account_key, std::string market);
+    bool Install(GameId game, std::string account_key, std::string market, std::string content_id = {});
     std::shared_ptr<const JobSnapshot> Snapshot() const;
     void Shutdown();
 private:
-    struct Request { GameId game; std::string account, market; bool discard = false, uninstall = false; };
+    struct Request { GameId game; std::string account, market; bool discard = false, uninstall = false; std::string content; bool refresh = false; };
     void Run();
     void Load();
     void Execute(const Request& request);
@@ -69,7 +76,7 @@ private:
     std::condition_variable wake_;
     std::optional<Request> pending_;
     std::shared_ptr<JobSnapshot> state_;
-    bool stopping_ = false, busy_ = false, cancel_requested_ = false;
+    bool stopping_ = false, busy_ = false, cancel_requested_ = false, pause_requested_ = false;
     std::thread worker_;
 };
 }  // namespace playden::stores::xbox

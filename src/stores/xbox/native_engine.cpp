@@ -26,6 +26,7 @@ extern "C" int xodus_ps5_available_space(const char* path, std::uint64_t* bytes)
 namespace playden::stores::xbox {
 namespace {
 std::string Message(const std::string& phase) {
+    if (phase == "refreshing") return "Refreshing Xbox library…";
     if (phase == "checking-account") return "Checking Xbox access…";
     if (phase == "resolving") return "Finding the PC download…";
     if (phase == "metadata") return "Reading game data…";
