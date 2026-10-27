@@ -1235,7 +1235,8 @@ void Controller::TickRuntime() {
     } else if (record && record->state == runtime::PreparationState::kReady && !record->recovery_pending &&
                !record->title_current) {
       game.status = "Kit update available"; game.can_prepare = usable;
-      game.detail = "Play updates the runtime kit first; the game and its saves stay as they are";
+      game.detail = record->runtime_current ? "Play updates this game's Home artwork and setup first"
+          : "Play updates the runtime kit first; the game and its saves stay as they are";
     } else if (record && record->state == runtime::PreparationState::kReady && !record->recovery_pending &&
                record->admission != "ok") {
       game.status = "Needs repair"; game.can_prepare = usable;

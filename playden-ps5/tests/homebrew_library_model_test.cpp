@@ -2758,7 +2758,7 @@ void store_art_follows_the_store() {
     xbox.id = playden::GameId::Xbox("9N5PKH0KW2L1");
     xbox.artwork_source = "https://store-images.s-microsoft.com/image/apps/example?w=4000";
     check(CoverUrl(xbox) == "https://store-images.s-microsoft.com/image/apps/example?w=600&h=900&q=85", "Xbox covers fit the bounded decoder");
-    check(HeroUrl(xbox) == "https://store-images.s-microsoft.com/image/apps/example?w=1920&h=1080&q=85" &&
+    check(HeroUrl(xbox) == CoverUrl(xbox) &&
               LogoUrl(xbox).empty(), "Xbox details use catalogue artwork without borrowing a Steam logo");
     Game local;
     local.id = playden::GameId::Local("0f8fad5b-d9cb-469f-a165-70867728950e");
