@@ -12,8 +12,9 @@ test evidence; this page tracks outstanding functionality.
   has been removed. Fresh approval, Xbox identity verification, session save
   and automatic library refresh passed on the PS5 at 23:33Z. A private inactive
   approval cache avoids repeating browser login after failed verification.
-  In-game authentication remains unverified; Call of the Elder Gods is running
-  for Gary's acceptance check.
+  Gary also confirmed Call of the Elder Gods is signed in and its existing saves
+  are visible. Verify MIO and expiry/account-change behavior before considering
+  this complete across games.
 - [ ] Verify sign-in persistence, expiry, account changes and game runtime end
   to end. Earlier device-code login proved library, subscription and PC licence
   access but not MIO's game grant. It is not the user-facing sign-in route.
@@ -48,6 +49,8 @@ test evidence; this page tracks outstanding functionality.
 - Controller reconnection after virtual-pad handover.
 - Unified Microsoft browser approval, verified session persistence and automatic
   Xbox library loading accepted on the actual PS5.
+- Call of the Elder Gods game sign-in and existing-save visibility confirmed by
+  Gary with the freshly approved browser session.
 - Native account reset retains installed games, saves and registered device identity.
 - Phone sign-in QR display and safe cancellation accepted on the actual PS5.
 - Normal game exit returns to PS5 Home; MIO's in-game 3840x2160 option verified.
