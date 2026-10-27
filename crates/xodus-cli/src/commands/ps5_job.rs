@@ -19,7 +19,7 @@ fn parse(bytes: &[u8]) -> Result<Request> {
     if v["schema"] != 1 || obj.keys().any(|k| !["schema","requestId","operation","market","accountKey","productId","contentId"].contains(&k.as_str())) { return Err("request-schema"); }
     let id = v["requestId"].as_str().ok_or("request-id")?;
     if uuid::Uuid::parse_str(id).map(|u| u.to_string()).ok().as_deref() != Some(id) { return Err("request-id"); }
-    let operation = v["operation"].as_str().filter(|s| ["refresh","install"].contains(s)).ok_or("request-operation")?;
+    let operation = v["operation"].as_str().filter(|s| ["refresh","plan","install"].contains(s)).ok_or("request-operation")?;
     let market = v["market"].as_str().filter(|s| s.len() == 2 && s.bytes().all(|b| b.is_ascii_uppercase())).ok_or("request-market")?;
     let optional = |key: &str| -> Result<Option<String>> { match v.get(key) { None | Some(Value::Null) => Ok(None), Some(Value::String(s)) => Ok(Some(s.clone())), _ => Err("request-field") } };
     let account = optional("accountKey")?;
@@ -27,7 +27,7 @@ fn parse(bytes: &[u8]) -> Result<Request> {
     let content = optional("contentId")?;
     if account.as_deref().is_some_and(|s| !hash(s)) || product.as_deref().is_some_and(|s| !product_id(s))
         || content.as_deref().is_some_and(|s| uuid::Uuid::parse_str(s).map(|u| u.to_string()).ok().as_deref() != Some(s)) { return Err("request-identity"); }
-    if operation == "install" && (account.is_none() || product.is_none()) { return Err("request-install-identity"); }
+    if (operation == "install" || operation == "plan") && (account.is_none() || product.is_none()) { return Err("request-install-identity"); }
     if operation == "refresh" && (product.is_some() || content.is_some()) { return Err("request-refresh-fields"); }
     Ok(Request { id: id.into(), operation: operation.into(), market: market.into(), account, product, content, observer: None })
 }
@@ -216,6 +216,7 @@ async fn execute(client: &reqwest::Client, tokens: &TokenManager, root: &Path, g
     if !entitled(product, &entries, chrono::Utc::now().timestamp()) { return Err("game-entitlement-required"); }
     state(root, req, "resolving", json!({}))?;
     let plan = crate::package_plan::resolve(client, product, &req.market).await.map_err(|_| "package-resolution")?.without_durable_selection();
+    if req.operation == "plan" { return state(root, req, "package-choice", plan.json(product, &req.market)); }
     let content = match plan.select(req.content.as_deref()) {
         Ok(content) => content,
         Err(_) => return state(root, req, "package-choice", plan.json(product, &req.market)),
@@ -296,6 +297,10 @@ mod tests {
         }
         let mut v = valid; v["operation"] = json!("install"); v["accountKey"] = json!("a".repeat(64)); v["productId"] = json!(A);
         assert!(parse(&serde_json::to_vec(&v).unwrap()).is_ok());
+        v["operation"] = json!("plan");
+        assert!(parse(&serde_json::to_vec(&v).unwrap()).is_ok());
+        v.as_object_mut().unwrap().remove("accountKey");
+        assert!(parse(&serde_json::to_vec(&v).unwrap()).is_err());
     }
     #[test] fn access_rejects_cycles_expiry_trials_and_missing_non_subscription_parents() {
         let mut rows = BTreeMap::from([(A.into(),row())]); assert!(entitled(A,&rows,0));
