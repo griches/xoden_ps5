@@ -607,3 +607,49 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   Raw deployment verification passed; backup is
   `console-backups/20261027-gamepass-home`. Current app was left running so Gary
   retains control; next launch loads the final Browse Game Pass fallback.
+
+## 2026-10-27 — Call of the Elder Gods install crash
+
+- Actual catalogue title is Call of the Elder Gods, product 9PF697TG7PP7. The
+  requested PC package is about 22.2 GB. No unrelated game download was started.
+- Reproduced the app crash on Retry with DevTools attached: report
+  `PS5_DevTools/captures/20261027-140948-FAKE77031-382.json`. SIGABRT in xodus-job,
+  RSS 623 -> 761 MiB. The captured ELF text hash matched the build. Stack recovery
+  found alloc::raw_vec::handle_error in streaming::run_reader requesting
+  107,928,160 bytes. This happened before game launch.
+- Backend 5530da0: segment hashes now share immutable package page tables using
+  Arc and checked ranges, rather than copying large arrays for each file. The
+  metadata reader uses a bounded 64 KiB buffer. Large page-table allocations are
+  fallible and return an error rather than aborting the app. Synthetic tests
+  prove shared backing storage and compatibility with existing resume identities.
+- First patched retry returned a failed download without a crash, so the crash
+  guard worked, but the install was not yet fixed.
+- Read only the XVD header and region descriptors from the existing PS5 prefix
+  cache for diagnosis. One encrypted region has 5,396,408 pages, requiring
+  129,513,792 bytes for units + hashes. Temporary inspection source was removed;
+  header/descriptor samples and output remain only in /tmp.
+- The PS5 app was using the driver's 128 MiB default heap. Playden b41941e sets
+  the supported app heap override to 512 MiB; no dependency or kit pins changed.
+  ELF inspection confirms the constant is 512 MiB.
+- Backend effefb9 adds bounded diagnostic codes for metadata failures to the
+  native observer and private job result. The UI distinguishes working-memory
+  exhaustion from unreadable package data; no URLs/paths/credentials are exposed.
+- Deployed final binary SHA256
+  `3f6f2feabe052f1eefa61b2d820f8e4fdbcefe42fc287f91ce20cf5387f844a7`;
+  verified deployment backup `console-backups/20261027-native-package-heap`.
+- Final validation: 152/152 host tests passed (135.97 seconds), 50 msixvc tests
+  passed (2 intentionally ignored), 76 CLI tests passed; native archive and PS5
+  build passed. Retry is currently active beyond the old allocation failure,
+  reading game data; content byte progress acceptance is still pending.
+- Virtual pad closed immediately after Retry. Debugger remains attached only to
+  verify this acceptance run; quit it cleanly afterwards, never kill the payload.
+
+### Elder Gods crash acceptance
+
+- The final retry passed metadata parsing and reached actual content download:
+  /tmp/elder-heap-progress.png shows 3%, 766 MB / 21 GB, 11.9 MB/s and an estimate
+  of about 29 minutes. This accepts the reported pre-download crash fix; full
+  installation and gameplay have not yet been accepted for this title.
+- Leave the active download running. Do not restart the app or cancel it for
+  further tests. Virtual controller is closed; quit DevTools cleanly so Gary
+  keeps control while the download continues. No actual Microsoft login needed.
