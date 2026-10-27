@@ -53,6 +53,7 @@ impl Job {
         let (cancel, receiver) = watch::channel(false);
         let sink = mailbox.clone();
         std::thread::Builder::new().name("xodus-job".into()).spawn(move || {
+            trace(b"xodus-native: worker entered\n");
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| worker(root, games, setup, receiver, &sink)))
                 .unwrap_or(Err("job-panicked"));
             // worker has dropped the runtime, credentials and lease before here.
@@ -78,10 +79,15 @@ fn worker(
     setup: impl FnOnce() -> Result<(Client, TokenManager), &'static str>,
     receiver: watch::Receiver<bool>, mailbox: &Arc<Mailbox>,
 ) -> Result<State, &'static str> {
+    trace(b"xodus-native: opening lease\n");
     let lease = JobLease::open(&root, &games, Some(mailbox.clone()))?;
+    trace(b"xodus-native: building runtime\n");
     let runtime = Builder::new_multi_thread().worker_threads(2).enable_all().max_blocking_threads(4).build().map_err(|_| "job-runtime")?;
+    trace(b"xodus-native: runtime ready\n");
     let result = run_drained(runtime, async {
+        trace(b"xodus-native: setup starting\n");
         let (client, tokens) = setup()?;
+        trace(b"xodus-native: setup ready\n");
         mailbox.update(|s| { if s.state != State::Stopping { s.state = State::Running; } });
         Ok::<_, &'static str>(lease.run(&client, &tokens).await)
     }, receiver);
@@ -119,7 +125,8 @@ mod tests {
     fn cancellation_retains_lease_until_blocking_io_has_drained() {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("job-request.json"), br#"{"schema":1,"requestId":"11111111-1111-4111-8111-111111111111","operation":"refresh","market":"GB"}"#).unwrap();
-        let lease = JobLease::open(root.path(), root.path(), None).unwrap();
+        trace(b"xodus-native: opening lease\n");
+    let lease = JobLease::open(root.path(), root.path(), None).unwrap();
         let contender = OpenOptions::new().write(true).open(root.path().join("job.lock")).unwrap();
         let (cancel, receiver) = watch::channel(false);
         let (started_tx, started) = mpsc::channel();
@@ -155,4 +162,12 @@ mod tests {
         let (_, receiver) = watch::channel(true);
         assert_eq!(run_drained(runtime, async { panic!("must not start"); #[allow(unreachable_code)] 1 }, receiver), None);
     }
+}
+
+// Fixed stage labels only: never log request contents, credentials or URLs.
+fn trace(message: &'static [u8]) {
+    #[cfg(target_os = "freebsd")]
+    unsafe { libc::write(2,message.as_ptr().cast(),message.len()); }
+    #[cfg(not(target_os = "freebsd"))]
+    let _ = message;
 }
