@@ -588,8 +588,8 @@ void SlowLicenseCheckShowsAfterAFewSeconds() {
   }
   std::filesystem::remove_all(root);
 }
-void PhoneApprovalLoadsMissingLibraryWithoutAnotherAction() {
-  char temp[]="/tmp/playden-phone-controller-XXXXXX";assert(mkdtemp(temp));
+void MicrosoftApprovalLoadsMissingLibraryWithoutAnotherAction() {
+  char temp[]="/tmp/playden-browser-controller-XXXXXX";assert(mkdtemp(temp));
   const auto root=std::filesystem::canonical(temp);
   {
     Storage storage(root.string());
@@ -602,9 +602,9 @@ void PhoneApprovalLoadsMissingLibraryWithoutAnotherAction() {
       const auto data=storage.Read("job-request.json");assert(data.ok());
       const auto request=steam::json::Parse(std::string(data.value().begin(),data.value().end()));assert(request);
       const auto operation=request->Find("operation")->text();const auto id=request->Find("requestId")->text();
-      if(operation=="signin-test") {
+      if(operation=="signin-browser") {
         ++phone;
-        put("job-result.json","{\"schema\":1,\"requestId\":\""+id+"\",\"operation\":\"signin-test\",\"status\":\"phone-sign-in-verified\",\"detail\":{\"pcLicenseVerified\":true,\"activeAccountReplaced\":false}}");
+        put("job-result.json","{\"schema\":1,\"requestId\":\""+id+"\",\"operation\":\"signin-browser\",\"status\":\"browser-sign-in-saved\",\"detail\":{\"browserSessionSaved\":true}}");
       } else {
         assert(operation=="refresh" && phone==1);++refresh;
         put("job-result.json","{\"schema\":1,\"requestId\":\""+id+"\",\"operation\":\"refresh\",\"status\":\"complete\",\"detail\":{}}");
@@ -615,7 +615,7 @@ void PhoneApprovalLoadsMissingLibraryWithoutAnotherAction() {
     Simulation model({}, {},ModelMode::Live);model.SetGamePassOnly(true);
     Repository repository;Backend backend;Controller controller(model,backend,repository);controller.SetXboxJobs(&jobs,&source);
     Wait(controller,[&]{return jobs.Snapshot()->phase=="idle";});
-    OpenSettings(model);Choose(model,"xbox-account");Choose(model,"xbox-phone-test");
+    OpenSettings(model);Choose(model,"xbox-account");Choose(model,"xbox-browser-signin");
     Wait(controller,[&]{return jobs.Snapshot()->phase=="refreshed" && model.view().subtitle.find("Your library is ready")!=std::string::npos;});
     for(int i=0;i<8;++i)controller.Tick();
     assert(phone==1 && refresh==1 && !jobs.Snapshot()->active_game.valid());
@@ -849,4 +849,4 @@ void StaySignedInOffKeepsTheTokenInMemory() {
   }
   std::filesystem::remove_all(root);
 }
-int main() { PhoneApprovalLoadsMissingLibraryWithoutAnotherAction(); GamePassStartupDoesNotRestoreSteam(); StaySignedInOffKeepsTheTokenInMemory(); TitleNamesCarryTheirStore(); NoSteamSessionWithOtherGamesOpensHome(); FailedRestoreWithOtherGamesOpensHome(); OtherRestoreFailuresWithOtherGamesOpenHome(); SteamSignOutKeepsOtherGames(); PasswordSignInWithGuardCode(); PasswordFailuresAndCancel(); SlowLicenseCheckShowsAfterAFewSeconds(); CanceledStorageRetryKeepsSavedSessionIntent(); RevokedSessionCleanupRetriesAfterStorageRecovery(); StorageFailureKeepsVisibleAccount(); StorageFailureRetriesSavedSession(); ChallengeAndCancel(); AuthenticationRestoreAndSignOut(); FailedClearDoesNotSwitch(); SignInAgainKeepsTheAccount(); ExitHonorsClearWithoutStartingNewQr(); StorageFailureAndRevocation(); ConnectedLibraryAndOfflineRestart(); LicenseChangesRefreshTheLibrary(); OfflineRefreshFromTheLibraryReconnects(); ShutdownClearsLibraryBeforeSession(); RepeatedClearPreservesFirstIntent(); }
+int main() { MicrosoftApprovalLoadsMissingLibraryWithoutAnotherAction(); GamePassStartupDoesNotRestoreSteam(); StaySignedInOffKeepsTheTokenInMemory(); TitleNamesCarryTheirStore(); NoSteamSessionWithOtherGamesOpensHome(); FailedRestoreWithOtherGamesOpensHome(); OtherRestoreFailuresWithOtherGamesOpenHome(); SteamSignOutKeepsOtherGames(); PasswordSignInWithGuardCode(); PasswordFailuresAndCancel(); SlowLicenseCheckShowsAfterAFewSeconds(); CanceledStorageRetryKeepsSavedSessionIntent(); RevokedSessionCleanupRetriesAfterStorageRecovery(); StorageFailureKeepsVisibleAccount(); StorageFailureRetriesSavedSession(); ChallengeAndCancel(); AuthenticationRestoreAndSignOut(); FailedClearDoesNotSwitch(); SignInAgainKeepsTheAccount(); ExitHonorsClearWithoutStartingNewQr(); StorageFailureAndRevocation(); ConnectedLibraryAndOfflineRestart(); LicenseChangesRefreshTheLibrary(); OfflineRefreshFromTheLibraryReconnects(); ShutdownClearsLibraryBeforeSession(); RepeatedClearPreservesFirstIntent(); }
