@@ -116,3 +116,23 @@ interrupt the Remote Play session.
 Installation status also has a read-only view at <http://127.0.0.1:47833>
 (`node progress-view.mjs`). Terminal job status is retained in `.last-job.json`;
 this does not resume an interrupted job.
+
+### Sign-in status and recovery
+
+The sign-in button checks the saved Microsoft session first. A stored account
+alone is not proof of a valid session. A verified session without an eligible
+PC Game Pass subscription is reported separately and does not enable downloads.
+The Microsoft window expires after ten minutes; **Cancel sign-in** stops the
+login process and allows another attempt. Closing the window or losing the
+connection produces a retryable error instead of reporting success.
+
+This verifies the account **on the Mac**. It does not claim the account is
+connected to the PS5. Console account transfer and a self-contained console
+sign-in flow are separate unfinished work; do not launch the legacy UID transfer
+payload as part of these offline sign-in tests.
+
+Offline checks (no Microsoft authentication or console access):
+
+```sh
+node --test ps5-extras/companion/backend.test.mjs ps5-extras/companion/sign-in.test.mjs
+```
