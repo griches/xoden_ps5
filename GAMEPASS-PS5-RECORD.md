@@ -1439,3 +1439,40 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   /tmp/gamepass-signin-final-host-tests.log. Do not start another full run unless
   new changes or a new unresolved failure require it. Native/wrapper/app builds
   and the previously listed focused checks have already passed.
+
+### 2026-10-28 — resume: finish verification within one sign-in attempt
+
+- Gary paused work for the night; the remaining host test run was cancelled
+  at his request. No automatic verification retries had been added before
+  that pause. Resumed only after Gary said "right, carry on".
+- Added bounded retries to verification of a newly approved or cached browser
+  grant: at most three identity checks, with one- and two-second delays, and
+  a sixty-second total verification deadline. A first success has no delay.
+  Retry only an Xbox-user HTTP 401, server failure or transient connection/
+  request timeout. Do not retry malformed requests, permission rejection,
+  rate limits or later identity/profile failures. Identity comparison and the
+  atomic active-account save still happen only after verification succeeds.
+- Per-attempt diagnostics are isolated, so an earlier rejected representation
+  cannot mislabel a later profile failure as an Xbox-user rejection. The paired
+  computer stays in verification until the operation actually succeeds or
+  exhausts its bounded retries; it is not told to restart after the first 401.
+- Seven focused browser protocol/retry tests passed, including immediate
+  success, recovery after initial 401s, bounded permanent failure, rejection
+  classification and cancellation before a subsequent request. Native PS5
+  and packaged app builds passed. Backend local commit: 76e1cdf.
+- Completed the interrupted C++ host regression without repeating its finished
+  portion: 124 completed tests in /tmp/gamepass-signin-final-host-tests.log,
+  plus 29 tests (125–153) in /tmp/gamepass-auto-verify-host-remaining.log.
+  All 153 unique tests passed. The previously timing-out installed-locations
+  test passed in 6.81 seconds in the completed first portion. No current
+  installed-locations failure is established.
+- Console FTP/loader were reachable; reloaded ps5vkctl only and confirmed idle.
+  Did not load DevLoop or open a virtual controller. Deployed and launched app
+  1514393e6a01a425c6e7bb0f3f3b4f61ad0ccfb5e703fbede65e06cc6b953a72;
+  backup: playden-ps5/console-backups/20261028-signin-auto-verification.
+  No account reset, device replacement, save or game-setting change.
+- Restarted the idle local page to remove its stale HTTP 401 display and opened
+  the refreshed page in the default browser. Asked Gary to choose the single
+  Sign in with Microsoft action and approve once. A fresh first-pass browser
+  login with this build is still pending; last night's cached-retry and Elder
+  Gods game sign-in acceptance remain the last live success. No pushes/releases.
