@@ -791,7 +791,7 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 
 ## 2026-10-27 — private repository, throughput candidate and artwork work
 
-- Created and pushed PRIVATE https://github.com/griches/gamepass-ps5. Local
+- Created and pushed PRIVATE https://github.com/griches/xoden_ps5. Local
   combined checkout is gamepass-ps5/. Preserved histories from playden-ps5,
   xodus-ps5-backend, xodus-games and the earlier xodus work; included previously
   uncommitted legacy CLI/runtime-wrapper source in the combined repository.

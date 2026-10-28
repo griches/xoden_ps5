@@ -6,7 +6,7 @@ kit **0.13.1** (native launcher patch over 0.13). Dates and limitations below ma
 completed gameplay test, and an older imported install does not validate the
 current direct-download flow.
 
-[Open a compatibility report](https://github.com/griches/gamepass-ps5/issues/new?template=compatibility-report.yml),
+[Open a compatibility report](https://github.com/griches/xoden_ps5/issues/new?template=compatibility-report.yml),
 including successful tests. Reports stay in this private repository. Access is
 limited to people who can access the repository.
 

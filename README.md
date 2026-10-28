@@ -11,11 +11,11 @@ game will run. Check the [compatibility chart](COMPATIBILITY.md) before a large 
 
 XoDen is an independent project, **not affiliated with or supported by Xodus,
 Xodus Nexus, Playden, Microsoft or Xbox**. Please report XoDen problems in
-[this repository's Issues](https://github.com/griches/gamepass-ps5/issues),
+[this repository's Issues](https://github.com/griches/xoden_ps5/issues),
 not to those projects' support channels. Their contributions are credited below.
 This repository and its release downloads currently require repository access.
 
-**[Download 0.1.0](https://github.com/griches/gamepass-ps5/releases/tag/0.1)** ·
+**[Download 0.1.0](https://github.com/griches/xoden_ps5/releases/tag/0.1)** ·
 **[Compatibility](COMPATIBILITY.md)** · **[Known issues / roadmap](ROADMAP.md)** ·
 **[Release notes](CHANGELOG.md)** · **[Build instructions](DEVELOPMENT.md)**
 
@@ -39,7 +39,7 @@ This repository and its release downloads currently require repository access.
 ## Install on the PS5
 
 1. Download and unzip `xoden-ps5-0.1.0.zip` from the
-   [0.1.0 release](https://github.com/griches/gamepass-ps5/releases/tag/0.1).
+   [0.1.0 release](https://github.com/griches/xoden_ps5/releases/tag/0.1).
    `SHA256SUMS` is provided alongside the downloads.
 2. Copy the **PPSA99324** folder to **/data/homebrew/PPSA99324** on the PS5
    using FTP. Keep all files and subfolders. This is a homebrew folder, not a
@@ -141,7 +141,9 @@ inherited Playden 0.7.2 version; that number does not mean they are newer XoDen 
 The [compatibility chart](COMPATIBILITY.md) records the **PC Game Pass edition**,
 runtime, settings and actual test coverage. “Launches” means a startup/menu test;
 “Works” requires gameplay evidence. Steam results and another edition's results
-are not automatically transferable. Please report successful games as well as failures.
+are not automatically transferable. Please report successful games as well as failures. To propose a chart change,
+edit `COMPATIBILITY.md` on a branch and open a pull request, or use the issue
+form and let a maintainer update it. See [contributing](CONTRIBUTING.md).
 
 - **Helper page will not open:** start the helper first and open its loopback URL
   on that computer. Install Node.js 24+ and Chrome if missing.
@@ -164,8 +166,8 @@ Xbox cloud saves or anti-cheat support; only behavior recorded for a game is ver
 
 ## Report issues here
 
-Use [XoDen Issues](https://github.com/griches/gamepass-ps5/issues) or the
-[compatibility report form](https://github.com/griches/gamepass-ps5/issues/new?template=compatibility-report.yml).
+Use [XoDen Issues](https://github.com/griches/xoden_ps5/issues) or the
+[compatibility report form](https://github.com/griches/xoden_ps5/issues/new?template=compatibility-report.yml).
 Include app version, runtime-kit version, firmware, exact PC game/edition, the last
 successful step, settings changes, and a screenshot or redacted log when possible.
 Never post session files, tokens, account identifiers, pairing codes, signed
@@ -184,7 +186,7 @@ Xodus, Nexus or Playden teams to support this fork.
 | `xodus/` and `xodus-nexus/` | Earlier integration source and pinned upstream provenance |
 
 ```sh
-git clone --recurse-submodules https://github.com/griches/gamepass-ps5.git
+git clone --recurse-submodules https://github.com/griches/xoden_ps5.git
 ```
 
 See [DEVELOPMENT.md](DEVELOPMENT.md), [source provenance](SOURCE-PROVENANCE.json)
