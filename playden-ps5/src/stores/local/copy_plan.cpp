@@ -99,11 +99,11 @@ CopyPlanBuild Failed(std::string failure, int error = 0) {
 
 std::string LinkWords(const std::string& relative) {
   return "The game's folder has a link, " + Quoted(relative) +
-         ". Playden can't copy links: replace it with the files it points to, then copy the game again.";
+         ". XoDen can't copy links: replace it with the files it points to, then copy the game again.";
 }
 
 std::string UnreadableWords(const std::string& relative) {
-  return "Playden can't read " + Quoted(relative) + " in the game's folder.";
+  return "XoDen can't read " + Quoted(relative) + " in the game's folder.";
 }
 
 bool WriteAll(FILE* file, const std::string& text) {
@@ -184,14 +184,14 @@ CopyPlanBuild BuildCopyPlan(const std::string& source_path, std::size_t max_file
     if (error == ENOENT) return Failed("The game's folder is not there. Check the drive.", error);
     if (error == ENOTDIR) return Failed("The game's folder is not a folder.", error);
     if (IsLinkError(error)) return Failed(LinkWords(source), error);
-    return Failed("Playden can't read the game's folder.", error);
+    return Failed("XoDen can't read the game's folder.", error);
   }
   CopyPlanBuild build;
   build.plan.source = source;
   // One frame per level below the folder, on the heap: no depth limit and no recursion.
   std::vector<Frame> stack;
   Frame first;
-  if (!OpenFrame(root, {}, &first)) return Failed("Playden can't read the game's folder.", errno);
+  if (!OpenFrame(root, {}, &first)) return Failed("XoDen can't read the game's folder.", errno);
   stack.push_back(std::move(first));
   const auto fail = [&](std::string failure, int error) {
     for (auto& frame : stack) Close(frame);
@@ -234,7 +234,7 @@ CopyPlanBuild BuildCopyPlan(const std::string& source_path, std::size_t max_file
     }
     if (S_ISDIR(info.st_mode)) {
       if (build.plan.dirs.size() >= max_files)
-        return fail("The game has more than " + WithThousands(max_files) + " folders. Playden can't copy it.", 0);
+        return fail("The game has more than " + WithThousands(max_files) + " folders. XoDen can't copy it.", 0);
       build.plan.dirs.push_back(relative);
       Frame next;
       if (!OpenFrame(child, relative, &next)) return fail(UnreadableWords(relative), errno);
@@ -245,7 +245,7 @@ CopyPlanBuild BuildCopyPlan(const std::string& source_path, std::size_t max_file
     if (S_ISLNK(info.st_mode)) return fail(LinkWords(relative), ELOOP);
     if (!S_ISREG(info.st_mode)) continue;
     if (build.plan.files.size() >= max_files)
-      return fail("The game has more than " + WithThousands(max_files) + " files. Playden can't copy it.", 0);
+      return fail("The game has more than " + WithThousands(max_files) + " files. XoDen can't copy it.", 0);
     CopyFile file;
     file.path = relative;
     file.bytes = info.st_size > 0 ? static_cast<std::uint64_t>(info.st_size) : 0;
@@ -260,8 +260,8 @@ CopyPlanBuild BuildCopyPlan(const std::string& source_path, std::size_t max_file
     if (build.plan.total > max_bytes) {
       const auto tib = max_bytes >> 40;
       return fail(tib > 0 && (max_bytes & ((1ull << 40) - 1)) == 0
-                      ? "The game is larger than " + std::to_string(tib) + " TiB. Playden can't copy it."
-                      : "The game is larger than " + WithThousands(max_bytes) + " bytes. Playden can't copy it.",
+                      ? "The game is larger than " + std::to_string(tib) + " TiB. XoDen can't copy it."
+                      : "The game is larger than " + WithThousands(max_bytes) + " bytes. XoDen can't copy it.",
                   0);
     }
     build.plan.files.push_back(std::move(file));

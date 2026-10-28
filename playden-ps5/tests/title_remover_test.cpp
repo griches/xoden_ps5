@@ -71,7 +71,7 @@ int main() {
   fs::create_directory(root / "elsewhere");
   fs::create_directory_symlink(root / "elsewhere", config.request_directory);
   outcome = RunTitleRemover(config, "FAKE78002", nonce);
-  CHECK(!outcome.sent && outcome.detail == "request directory is not Playden's");
+  CHECK(!outcome.sent && outcome.detail == "request directory is not XoDen's");
   CHECK(!fs::exists(root / "elsewhere/request"));
   fs::remove_all(root);
   return 0;

@@ -259,11 +259,11 @@ SteamworksResult EmulateSteamworks(const std::string& install_root, const std::s
     const auto orig = fs::path(path.string() + ".orig");
     const bool pe64 = Lower(path.filename().string()) == "steam_api64.dll";
     const auto emulator = LoadEmulator(emulator_dir, pe64);
-    if (!emulator) return fail("Playden's Steam emulator files are missing or damaged; reinstall Playden.");
+    if (!emulator) return fail("XoDen's Steam emulator files are missing or damaged; reinstall XoDen.");
     const auto current = ReadFile(path, kMaxDllBytes);
-    if (!current) return fail("Playden could not read the game's " + relative + ".");
+    if (!current) return fail("XoDen could not read the game's " + relative + ".");
     const auto digest = HashArtifactBytes(*current);
-    if (!digest) return fail("Playden could not check the game's " + relative + ".");
+    if (!digest) return fail("XoDen could not check the game's " + relative + ".");
     std::string original;
     if (IsPlaydenEmulator(*digest, retired)) {
       // Playden's own (an earlier build after a Playden update): the game's DLL is the .orig.
@@ -273,9 +273,9 @@ SteamworksResult EmulateSteamworks(const std::string& install_root, const std::s
       // are lost with it, and the emulator would hand the game the wrong ones.
       const auto kept_digest = HashArtifactBytes(*kept);
       if (!kept_digest || IsPlaydenEmulator(*kept_digest, retired))
-        return fail("An earlier Playden lost the game's own " + relative + "; reinstall the game to get it back.");
+        return fail("An earlier XoDen lost the game's own " + relative + "; reinstall the game to get it back.");
       if (*digest != emulator->sha256) {
-        if (!WriteAtomic(path, emulator->bytes)) return fail("Playden could not set up Steam features for this game.");
+        if (!WriteAtomic(path, emulator->bytes)) return fail("XoDen could not set up Steam features for this game.");
         result.changed.push_back(relative);
       }
       original = *kept;
@@ -284,13 +284,13 @@ SteamworksResult EmulateSteamworks(const std::string& install_root, const std::s
       // A first swap, or a newer original from a game update: keep it before replacing it.
       const auto kept = IsRegular(orig) ? ReadFile(orig, kMaxDllBytes) : std::nullopt;
       if ((!kept || *kept != *current) && !WriteAtomic(orig, *current))
-        return fail("Playden could not keep a copy of the game's " + relative + ".");
-      if (!WriteAtomic(path, emulator->bytes)) return fail("Playden could not set up Steam features for this game.");
+        return fail("XoDen could not keep a copy of the game's " + relative + ".");
+      if (!WriteAtomic(path, emulator->bytes)) return fail("XoDen could not set up Steam features for this game.");
       result.changed.push_back(relative);
       original = *current;
     }
     if (!WriteSettings(path.parent_path(), identity, original))
-      return fail("Playden could not write the game's Steam settings.");
+      return fail("XoDen could not write the game's Steam settings.");
   }
   result.ok = true;
   return result;
@@ -339,12 +339,12 @@ SteamworksResult ProvideLegacySteam(const std::string& install_root, const std::
       stub = ReadFile(fs::path(emulator_dir) / "steam.dll", kMaxDllBytes);
       const auto digest = stub ? HashArtifactBytes(*stub) : std::nullopt;
       if (!digest || *digest != kLegacySteamSha256) {
-        result.message = "Playden's runtime is missing its steam.dll; reinstall Playden.";
+        result.message = "XoDen's runtime is missing its steam.dll; reinstall XoDen.";
         return result;
       }
     }
     if (!WriteAtomic(folder / "steam.dll", *stub)) {
-      result.message = "Playden could not add steam.dll beside the game's " + relative + ".";
+      result.message = "XoDen could not add steam.dll beside the game's " + relative + ".";
       return result;
     }
     result.found.push_back(folder_relative.string());
@@ -366,7 +366,7 @@ SteamworksResult RemoveLegacySteam(const std::string& install_root, const std::v
     result.found.push_back(shown);
     if (!digest || *digest != kLegacySteamSha256) continue;  // the game's own
     if (::unlink(present.c_str()) != 0) {
-      result.message = "Playden could not remove its steam.dll beside the game's " + relative + ".";
+      result.message = "XoDen could not remove its steam.dll beside the game's " + relative + ".";
       return result;
     }
     result.changed.push_back(shown);
@@ -387,11 +387,11 @@ SteamworksResult RestoreSteamworks(const std::string& install_root, const std::v
     const auto kept = ReadFile(fs::path(path.string() + ".orig"), kMaxDllBytes);
     const auto kept_digest = kept ? HashArtifactBytes(*kept) : std::nullopt;
     if (kept_digest && IsPlaydenEmulator(*kept_digest, retired)) {
-      result.message = "An earlier Playden lost the game's own " + relative + "; reinstall the game to get it back.";
+      result.message = "An earlier XoDen lost the game's own " + relative + "; reinstall the game to get it back.";
       return result;
     }
     if (!kept || !WriteAtomic(path, *kept)) {
-      result.message = "Playden could not put back the game's own " + relative + "; verify the download.";
+      result.message = "XoDen could not put back the game's own " + relative + "; verify the download.";
       return result;
     }
     result.changed.push_back(relative);

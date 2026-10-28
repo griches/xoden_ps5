@@ -302,7 +302,7 @@ void UpdateService::Run(std::function<void()> work) {
       shared_->busy = false;
       shared_->queued = nullptr;
     }
-    Fail("Playden could not start the update.", "pthread_create " + std::to_string(rc));
+    Fail("XoDen could not start the update.", "pthread_create " + std::to_string(rc));
     return;
   }
   shared_->thread_started = true;
@@ -486,8 +486,8 @@ void UpdateService::ConfirmApplied(const std::string& text) {
     }
     Set([&](UpdateSnapshot& s) {
       s.whats_new = !rolled_back;
-      s.finished_message = rolled_back ? "Playden went back to version " + version->ToString() + "."
-                                       : "Playden was updated to " + version->ToString() + ".";
+      s.finished_message = rolled_back ? "XoDen went back to version " + version->ToString() + "."
+                                       : "XoDen was updated to " + version->ToString() + ".";
       s.finished_failed = false;
     });
     // Only the app user's own leftovers go now. The previous app and kit stay to go back by hand;
@@ -534,8 +534,8 @@ void UpdateService::ConfirmApplied(const std::string& text) {
     if (restored && displaced.find("/.failed-") != std::string::npos) RemoveOwnedTree(displaced);
   }
   Set([&](UpdateSnapshot& s) {
-    s.finished_message = (rolled_back ? "Going back to Playden " : "The update to Playden ") + field("version") +
-                         " did not finish. Playden " + config_.current.ToString() + " is still installed.";
+    s.finished_message = (rolled_back ? "Going back to XoDen " : "The update to XoDen ") + field("version") +
+                         " did not finish. XoDen " + config_.current.ToString() + " is still installed.";
     s.finished_failed = true;
   });
   unlink(StatePath().c_str());
@@ -591,13 +591,13 @@ void UpdateService::DoCheck(bool user_asked) {
   std::optional<std::vector<Release>> releases;  // every release, when read: betas, or a kit zip left out
   if (include_betas) {
     releases = FetchReleases(&error);
-    if (!releases) return Fail("Playden could not read the releases on GitHub.", error);
+    if (!releases) return Fail("XoDen could not read the releases on GitHub.", error);
     for (const auto& candidate : *releases)
       if (!candidate.draft && (!release || release->version < candidate.version)) release = candidate;
   } else {
     const auto body = local ? read_local("release.json")
                             : FetchSmall(config_.latest_release_url, 2 << 20, options, "application/vnd.github+json", &error);
-    if (!body) return Fail("Playden could not reach GitHub to look for updates.", error);
+    if (!body) return Fail("XoDen could not reach GitHub to look for updates.", error);
     release = ParseRelease(*body, &error);
     if (!release) return Fail("The latest release on GitHub could not be read.", error);
     if (release->draft || release->prerelease || release->version.beta) release.reset();
@@ -617,13 +617,13 @@ void UpdateService::DoCheck(bool user_asked) {
   if (!asset) return Fail("Release " + release->tag + " has no update information. Install it by hand.", "no asset");
   const auto manifest_text = local ? read_local(kUpdateManifestAsset)
                                    : FetchSmall(asset->url, 256 << 10, options, "application/octet-stream", &error);
-  if (!manifest_text) return Fail("Playden could not read the update information.", error);
+  if (!manifest_text) return Fail("XoDen could not read the update information.", error);
   const auto manifest = ParseUpdateManifest(*manifest_text, &error);
   if (!manifest) return Fail("The update information of " + release->tag + " is not valid.", error);
   if (manifest->app_version != release->version || manifest->title_id != config_.title_id)
     return Fail("The update information does not match release " + release->tag + ".", "version or title");
   if (config_.current < manifest->min_from)
-    return Fail("Playden " + release->version.ToString() + " cannot update from this version. Install it by hand.",
+    return Fail("XoDen " + release->version.ToString() + " cannot update from this version. Install it by hand.",
                 "min_from " + manifest->min_from.ToString());
   const auto* app = release->Find(manifest->app_asset);
   const auto* kit = release->Find(manifest->kit.asset);
@@ -671,7 +671,7 @@ void UpdateService::DoInstall() {
   const auto& release = *release_;
   const auto& manifest = *manifest_;
   if (!PrepareWorkRoot() || !MakeFolders(config_.work_root + "/downloads"))
-    return Fail("Playden could not create its update folder.", config_.work_root);
+    return Fail("XoDen could not create its update folder.", config_.work_root);
   const auto* app = release.Find(manifest.app_asset);
   const auto* kit = kit_zip_ ? &*kit_zip_ : release.Find(manifest.kit.asset);
   std::string kit_folder = ReadyKit(manifest.kit);
@@ -694,7 +694,7 @@ void UpdateService::DoInstall() {
   // The installed kit already matches: nothing to swap for it.
   staged_kit_ = kit_folder == config_.kits_root + "/" + manifest.kit.kit_id ? std::string() : kit_folder;
   staged_kit_id_ = manifest.kit.kit_id;
-  if (!SaveState("staged", StagedFields())) return Fail("Playden could not save the update state.", StatePath());
+  if (!SaveState("staged", StagedFields())) return Fail("XoDen could not save the update state.", StatePath());
   Log("update " + release.version.ToString() + " staged");
   Set([&](UpdateSnapshot& s) {
     s.phase = UpdatePhase::kStaged;
@@ -752,7 +752,7 @@ bool UpdateService::StageKit(const ReleaseAsset& asset, const KitPart& kit, bool
     return MakeFolders(staging) && chmod(staging.c_str(), 0777) == 0;
   });
   if (!IsFolder(staging) || access(staging.c_str(), W_OK) != 0) {
-    fail("Playden could not create the kit folder.", staging);
+    fail("XoDen could not create the kit folder.", staging);
     return false;
   }
   ZipExtractOptions unzip;
@@ -796,7 +796,7 @@ bool UpdateService::StageKit(const ReleaseAsset& asset, const KitPart& kit, bool
   RemoveOwnedTree(replaced);
   if (!moved) {
     RemoveOwnedTree(staging);
-    fail("Playden could not put the new kit in place.", final_folder);
+    fail("XoDen could not put the new kit in place.", final_folder);
     return false;
   }
   if (!local) unlink(zip.c_str());
@@ -868,7 +868,7 @@ void UpdateService::DoCheckKit() {
   };
   std::string error;
   const auto releases = FetchReleases(&error);
-  if (!releases) return FailKit("Playden could not reach GitHub to download its runtime kit.", error);
+  if (!releases) return FailKit("XoDen could not reach GitHub to download its runtime kit.", error);
   const Release* own = nullptr;
   for (const auto& release : *releases)
     if (!release.draft && release.version == config_.current) own = &release;
@@ -886,7 +886,7 @@ void UpdateService::DoCheckKit() {
   } else {
     error = std::string("cannot read ") + kUpdateManifestAsset;
   }
-  if (!manifest_text) return FailKit("Playden could not read the kit information.", error);
+  if (!manifest_text) return FailKit("XoDen could not read the kit information.", error);
   const auto manifest = ParseUpdateManifest(*manifest_text, &error);
   if (!manifest) return FailKit("The kit information of " + own->tag + " is not valid.", error);
   if (manifest->kit.kit_id != config_.kit_id || manifest->kit.manifest_sha256 != config_.kit_manifest_sha256)
@@ -937,7 +937,7 @@ void UpdateService::DoInstallKit() {
   std::string folder = ReadyKit(kit);
   if (folder.empty()) {
     if (!PrepareWorkRoot() || !MakeFolders(config_.work_root + "/downloads"))
-      return FailKit("Playden could not create its download folder.", config_.work_root);
+      return FailKit("XoDen could not create its download folder.", config_.work_root);
     const std::uint64_t needed = kit_asset_->size * 4;  // zip, unpacked files and some room to spare
     if (config_.free_bytes) {
       const auto free = config_.free_bytes(config_.work_root);
@@ -959,7 +959,7 @@ void UpdateService::DoInstallKit() {
       if (Exists(aside)) rename(aside.c_str(), installed.c_str());
       return false;
     });
-    if (!moved) return FailKit("Playden could not put the kit in place.", installed);
+    if (!moved) return FailKit("XoDen could not put the kit in place.", installed);
   }
   Log("kit " + kit.kit_id + " " + kit.revision + " installed");
   Set([](UpdateSnapshot& s) {
@@ -986,7 +986,7 @@ bool UpdateService::StageApp(const Release& release, const UpdateManifest& manif
       Set([](UpdateSnapshot& s) { s.phase = UpdatePhase::kAvailable; s.part.clear(); });
       return false;
     }
-    Fail("The Playden download failed.", download.error);
+    Fail("The XoDen download failed.", download.error);
     return false;
   }
   Set([&](UpdateSnapshot& s) {
@@ -998,7 +998,7 @@ bool UpdateService::StageApp(const Release& release, const UpdateManifest& manif
   const std::string stage = config_.work_root + "/stage/" + release.version.ToString();
   RemoveOwnedTree(stage);
   if (!MakeFolders(stage)) {
-    Fail("Playden could not create its update folder.", stage);
+    Fail("XoDen could not create its update folder.", stage);
     return false;
   }
   ZipExtractOptions unzip;
@@ -1019,7 +1019,7 @@ bool UpdateService::StageApp(const Release& release, const UpdateManifest& manif
       Set([](UpdateSnapshot& s) { s.phase = UpdatePhase::kAvailable; s.part.clear(); });
       return false;
     }
-    Fail("The Playden download could not be unpacked.", unpacked.error);
+    Fail("The XoDen download could not be unpacked.", unpacked.error);
     return false;
   }
   std::string param_text;
@@ -1039,7 +1039,7 @@ bool UpdateService::StageApp(const Release& release, const UpdateManifest& manif
       *content_version != numeric || !full_version || *full_version != release.version ||
       !Exists(stage + "/eboot.bin")) {
     RemoveOwnedTree(stage);
-    Fail("The downloaded Playden is not version " + release.version.ToString() + ".", "param.json");
+    Fail("The downloaded XoDen is not version " + release.version.ToString() + ".", "param.json");
     return false;
   }
   if (!local) unlink(zip.c_str());

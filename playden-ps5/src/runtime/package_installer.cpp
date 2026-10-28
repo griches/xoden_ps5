@@ -1414,7 +1414,7 @@ PackageActionResult FilesystemPackageInstaller::CopyMappings(
     CreateDirectoriesWithMode(final.parent_path(), 0755, error);
   }
   if (error)
-    return Failed("destination-unwritable", "Playden can't create " + final.parent_path().string() +
+    return Failed("destination-unwritable", "XoDen can't create " + final.parent_path().string() +
                                                 " (errno=" + std::to_string(error.value()) +
                                                 " message=" + error.message() + ")");
   bool final_known = false;
@@ -1451,7 +1451,7 @@ PackageActionResult FilesystemPackageInstaller::CopyMappings(
       return Failed("atomic-rename-failed",
                     std::string(error == std::errc::cross_device_link
                                     ? "package staging and destination must be on the same filesystem"
-                                    : denied ? "Playden can't write to " + final.parent_path().string() +
+                                    : denied ? "XoDen can't write to " + final.parent_path().string() +
                                                    " (permission denied)"
                                              : "package staging rename into " + final.parent_path().string() +
                                                    " failed") + " (" + detail + ")");

@@ -219,7 +219,7 @@ bool ReadBurnMsiPackage(std::string_view bundle, const std::string& package_id, 
   auto containers = SectionContainers(bundle);
   if (!containers) containers = ScannedContainers(bundle);
   if (containers->empty()) {
-    *reason = "not a setup bundle Playden can read";
+    *reason = "not a setup bundle XoDen can read";
     return false;
   }
   std::map<std::string, std::string> ux;
@@ -291,7 +291,7 @@ bool ReadBurnMsiPackage(std::string_view bundle, const std::string& package_id, 
       return false;
     }
     if (name.empty() || name == "." || name == "..") {
-      *reason = "the bundle names a payload Playden can't use";
+      *reason = "the bundle names a payload XoDen can't use";
       return false;
     }
     const auto lower = Lower(name);

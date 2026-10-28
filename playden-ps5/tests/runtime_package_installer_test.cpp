@@ -1141,7 +1141,7 @@ void RenameFailureReportsErrno() {
   CHECK(::chmod(homebrew.c_str(), 0755) == 0);
   CHECK(result.state == PackageActionState::kFailed);
   CHECK(result.code == "atomic-rename-failed");
-  CHECK(result.message.find("Playden can't write to " + homebrew.string() + " (permission denied)") != std::string::npos);
+  CHECK(result.message.find("XoDen can't write to " + homebrew.string() + " (permission denied)") != std::string::npos);
   CHECK(result.message.find("errno=" + std::to_string(EACCES)) != std::string::npos);
   CHECK(result.message.find(std::make_error_code(std::errc::permission_denied).message()) != std::string::npos);
   CHECK(!std::filesystem::exists(homebrew / "FAKE78001"));

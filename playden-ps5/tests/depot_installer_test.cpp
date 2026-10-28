@@ -621,10 +621,10 @@ void StatsAndRemovalLogs(const std::filesystem::path& root) {
   });
   CHECK(runner.Remove((root / "440").string()).empty());
   CHECK(removals == 1);
-  expected_app = 441; expected_ok = "ok=0 The game's folder holds no Playden install record, so it was left as it is.";
+  expected_app = 441; expected_ok = "ok=0 The game's folder holds no XoDen install record, so it was left as it is.";
   std::filesystem::create_directories(root / "441");
   std::ofstream(root / "441" / "keep.txt") << "unmanaged";
-  CHECK(runner.Remove((root / "441").string()).find("no Playden install record") != std::string::npos);
+  CHECK(runner.Remove((root / "441").string()).find("no XoDen install record") != std::string::npos);
   CHECK(removals == 2);
   CHECK(!runner.Remove((root / "account-name").string() + "/..").empty());
   CHECK(removals == 2); // no unvalidated path/name is logged

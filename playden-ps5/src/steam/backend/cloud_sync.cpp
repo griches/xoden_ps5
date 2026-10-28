@@ -465,7 +465,7 @@ std::string AccountKey(std::uint64_t steam_id) {
 // accepted and, it seems, to logons it was limiting; Playden waits for its next run before trying the
 // token again (cm_client.cpp).
 constexpr const char* kSignInRefused =
-    "Steam turned down the sign-in. Playden tries again next time it starts; if this keeps happening, use Settings, Account, Sign in again.";
+    "Steam turned down the sign-in. XoDen tries again next time it starts; if this keeps happening, use Settings, Account, Sign in again.";
 
 CloudSync::CloudSync(CmClient& cm, HttpClient& http) {
   hooks_.session = [&cm](const StoredSession& session, std::uint32_t deadline_ms, const std::atomic<bool>& cancel,
@@ -650,7 +650,7 @@ CloudPlan CloudSync::Check(const StoredSession& session, const GameSaveLocation&
                        : "Saves here and in Steam Cloud both changed. Choose which to keep.";
   } else if (plan.uploads > 0 && plan.requires_account_confirmation) {
     plan.status = PlanStatus::kNeedsAccount;
-    plan.message = "Confirm this Steam account before Playden changes its Cloud saves.";
+    plan.message = "Confirm this Steam account before XoDen changes its Cloud saves.";
   } else if (plan.downloads > 0 || plan.uploads > 0) {
     plan.status = PlanStatus::kReady;
     plan.message = plan.downloads > 0 && plan.uploads > 0
@@ -722,7 +722,7 @@ CloudOutcome CloudSync::Apply(const StoredSession& session, const GameSaveLocati
   if (progress) progress(0, total);
   const bool remote_changes = !uploads.empty() || !remote_deletes.empty();
   if (remote_changes && plan.requires_account_confirmation && !confirm_account)
-    return fail("Confirm this Steam account before Playden changes its Cloud saves.");
+    return fail("Confirm this Steam account before XoDen changes its Cloud saves.");
 
   const auto backup_root = location.state_root + "/" + kBackupFolder + "/" +
                            std::to_string(hooks_.now ? hooks_.now() : std::chrono::duration_cast<std::chrono::seconds>(
@@ -786,12 +786,12 @@ CloudOutcome CloudSync::Apply(const StoredSession& session, const GameSaveLocati
                                " raw_size=" + std::to_string(ticket->raw_file_size) + " listed_size=" +
                                std::to_string(decision.remote_fact.size) + " file_size=" + std::to_string(ticket->file_size);
         failure = ticket && ticket->file_size > kMaxHttpResponseBytes ? "A Cloud save is too large to download yet."
-                                                                       : "Steam described a Cloud save Playden cannot use.";
+                                                                       : "Steam described a Cloud save XoDen cannot use.";
         return std::nullopt;
       }
       const auto url = TransferUrl(ticket->use_https, ticket->host, ticket->path);
       if (!url) {
-        failure = "Steam described a Cloud save Playden cannot use.";
+        failure = "Steam described a Cloud save XoDen cannot use.";
         detail = named + " transfer-url refused host=" + ticket->host;
         return std::nullopt;
       }
@@ -872,7 +872,7 @@ CloudOutcome CloudSync::Apply(const StoredSession& session, const GameSaveLocati
           if (!WriteFileAtomic(backup_root + "/cloud/" + (decision.local.root == SaveRoot::kGame ? "game/" : "prefix/") +
                                    decision.local.path,
                                *fetched)) {
-            failure = "Playden could not keep a copy of the Cloud saves it would replace.";
+            failure = "XoDen could not keep a copy of the Cloud saves it would replace.";
             return CmError::kProtocol;
           }
         }
@@ -917,7 +917,7 @@ CloudOutcome CloudSync::Apply(const StoredSession& session, const GameSaveLocati
           return abort_batch("Steam refused a Cloud save upload (" + std::to_string(eresult) + ").", CmError::kRejected);
         }
         const auto upload = DecodeBeginFileUploadResponse(reply);
-        if (!upload || upload->encrypt_file) return abort_batch("Steam asked for an upload Playden cannot make.", CmError::kProtocol);
+        if (!upload || upload->encrypt_file) return abort_batch("Steam asked for an upload XoDen cannot make.", CmError::kProtocol);
         bool transferred = true;
         for (const auto& block : upload->blocks) {
           const auto url = TransferUrl(block.use_https, block.host, block.path);

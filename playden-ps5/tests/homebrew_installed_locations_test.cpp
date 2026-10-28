@@ -872,7 +872,7 @@ void ImportedGamePlaysInPlace() {
     tick_until([&] {
       const auto& modals = model.state().navigation.modals;
       if (modals.empty()) return false;
-      if (modals.back().body.find("Playden couldn't open the game's folder in time.") != std::string::npos) return true;
+      if (modals.back().body.find("XoDen couldn't open the game's folder in time.") != std::string::npos) return true;
       // The recreated title never starts either: its own "Can't play" may come up first.
       CHECK(model.action("focus:alert-ok") && model.action("cross"));
       return false;

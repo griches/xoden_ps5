@@ -149,7 +149,7 @@ DotnetHeapResult LimitDotnetHeap(const std::string& game_root) {
       if (!updated) continue;  // an unusual layout is left as the game shipped it
       if (!WriteAtomic(config, *updated)) {
         result.ok = false;
-        result.message = "Playden could not update the game's .NET settings (" + relative + ").";
+        result.message = "XoDen could not update the game's .NET settings (" + relative + ").";
         return result;
       }
       result.changed.push_back(relative);

@@ -764,7 +764,7 @@ void InstallService::Run() {
         if (removal->forget) remover->Forget(*removal->forget);
         else failure = remover->Remove(removal->root);
       } else if (removal->game) {
-        failure = "Playden can't delete this game's files.";
+        failure = "XoDen can't delete this game's files.";
       }
       std::lock_guard<std::mutex> lock(mutex_);
       if (const auto& game = removal->game) {

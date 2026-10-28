@@ -327,7 +327,7 @@ void t08_nested_settings_restore_openers(const std::filesystem::path& fixtures,
     check(simulation.state().navigation.focus_key == "setting-resolution", "T08 picker restores its opener");
     check(simulation.state().game_settings.at(SteamId(900001)).overrides.at("resolution") == "2560x1440", "T08 picker saves the override");
     check(find_row(simulation, "setting-resolution")->modified, "T08 changed row is marked");
-    check(find_row(simulation, "preset-picker")->value == "Custom · from Playden default", "T08 preset reads Custom after a change");
+    check(find_row(simulation, "preset-picker")->value == "Custom · from XoDen default", "T08 preset reads Custom after a change");
     activate(simulation, "setting-extra_arguments");
     simulation.text("--fixture");
     simulation.action("circle");
@@ -500,7 +500,7 @@ void t08b_settings_sheet_rules(const std::filesystem::path& fixtures, const std:
     activate(simulation, "details-more");
     activate(simulation, "game-settings");
     check(find_row(simulation, "setting-resolution") && find_row(simulation, "setting-resolution")->value == "1920×1080",
-          "T08b games without a recipe show Playden defaults");
+          "T08b games without a recipe show XoDen defaults");
 }
 
 // The preset chooser compares the focused preset with the current values; the Community
@@ -699,7 +699,7 @@ void t11_preferences_failure_and_controller_modal_recovery(const std::filesystem
         const auto& rows = restored.view().rows;
         const auto kit = std::find_if(rows.begin(), rows.end(), [](const auto& row) { return row.key == "about-kit"; });
         check(kit != rows.end() && kit->value.rfind("playden-kit · ", 0) == 0 &&
-                  kit->subtitle == "The kit this version of Playden was tested with",
+                  kit->subtitle == "The kit this version of XoDen was tested with",
               "T11 About names the runtime kit and whether it is the tested one");
     }
 }
@@ -782,20 +782,20 @@ void t13_settings_sections_rail(const std::filesystem::path& fixtures, const std
     // Quit Playden, as on macOS: the rail entry is the action, with no "Quit / Review" card.
     simulation.action("left");
     for (int step = 0; step < 12; ++step) simulation.action("down");
-    check(section() == "Quit Playden" && simulation.state().navigation.focus_key == "settings-quit",
-          "T13 the last rail entry is Quit Playden");
+    check(section() == "Quit XoDen" && simulation.state().navigation.focus_key == "settings-quit",
+          "T13 the last rail entry is Quit XoDen");
     simulation.action("right");
-    check(simulation.state().navigation.settings_rail_focused, "T13 Right stays on the Quit Playden rail entry");
+    check(simulation.state().navigation.settings_rail_focused, "T13 Right stays on the Quit XoDen rail entry");
     simulation.action("cross");
     check(!simulation.state().navigation.modals.empty() && simulation.state().navigation.modals.back().id == "confirmation",
-          "T13 Cross on Quit Playden asks to confirm quitting");
+          "T13 Cross on Quit XoDen asks to confirm quitting");
     simulation.action("circle");
     check(simulation.state().navigation.modals.empty() && simulation.state().navigation.settings_rail_focused,
-          "T13 cancelling returns to the Quit Playden rail entry");
+          "T13 cancelling returns to the Quit XoDen rail entry");
     simulation.action("up");
     simulation.action("right");
     for (int step = 0; step < 20; ++step) simulation.action("down");
-    check(section() != "Quit Playden", "T13 moving down the rows never lands on the Quit Playden entry");
+    check(section() != "Quit XoDen", "T13 moving down the rows never lands on the Quit XoDen entry");
 }
 
 } // namespace
@@ -840,8 +840,8 @@ void t52_recipe_values_in_game_settings(const std::filesystem::path& fixtures, c
     auto& setup = setups[SteamId(900001)];
     setup.scanned = true;
     setup.programs = {{"bin/win64/hl2_win64.exe", "pe64", "", false, "d3d11 graphics=dxvk"},
-                      {"Launcher.exe", "pe32", "This game needs .NET, which Playden's runtime doesn't include yet.", true, ""},
-                      {"Stub.exe", "pe32", "This game's program has Steam DRM in a form Playden can't unpack yet.", false, ""}};
+                      {"Launcher.exe", "pe32", "This game needs .NET, which XoDen's runtime doesn't include yet.", true, ""},
+                      {"Stub.exe", "pe32", "This game's program has Steam DRM in a form XoDen can't unpack yet.", false, ""}};
     // The programs show in an open Program picker as soon as the folder's scan arrives.
     simulation.action("details:900001");
     activate(simulation, "details-more");
@@ -1229,10 +1229,10 @@ static void t17_import_sheet(const std::filesystem::path& fixtures, const std::f
     press("import-candidate-usb0:playden/import/Café Étoile");
     check(simulation.view().surface == "import-choice" &&
               simulation.view().subtitle == "Starts with CafeEtoile.exe, which you can change in Game settings. "
-                                            "You can import it into Playden later from the game's page." &&
+                                            "You can import it into XoDen later from the game's page." &&
               !row("import-play-in-place")->enabled &&
               row("import-play-in-place")->subtitle == "This folder's name has characters the PS5 can't start a game from. "
-                                                       "Copy it into Playden instead.",
+                                                       "Copy it into XoDen instead.",
           "T17 one clear program skips the list; a copy-only folder says why");
     simulation.action("circle");
     check(simulation.view().surface == "import-games", "T17 Back returns to the sheet");
@@ -1248,10 +1248,10 @@ static void t17_import_sheet(const std::filesystem::path& fixtures, const std::f
     simulation.action("cross");
     check(simulation.view().surface == "import-choice" && simulation.view().title == "Where will the game files live?" &&
               simulation.view().eyebrow == "Import games · Old School Rally" &&
-              simulation.view().subtitle == "You can import it into Playden later from the game's page." &&
+              simulation.view().subtitle == "You can import it into XoDen later from the game's page." &&
               row("import-play-in-place")->title == "Play from the USB drive" &&
               row("import-play-in-place")->subtitle == "Nothing is copied. Keep the drive plugged in." &&
-              row("import-copy")->title == "Import into Playden" && row("import-copy")->value == "938 MB" &&
+              row("import-copy")->title == "Import into XoDen" && row("import-copy")->value == "938 MB" &&
               row("import-copy")->subtitle == "Copies the game. You pick the storage next." &&
               simulation.state().navigation.focus_key == "import-copy",
           "T17 choosing the program asks where the game files live, Import focused");
@@ -1286,7 +1286,7 @@ static void t18_imported_game_page(const std::filesystem::path& fixtures, const 
     };
     check(simulation.scenario("import-details"), "T18 import-details scenario");
     check(simulation.state().navigation.route == Route::Details && row("details-play") && row("details-play")->title == "Play" &&
-              row("details-copy")->title == "Import into Playden" && row("details-remove")->title == "Remove from library" &&
+              row("details-copy")->title == "Import into XoDen" && row("details-remove")->title == "Remove from library" &&
               row("details-folder")->title == "Plays from /mnt/usb0/playden/import/Night Sky" && !row("details-cloud"),
           "T18 an imported game's page plays in place and offers Import and Remove");
     // Import into Playden: the wizard's drive choice at once; Back closes it.
@@ -1299,7 +1299,7 @@ static void t18_imported_game_page(const std::filesystem::path& fixtures, const 
               !row("volume-readonly")->enabled && row("volume-readonly")->subtitle == "No write access" &&
               simulation.state().navigation.focus_key == "volume-external" &&
               simulation.view().legends.front() == "Cross Import here" && simulation.view().rows.back().title == "Back",
-          "T18 Import into Playden from the page opens the drive choice, the default drive focused");
+          "T18 Import into XoDen from the page opens the drive choice, the default drive focused");
     simulation.action("circle");
     check(simulation.state().navigation.modals.empty() && simulation.state().navigation.route == Route::Details,
           "T18 Back from the page's drive choice closes it");
@@ -1339,7 +1339,7 @@ static void t18_imported_game_page(const std::filesystem::path& fixtures, const 
     press("import-candidate-internal:playden-import/Hollow Knight");
     check(row("import-play-in-place")->title == "Play from the drop folder" &&
               row("import-play-in-place")->subtitle == "Nothing moves. The files stay in /data/playden-import." &&
-              row("import-copy")->title == "Import into Playden" && row("import-copy")->value == "8.9 GB" &&
+              row("import-copy")->title == "Import into XoDen" && row("import-copy")->value == "8.9 GB" &&
               row("import-copy")->subtitle == "Takes the game out of the drop folder. You pick the storage next." &&
               !row("import-move") && !row("storage-picker"),
           "T18 a drop-folder game plays from there or is imported");
@@ -1356,7 +1356,7 @@ static void t18_imported_game_page(const std::filesystem::path& fixtures, const 
     const auto id = simulation.state().navigation.detail_id.value_or(playden::GameId{});
     check(simulation.state().navigation.route == Route::Details && id.store == playden::Store::kLocal &&
               row("details-uninstall") && !row("details-remove") && !row("details-copy"),
-          "T18 a moved game is in Playden at once and uninstalls");
+          "T18 a moved game is in XoDen at once and uninstalls");
     // To another drive (a fresh console): a copy, playing from the drop folder until it is done.
     playden::homebrew::Simulation fresh(fixtures, profile);
     const auto press_fresh = [&](const std::string& key) {

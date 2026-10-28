@@ -572,7 +572,7 @@ class Verifier {
             !build_any || !build_any->boolean() || !build_prefix || build_prefix->text() != prefix->text() ||
             !build_list || build_list->text() != allow_list->text())
           return Failure(KitManifestStatus::kIntegrityFailure,
-                         "the any-title variant lacks its capability or Playden's title rule");
+                         "the any-title variant lacks its capability or XoDen's title rule");
         any_title_seen = true;
         expected_target = prefix->text() + "*";
       } else if (build->Find("any_title") != nullptr) {

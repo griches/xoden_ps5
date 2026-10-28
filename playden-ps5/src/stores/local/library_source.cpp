@@ -54,8 +54,8 @@ const char* ImportWords(ImportError error) {
     case ImportError::kInvalid: return "The game's folder, program or name can't be used.";
     case ImportError::kNotFound: return "The game is not in the library.";
     case ImportError::kWrongState: return "Cancel the game's copy first.";
-    case ImportError::kNotLoaded: return "Playden's list of imported games could not be read.";
-    default: return "Playden's list of imported games could not be saved.";
+    case ImportError::kNotLoaded: return "XoDen's list of imported games could not be read.";
+    default: return "XoDen's list of imported games could not be saved.";
   }
 }
 
@@ -318,7 +318,7 @@ void LocalLibrarySource::Execute(const Job& job) {
     }
     case Command::kAdd: {
       const auto* volume = Volume(job.volume);
-      if (!volume) return Outcome(job, false, {}, "Playden doesn't know the drive \"" + job.volume + "\".");
+      if (!volume) return Outcome(job, false, {}, "XoDen doesn't know the drive \"" + job.volume + "\".");
       if (CheckPresence()) Scan();
       if (!present_.count(volume->volume)) return Outcome(job, false, {}, "The game's drive is not connected.");
       if (!IsSafeRelativePath(job.folder)) return Outcome(job, false, {}, "The game's folder can't be used.");
@@ -359,8 +359,8 @@ void LocalLibrarySource::Execute(const Job& job) {
       const auto game = store_.Find(job.id);
       const auto* volume = game ? Volume(game->volume) : nullptr;
       if (!game) return Outcome(job, false, job.id, ImportWords(ImportError::kNotFound));
-      if (!config_.copy_into_playden) return Outcome(job, false, job.id, "Playden can't copy games here.");
-      if (game->state == ImportState::kCopied) return Outcome(job, false, job.id, "The game is already in Playden.");
+      if (!config_.copy_into_playden) return Outcome(job, false, job.id, "XoDen can't copy games here.");
+      if (game->state == ImportState::kCopied) return Outcome(job, false, job.id, "The game is already in XoDen.");
       if (game->state != ImportState::kInPlace) return Outcome(job, false, job.id, "The game is already being copied.");
       if (CheckPresence()) Scan();
       if (!volume || !present_.count(volume->volume)) return Outcome(job, false, job.id, "The game's drive is not connected.");
@@ -378,8 +378,8 @@ void LocalLibrarySource::Execute(const Job& job) {
       const auto game = store_.Find(job.id);
       const auto* volume = game ? Volume(game->volume) : nullptr;
       if (!game) return Outcome(job, false, job.id, ImportWords(ImportError::kNotFound));
-      if (!config_.move_into_playden) return Outcome(job, false, job.id, "Playden can't move games here.");
-      if (game->state == ImportState::kCopied) return Outcome(job, false, job.id, "The game is already in Playden.");
+      if (!config_.move_into_playden) return Outcome(job, false, job.id, "XoDen can't move games here.");
+      if (game->state == ImportState::kCopied) return Outcome(job, false, job.id, "The game is already in XoDen.");
       if (game->state == ImportState::kCopyQueued) return Outcome(job, false, job.id, "The game is already being copied.");
       if (!volume || game->volume != ImportStore::kDropFolderVolume)
         return Outcome(job, false, job.id, "Only games in the drop folder can be moved. Copy it instead.");

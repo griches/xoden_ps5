@@ -295,7 +295,7 @@ void PendingLaunchOfStoppedGameMoves() {
           const auto later = MigrateLayout(f->paths, f->ops);
           CHECK(later.notice.empty() == (start < kLayoutPostponeNoticeAfter));
           if (!later.notice.empty())
-            CHECK(later.notice.find("the last game you started from Playden may still be running or suspended. Close it") !=
+            CHECK(later.notice.find("the last game you started from XoDen may still be running or suspended. Close it") !=
                   std::string::npos);
         }
       }

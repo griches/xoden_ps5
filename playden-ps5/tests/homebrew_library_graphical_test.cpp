@@ -106,8 +106,14 @@ int main(int argc,char** argv) {
       assert(phone.action("focus:xbox-browser-signin") && phone.action("cross"));
       phone.UpdateXboxBrowserSignIn("Waiting","0123456789abcdef",true);
       assert(phone.state().navigation.modals.back().link.empty());
+      assert(phone.view().pairing_code=="0123 4567 89AB CDEF");
+      assert(phone.view().subtitle.find("0123")==std::string::npos);
       for(int i=0;i<16;++i) renderer.draw(phone,1920,1080);
       assert(renderer.capture_png(output/"microsoft-signin-pairing.png",1920,1080));
+      phone.UpdateXboxBrowserSignIn("Checking Xbox access…",{},true);
+      assert(phone.view().pairing_code.empty());
+      for(int i=0;i<16;++i) renderer.draw(phone,1920,1080);
+      assert(renderer.capture_png(output/"microsoft-signin-verifying.png",1920,1080));
     }
     {
       Simulation missing({}, {}, ModelMode::Live);
@@ -144,7 +150,7 @@ int main(int argc,char** argv) {
       };
       LiveSelfUpdate offer;
       offer.current="0.2.0"; offer.phase="available"; offer.available="0.3.0";
-      offer.notes="Playden updates itself from GitHub releases. Downloads resume after a restart, and the Saves tab "
+      offer.notes="XoDen updates itself from GitHub releases. Downloads resume after a restart, and the Saves tab "
                   "shows which games are in sync.";
       offer.notes_url="https://github.com/leolobato/playden-ps5/releases/tag/v0.3.0";
       offer.download_bytes=486'000'000; offer.kit_needed=true;
@@ -160,9 +166,9 @@ int main(int argc,char** argv) {
       LiveSelfUpdate fresh;
       fresh.current="0.3.0"; fresh.current_notes=offer.notes;
       fresh.current_notes_url=offer.notes_url;
-      fresh.finished_message="Playden was updated to 0.3.0."; fresh.whats_new=true;
+      fresh.finished_message="XoDen was updated to 0.3.0."; fresh.whats_new=true;
       updating.UpdateSelfUpdate(fresh);
-      assert(updating.state().navigation.modals.back().title=="What's new in Playden 0.3.0");
+      assert(updating.state().navigation.modals.back().title=="What's new in XoDen 0.3.0");
       capture_update("whats-new.png");
       assert(updating.action("cross") && updating.state().navigation.modals.empty());
       fresh.finished_message.clear(); fresh.whats_new=false; fresh.current_notes.clear();
@@ -220,7 +226,7 @@ int main(int argc,char** argv) {
         // Prepared and waiting for the PS5: Finish setup explains quitting to Home.
         LiveRuntimeGame waiting; waiting.game_id= SteamId(42); waiting.status="Waiting for the PS5"; waiting.has_title=true;
         waiting.awaiting_registration=true; waiting.can_prepare=true;
-        waiting.detail="Waiting for the PS5, which adds the game to Home when Playden quits";
+        waiting.detail="Waiting for the PS5, which adds the game to Home when XoDen quits";
         live.UpdateRuntime(RuntimeState::Ready, {waiting});
         capture_live("details-ready-to-play.png");
         live.NotifyReadyToPlay(SteamId(42));

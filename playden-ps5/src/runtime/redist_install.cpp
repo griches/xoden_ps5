@@ -267,14 +267,14 @@ bool InstallPlan(std::string_view package, const CabinetSource& beside, const st
   MsiInstallPlan plan;
   if (!ReadMsiPackage(package, &plan, reason)) return false;
   if (plan.unsupported_files) {
-    *reason = std::to_string(plan.unsupported_files) + " of the package's files are stored in a way Playden can't install";
+    *reason = std::to_string(plan.unsupported_files) + " of the package's files are stored in a way XoDen can't install";
     return false;
   }
   if (keep) {
     plan.files.erase(std::remove_if(plan.files.begin(), plan.files.end(), [&](const MsiFile& file) { return !keep(file); }),
                      plan.files.end());
     if (plan.files.empty()) {
-      *reason = "the package has none of the files Playden takes from it";
+      *reason = "the package has none of the files XoDen takes from it";
       return false;
     }
   }
@@ -423,7 +423,7 @@ MfcInstallResult InstallMfcRuntime(const VcRedist& redist, const std::string& ca
   const auto slash = redist.url.rfind('/');
   const auto file_name = slash == std::string::npos ? std::string() : redist.url.substr(slash + 1);
   if (file_name.empty() || file_name == "." || file_name == ".." || redist.bytes == 0 || redist.bytes > kMaxPackageBytes)
-    return fail("the redistributable's download is not one Playden can use");
+    return fail("the redistributable's download is not one XoDen can use");
   const auto folder = std::filesystem::path(cache_root) / ("vc-" + redist.version) / redist.architecture;
   const auto cached = folder / file_name;
   // The kept copy, when it is still the pinned one.
@@ -435,7 +435,7 @@ MfcInstallResult InstallMfcRuntime(const VcRedist& redist, const std::string& ca
     bundle.clear();
     std::error_code ignored;
     std::filesystem::remove(cached, ignored);
-    if (!fetch) return fail("Playden can't download it here");
+    if (!fetch) return fail("XoDen can't download it here");
     // In ranges: one HTTP response is kept small.
     bundle.reserve(redist.bytes);
     for (std::uint64_t offset = 0; offset < redist.bytes;) {
@@ -458,7 +458,7 @@ MfcInstallResult InstallMfcRuntime(const VcRedist& redist, const std::string& ca
     }
     if (HashArtifactBytes(bundle).value_or("") != redist.sha256) {
       out.download_failed = true;
-      return fail("the download is not the redistributable Playden expects (SHA-256 mismatch)");
+      return fail("the download is not the redistributable XoDen expects (SHA-256 mismatch)");
     }
     out.source = "download";
     // Kept for other games: written beside, then renamed into place.

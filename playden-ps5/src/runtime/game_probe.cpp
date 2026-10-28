@@ -406,12 +406,12 @@ GameDefaults DefaultsFor(const GameProbe& probe, const RuntimeAbilities& runtime
   if (probe.shared_section && !runtime.shared_sections)
     soft = "This game's program needs a shared memory section the PS5 can't map yet.";
   else if (probe.dotnet && !runtime.wine_mono)
-    soft = "This game needs .NET, which Playden's runtime doesn't include yet.";
+    soft = "This game needs .NET, which XoDen's runtime doesn't include yet.";
   if (probe.steam_stub && !probe.steam_stub_supported) {
-    out.refusal = "This game's program has Steam DRM in a form Playden can't unpack yet.";
+    out.refusal = "This game's program has Steam DRM in a form XoDen can't unpack yet.";
   } else if (probe.engine == "nwjs") {
     // Chromium starts helper processes, and in one process it reserves 64 GB of address space.
-    out.refusal = "This game runs on NW.js (a built-in web browser), which Playden can't start on the PS5 yet.";
+    out.refusal = "This game runs on NW.js (a built-in web browser), which XoDen can't start on the PS5 yet.";
   } else if (probe.engine == "unity") {
     // Modern Unity players can name APIs whose shaders were excluded at build time.
     // Let the game's own supported-API list select its renderer instead of forcing

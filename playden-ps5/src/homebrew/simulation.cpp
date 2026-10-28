@@ -295,7 +295,7 @@ const char* source_label(rt::ValueSource source) {
     case rt::ValueSource::kRecipe: return "From the game";
     case rt::ValueSource::kPreset: return "From preset";
     case rt::ValueSource::kUser: return "Your choice";
-    default: return "Playden default";
+    default: return "XoDen default";
     }
 }
 
@@ -501,7 +501,7 @@ std::string action_label(const std::string& key) {
         {"xbox-refresh", "Refresh Xbox library"}, {"xbox-phone-test", "Phone sign-in"}, {"xbox-browser-signin", "Sign in with Microsoft"}, {"xbox-phone-done", "Done"}, {"xbox-signout", "Sign out"}, {"account-reauth", "Sign in again"}, {"job-resume-all", "Resume all"}, {"job-clear-completed", "Clear completed"},
         {"prep-clear-completed", "Clear completed"}, {"storage-close", "Close"}, {"collection-new", "New collection"}, {"collection-manage", "Manage collections"},
         {"about-version", "Version"}, {"self-update-install", "Download and install"},
-        {"self-update-restart", "Restart Playden"}, {"self-update-cancel", "Cancel update"},
+        {"self-update-restart", "Restart XoDen"}, {"self-update-cancel", "Cancel update"},
         {"kit-install", "Download"}, {"kit-cancel", "Cancel download"},
         {"self-update-back-confirm", "Go back"}, {"release-notes-ok", "OK"},
         {"about-build", "Build"}, {"about-framework", "Framework"}, {"about-platform", "Platform"},
@@ -642,12 +642,12 @@ constexpr const char* kImportEmptyText =
     "Copy game folders into playden/import on an exFAT drive, or into /data/playden-import over FTP, then choose "
     "Look for games.";
 constexpr const char* kImportCopyOnlyText =
-    "This folder's name has characters the PS5 can't start a game from. Copy it into Playden instead.";
+    "This folder's name has characters the PS5 can't start a game from. Copy it into XoDen instead.";
 
 constexpr const char* kImportDropVolume = "internal";
 // The wizard's step 1 title, and what it says about importing later.
 constexpr const char* kImportChoiceTitle = "Where will the game files live?";
-constexpr const char* kImportChoiceText = "You can import it into Playden later from the game's page.";
+constexpr const char* kImportChoiceText = "You can import it into XoDen later from the game's page.";
 
 
 // A drive's name as the Import sheet groups it ("USB drive", "Console drop folder").
@@ -707,9 +707,9 @@ StartupProblem describe_startup_problem(const std::string& detail, bool granted)
             if (detail.find(std::string("helper stage=") + name + " ") != std::string::npos) return true;
         return false;
     };
-    const StartupProblem incomplete{"Playden's app folder is incomplete",
-        "Some of Playden's files in /data/homebrew are missing or can't be read. Copy the whole app folder from the "
-        "release zip again (or use tools/console_title_deploy.py), then open Playden again."};
+    const StartupProblem incomplete{"XoDen's app folder is incomplete",
+        "Some of XoDen's files in /data/homebrew are missing or can't be read. Copy the whole app folder from the "
+        "release zip again (or use tools/console_title_deploy.py), then open XoDen again."};
     constexpr const char* kElsewhere = "launcher is not installed in ";
     if (const auto at = detail.find(kElsewhere); at != std::string::npos) {
         const auto from = at + std::strlen(kElsewhere);
@@ -717,42 +717,42 @@ StartupProblem describe_startup_problem(const std::string& detail, bool granted)
         const auto parent = folder.substr(0, folder.rfind('/'));
         // ProsperoStore can install to other folders and drives; its labels are Settings > Install location and
         // Uninstall (held) on the app's page.
-        return {"Install Playden on console storage",
-                "Playden runs only from " + folder + ", on the console's own storage. From ProsperoStore: set "
-                "Settings > Install location to " + parent + ", hold Uninstall on Playden's page, then install it "
+        return {"Install XoDen on console storage",
+                "XoDen runs only from " + folder + ", on the console's own storage. From ProsperoStore: set "
+                "Settings > Install location to " + parent + ", hold Uninstall on XoDen's page, then install it "
                 "again. If you copied it by hand, move the app folder to " + parent + ".",
                 false};
     }
     if (granted) {
         if (has("stable launcher source is invalid")) return incomplete;
         if (has("stable launcher source identity does not match"))
-            return {"Playden can't start",
-                    "The Playden that started is not the copy in /data/homebrew. If you just copied a new version, "
+            return {"XoDen can't start",
+                    "The XoDen that started is not the copy in /data/homebrew. If you just copied a new version, "
                     "restart the PS5; if it stays, copy the whole app folder to /data/homebrew again."};
-        return {"Playden can't start", "Playden has root access but can't use its data in /data/playden. "
-                                       "Restart Playden; if it stays, check that folder's permissions over FTP."};
+        return {"XoDen can't start", "XoDen has root access but can't use its data in /data/playden. "
+                                       "Restart XoDen; if it stays, check that folder's permissions over FTP."};
     }
     if (has("launcher source is invalid") || has("launcher source identity is unavailable") ||
         stage({"find-helper", "validate-helper", "open-helper", "stat-helper"}))
         return incomplete;
     if (stage({"network", "socket", "socket-options"}))
-        return {"Playden can't start", "The console's network did not start, and Playden needs it to ask for root "
-                                       "access. Restart the PS5, jailbreak it again, then open Playden again."};
+        return {"XoDen can't start", "The console's network did not start, and XoDen needs it to ask for root "
+                                       "access. Restart the PS5, jailbreak it again, then open XoDen again."};
     if (stage({"stream-helper"}))
         return {"Root access is missing",
-                "The ELF loader on port 9021 stopped while Playden sent it the root helper. Load the ELF loader "
-                "again, then open Playden again."};
+                "The ELF loader on port 9021 stopped while XoDen sent it the root helper. Load the ELF loader "
+                "again, then open XoDen again."};
     if (stage({"connect"}))
         return {"The ELF loader isn't running",
-                "Playden gets root access through the ELF loader (elfldr) on port 9021, and nothing answered there. "
-                "Load the ELF loader (most autoloaders start it), then open Playden again."};
+                "XoDen gets root access through the ELF loader (elfldr) on port 9021, and nothing answered there. "
+                "Load the ELF loader (most autoloaders start it), then open XoDen again."};
     if (has("helper stage="))
         return {"Root access is missing",
-                "The ELF loader ran Playden's root helper, but the helper could not give Playden access. "
-                "Load kstuff and the autoloader, then open Playden again. If it stays, report the startup error "
+                "The ELF loader ran XoDen's root helper, but the helper could not give XoDen access. "
+                "Load kstuff and the autoloader, then open XoDen again. If it stays, report the startup error "
                 "below with your firmware version."};
-    return {"Root access is missing", "Without it, Playden can't reach its data, so it can't show your games, "
-                                      "download or play. Load kstuff and the autoloader, then open Playden again."};
+    return {"Root access is missing", "Without it, XoDen can't reach its data, so it can't show your games, "
+                                      "download or play. Load kstuff and the autoloader, then open XoDen again."};
 }
 
 } // namespace
@@ -1627,12 +1627,12 @@ void Simulation::UpdateRuntimeProblem(const std::string& raw) {
     if (!live()) return;
     std::string words;
     if (raw.find("data root") != std::string::npos)
-        words = "Playden can't use its data folder /data/playden. Make it writable (chmod 777 over FTP) and restart Playden.";
+        words = "XoDen can't use its data folder /data/playden. Make it writable (chmod 777 over FTP) and restart XoDen.";
     else if (raw.find("directory boundary") != std::string::npos)
-        words = "The console's /data is mounted in a way Playden can't use. ShadowMountPlus 1.7beta4 or later does this: "
-                "load 1.7beta2 and restart Playden.";
+        words = "The console's /data is mounted in a way XoDen can't use. ShadowMountPlus 1.7beta4 or later does this: "
+                "load 1.7beta2 and restart XoDen.";
     else if (!raw.empty())
-        words = "The game runtime couldn't start (" + raw + "). Restart Playden; if it stays, reinstall it.";
+        words = "The game runtime couldn't start (" + raw + "). Restart XoDen; if it stays, reinstall it.";
     if (words == state_.runtime_problem) return;
     state_.runtime_problem = words;
     state_.notices.erase(std::remove_if(state_.notices.begin(), state_.notices.end(),
@@ -1710,9 +1710,9 @@ void Simulation::UpdateSelfUpdate(const LiveSelfUpdate& update) {
     } else if (update.phase == "failed" && before.phase != "failed") {
         // A check that ran on its own fails quietly; what the player started says why it stopped.
         if (update.user_check || before.phase == "downloading" || before.phase == "unpacking")
-            show_alert("Playden update stopped", update.error);
+            show_alert("XoDen update stopped", update.error);
     } else if (update.phase == "up-to-date" && before.phase == "checking" && update.user_check) {
-        push_notice({"self-update-check", "Playden is up to date", "", false, kLiveNoticeSeconds, false,
+        push_notice({"self-update-check", "XoDen is up to date", "", false, kLiveNoticeSeconds, false,
                      "Version " + update.current});
     }
     // The kit-only install. An update on offer or under way brings the kit itself, so it asks first.
@@ -1758,25 +1758,25 @@ void Simulation::show_update_prompt() {
         const std::string size = update.kit_download_bytes ? "The download is " + format_bytes(update.kit_download_bytes) + ". "
                                                            : std::string();
         prompt.body = (update.kit_replaces
-                           ? "The installed runtime kit isn't the one Playden " + update.current +
-                                 " was made for, so games may not run as this version expects. Playden can put the "
+                           ? "The installed runtime kit isn't the one XoDen " + update.current +
+                                 " was made for, so games may not run as this version expects. XoDen can put the "
                                  "right one in its place. "
-                           : std::string("Playden needs its runtime kit to prepare and play Windows games. ")) +
-                      size + "You can sign in and keep using Playden while it downloads.";
+                           : std::string("XoDen needs its runtime kit to prepare and play Windows games. ")) +
+                      size + "You can sign in and keep using XoDen while it downloads.";
         open_modal(std::move(prompt));
     } else if (pending_update_prompt_ == "available" && update.phase == "available") {
-        ModalEntry prompt{"confirmation", "Playden " + update.available + (update.available.find("-beta.") != std::string::npos ? " (Beta)" : "") + " is available", state_.navigation.focus_key,
+        ModalEntry prompt{"confirmation", "XoDen " + update.available + (update.available.find("-beta.") != std::string::npos ? " (Beta)" : "") + " is available", state_.navigation.focus_key,
                           {"self-update-install", "ready-later"}, 0, false};
         prompt.body = (update.notes.empty() ? std::string() : update.notes + "\n\n") + "The download is " +
                       format_bytes(update.download_bytes) +
                       (update.kit_needed ? ", with a new runtime kit." : ".") +
-                      " You can keep using Playden while it downloads.";
+                      " You can keep using XoDen while it downloads.";
         prompt.link = update.notes_url;
         open_modal(std::move(prompt));
     } else if (pending_update_prompt_ == "staged" && update.phase == "staged") {
-        ModalEntry prompt{"confirmation", "Playden " + update.available + " is ready", state_.navigation.focus_key,
+        ModalEntry prompt{"confirmation", "XoDen " + update.available + " is ready", state_.navigation.focus_key,
                           {"self-update-restart", "ready-later"}, 0, false};
-        prompt.body = "Restart Playden to finish the update. It closes and opens again by itself; if it doesn't, "
+        prompt.body = "Restart XoDen to finish the update. It closes and opens again by itself; if it doesn't, "
                       "open it from the Home screen.";
         open_modal(std::move(prompt));
     } else if (pending_update_prompt_ == "whats-new" || pending_update_prompt_ == "release-notes") {
@@ -1815,21 +1815,21 @@ void Simulation::sync_self_update_job() {
     job.id = "playden-update";
     job.kind = "self-update";
     job.queue_order = -1;
-    job.title = "Playden " + update.available;
+    job.title = "XoDen " + update.available;
     if (update.phase == "downloading") {
         job.state = JobState::Downloading;
-        job.stage_text = kit ? "Downloading the runtime kit" : "Downloading Playden";
+        job.stage_text = kit ? "Downloading the runtime kit" : "Downloading XoDen";
         job.state_text = "Downloading";
         job.bytes_per_second = update.bytes_per_second;
         job.eta_seconds = update.eta_seconds;
     } else if (update.phase == "unpacking") {
         job.state = JobState::Verifying;
-        job.stage_text = kit ? "Unpacking the runtime kit" : "Unpacking Playden";
+        job.stage_text = kit ? "Unpacking the runtime kit" : "Unpacking XoDen";
         job.state_text = "Unpacking";
     } else {
         job.state = JobState::Downloaded;
-        job.stage_text = "Restart Playden to finish";
-        job.state_text = "Ready · restart Playden";
+        job.stage_text = "Restart XoDen to finish";
+        job.state_text = "Ready · restart XoDen";
     }
     job.completed_bytes = update.phase == "staged" ? update.download_bytes : update.done;
     job.total_bytes = update.phase == "staged" ? update.download_bytes : update.total;
@@ -1853,11 +1853,11 @@ void Simulation::close_game_modals() {
 void Simulation::open_release_notes(bool after_update) {
     const auto& update = state_.self_update;
     ModalEntry notes{"confirmation",
-                     (after_update ? "What's new in Playden " : "Playden ") + update.current +
+                     (after_update ? "What's new in XoDen " : "XoDen ") + update.current +
                          (update.current.find("-beta.") != std::string::npos ? " (Beta)" : "") +
                          (after_update ? std::string() : std::string(" release notes")),
                      state_.navigation.focus_key, {"release-notes-ok"}, 0, false};
-    notes.body = (after_update ? "Playden was updated to " + update.current + ".\n\n" : std::string()) +
+    notes.body = (after_update ? "XoDen was updated to " + update.current + ".\n\n" : std::string()) +
                  (update.current_notes.empty() ? std::string("What changed in this version is on its release page.")
                                                : update.current_notes);
     notes.link = update.current_notes_url;
@@ -1896,9 +1896,9 @@ void Simulation::UpdateXboxBrowserSignIn(std::string message,std::string code,bo
     for(auto& c:code)if(c>='a'&&c<='f')c=char(c-'a'+'A');
     for(auto& modal:state_.navigation.modals) if(modal.id=="browser-sign-in") {
         modal.link.clear();
-        modal.body=valid?"On your computer, open:\nhttp://127.0.0.1:47832\nEnter your PS5 address and this pairing code:\n"+
-            code.substr(0,4)+" "+code.substr(4,4)+" "+code.substr(8,4)+" "+code.substr(12,4)+
-            "\nSign in to Microsoft. Your PS5 saves the result automatically.":std::move(message);
+        modal.pairing_code=valid?code.substr(0,4)+" "+code.substr(4,4)+" "+code.substr(8,4)+" "+code.substr(12,4):std::string{};
+        modal.pairing_url=valid?"http://127.0.0.1:47832":std::string{};
+        modal.body=valid?"Use a computer on the same network as your PS5.":std::move(message);
         modal.action_keys={busy?"cancel":"xbox-phone-done"};modal.focused_action=0;
     }
     rebuild_view();
@@ -1949,7 +1949,7 @@ void Simulation::request_self_update_restart(const std::string& request) {
         return game.status == "Preparing" || !game.uninstall_status.empty() || game.maintenance_running;
     });
     if (busy) {
-        show_alert("Restart Playden later", "A game is being prepared or removed. Restart Playden from Settings when it is done.");
+        show_alert("Restart XoDen later", "A game is being prepared or removed. Restart XoDen from Settings when it is done.");
         return;
     }
     self_update_requests_.push_back(request);
@@ -1981,7 +1981,7 @@ void Simulation::UpdateRuntime(RuntimeState runtime, const std::vector<LiveRunti
         // A finished maintenance request says how it went; applying settings speaks only when it fails.
         if (before->second.maintenance_running && !game.maintenance_running && game.maintenance) {
             const bool apply = *game.maintenance == MaintenanceKind::ApplySettings;
-            const bool deferred = game.maintenance_message == "Changes apply the next time Playden starts the game.";
+            const bool deferred = game.maintenance_message == "Changes apply the next time XoDen starts the game.";
             if (!apply || (!game.maintenance_ok && !deferred))
                 push_notice({"maintenance-" + ToKey(id), game.maintenance_ok ? title + ": done" : title + ": not done", "",
                              false, kLiveNoticeSeconds * (game.maintenance_ok ? 1 : 2), !game.maintenance_ok, game.maintenance_message});
@@ -2063,7 +2063,7 @@ void Simulation::show_ready_prompt() {
     const auto* game = find_game(state_, id);
     ModalEntry prompt{"confirmation", (game ? game->title : std::string("Your game")) + " is ready to play",
                       state_.navigation.focus_key, {"ready-later", "quit-to-home"}, 1, false};
-    prompt.body = "Play quits Playden to the PS5 Home screen, where the game appears. Start it from there.";
+    prompt.body = "Play quits XoDen to the PS5 Home screen, where the game appears. Start it from there.";
     open_modal(std::move(prompt));
 }
 
@@ -2234,7 +2234,7 @@ void Simulation::UpdateVolumes(const std::vector<LiveVolume>& volumes, const std
         const auto* volume = find_volume(state_, default_volume_id);
         push_notice({"default-volume", "Install drive not saved", "", false, kLiveNoticeSeconds * 2, true,
                      (volume ? volume->label : std::string("This drive")) +
-                         " is used until Playden closes · Console storage may be full"});
+                         " is used until XoDen closes · Console storage may be full"});
     }
     default_volume_saved_ = default_volume_saved;
     apply_live_volume_usage();
@@ -3045,7 +3045,7 @@ bool Simulation::record_live_persistence() {
         state_.notices.erase(std::remove_if(state_.notices.begin(), state_.notices.end(),
                                             [](const Notice& notice) { return notice.id == "persistence-validation"; }),
                              state_.notices.end());
-        if (live()) show_alert("This change is too large to save", "Playden undid it, so your library is as it was.");
+        if (live()) show_alert("This change is too large to save", "XoDen undid it, so your library is as it was.");
         else state_.notices.push_back({"persistence-validation", "This change is too large to save", "", true, 0});
         force_organization_reset_ = false;
         return false;
@@ -3897,6 +3897,8 @@ void Simulation::rebuild_view() {
     } else if (!state_.navigation.modals.empty()) {
         const auto& modal = state_.navigation.modals.back();
         view_.title = modal.title;
+        view_.pairing_code = modal.pairing_code;
+        view_.pairing_url = modal.pairing_url;
         if (modal.id == "xbox-account" || modal.id == "phone-sign-in" || modal.id == "browser-sign-in" || modal.id == "compatibility") view_.subtitle = modal.body;
         if (modal.id == "logs") {
             view_.subtitle = state_.log_context;
@@ -4041,7 +4043,7 @@ void Simulation::rebuild_view() {
             if (settings_ready && action_key == "preset-picker") {
                 item.kind = RowKind::Profile;
                 const auto* preset = preset_for(settings_game);
-                const std::string name = preset ? preset->name : "Playden default";
+                const std::string name = preset ? preset->name : "XoDen default";
                 item.value = settings_custom ? "Custom · from " + name : name;
                 item.subtitle = "A ready-made bundle of the settings below.";
             } else if (settings_ready && modal.id == "preset-picker" && action_key.rfind("preset-", 0) == 0 && action_key != "preset-community") {
@@ -4213,7 +4215,7 @@ void Simulation::rebuild_view() {
             } else if (settings_ready && action_key == "export-recipe") {
                 item.kind = RowKind::Action;
                 item.title = "Export as recipe";
-                item.subtitle = "Saves these settings as a community recipe to share with Playden.";
+                item.subtitle = "Saves these settings as a community recipe to share with XoDen.";
                 item.enabled = settings_values.launch != nullptr;
             } else if (settings_ready && !modal.setting_id.empty() && action_key.rfind("program-", 0) == 0 && action_key != "program-scan") {
                 // A program from the game folder, in the Program picker.
@@ -4235,7 +4237,7 @@ void Simulation::rebuild_view() {
                 }
             } else if (action_key == "program-scan") {
                 item.kind = RowKind::Status;
-                item.subtitle = "Playden is listing the programs in the game folder.";
+                item.subtitle = "XoDen is listing the programs in the game folder.";
                 item.enabled = false;
             } else if (settings_ready && !modal.setting_id.empty() && action_key == "value-reset") {
                 const auto& current = settings_values.values.at(modal.setting_id);
@@ -4476,7 +4478,7 @@ void Simulation::rebuild_view() {
                 item.enabled = import_wizard_subject.ascii_ok;
             }
             else if (modal.id == "import-choice" && action_key == "import-copy") {
-                item.title = "Import into Playden";
+                item.title = "Import into XoDen";
                 item.value = format_bytes(import_wizard_subject.bytes);
                 item.subtitle = import_from_drop ? "Takes the game out of the drop folder. You pick the storage next."
                                                  : "Copies the game. You pick the storage next.";
@@ -4519,7 +4521,7 @@ void Simulation::rebuild_view() {
                 const auto id = state_.navigation.selected_game_id;
                 const auto record = state_.game_settings.find(id);
                 const auto* preset = preset_for(id);
-                const std::string name = preset ? preset->name : "Playden default";
+                const std::string name = preset ? preset->name : "XoDen default";
                 item.value = record != state_.game_settings.end() && !record->second.overrides.empty() ? "Custom · from " + name : name;
                 if (live()) {
                     const auto runtime_game = state_.runtime_games.find(id);
@@ -4540,7 +4542,7 @@ void Simulation::rebuild_view() {
             else if (action_key == "account-auth") { item.kind = RowKind::Status; item.value = auth_name(state_.account().authentication); item.subtitle = state_.account().error; item.enabled = false; }
             else if (action_key == "account-last-sync") { item.kind = RowKind::Status; item.value = state_.account().last_sync == 0 ? "Never" : std::to_string(state_.account().last_sync); item.enabled = false; }
             else if (action_key.rfind("open-game:", 0) == 0) item.title = "Open game";
-            else if (action_key == "about-version") { item.kind = RowKind::Status; item.value = live() ? "Playden " + state_.self_update.current +
+            else if (action_key == "about-version") { item.kind = RowKind::Status; item.value = live() ? "XoDen " + state_.self_update.current +
                 (state_.self_update.current.find("-beta.") != std::string::npos ? " (Beta)" : "") : "Simulated"; item.enabled = false; }
             else if (action_key == "about-build") { item.kind = RowKind::Status; item.value = live() ? "Live service model" : "UI comparison fixture"; item.enabled = false; }
             else if (action_key == "about-framework") { item.kind = RowKind::Status; item.value = "Homebrew native model + Hui"; item.enabled = false; }
@@ -4557,7 +4559,7 @@ void Simulation::rebuild_view() {
                 } else if (action_key == "about-kit") {
                     item.value = kit.kit_id + " · " + short_hash(kit.manifest_sha256);
                     item.subtitle = kit.manifest_sha256 == kit.expected_manifest_sha256
-                        ? "The kit this version of Playden was tested with"
+                        ? "The kit this version of XoDen was tested with"
                         : "Not the kit this version was tested with (" + short_hash(kit.expected_manifest_sha256) + ")";
                 } else {
                     item.value = "prospero-win " + kit.prospero_win_revision.substr(0, 7);
@@ -4644,7 +4646,7 @@ void Simulation::rebuild_view() {
         row("root-quit", RowKind::Action, "Quit to Home", "root-quit");
         view_.legends = {"Cross Quit to Home"};
     } else if (state_.navigation.route == Route::Startup) {
-        view_.title = "Welcome to Playden";
+        view_.title = "Welcome to XoDen";
         view_.subtitle = live() ? "Connect a store or import games to fill your library." : "Browse the local UI fixture or connect a simulated Steam account.";
         if (state_.startup_loading || state_.account().authentication == AuthState::Restoring) {
             row("startup-loading", RowKind::Status, live() ? "Restoring your accounts…" : "Loading saved fixture state…", "").enabled = false;
@@ -4998,7 +5000,7 @@ void Simulation::rebuild_view() {
                 row("details-cancel-copy", RowKind::Action, "Cancel copy", "import-cancel-copy");
             } else if (const auto* external = in_place ? external_game(game->id) : nullptr; external && external->available) {
                 // Its drive is there: a folder the PS5 can't play from (its name) can still be copied.
-                row("details-copy", RowKind::Action, "Import into Playden",
+                row("details-copy", RowKind::Action, "Import into XoDen",
                     "import-copy-game");
             }
             if (in_place) {
@@ -5059,12 +5061,12 @@ void Simulation::rebuild_view() {
                 if (position > 0 && queue.waiting.size() > 1)
                     hint = std::to_string(position) + " of " + std::to_string(queue.waiting.size()) + " waiting. " + hint;
             }
-            else if (waiting && imported) hint = "The PS5 adds the game to Home when Playden quits.";
-            else if (waiting) hint = "Quit Playden and " + game->title + " appears on the PS5 Home screen.";
+            else if (waiting && imported) hint = "The PS5 adds the game to Home when XoDen quits.";
+            else if (waiting) hint = "Quit XoDen and " + game->title + " appears on the PS5 Home screen.";
             else if (status == "Registration pending") hint = "The PS5 hasn't confirmed " + game->title + " yet.";
             else if (status == "Removal incomplete") hint = "Removing " + game->title + " from the PS5 Home screen stopped partway.";
             else if (status == "Needs repair") hint = "Some of " + game->title + "'s setup files changed.";
-            else if (status == "No kit") hint = "Playden needs its runtime kit to set up games.";
+            else if (status == "No kit") hint = "XoDen needs its runtime kit to set up games.";
             else if (runtime && runtime->setup_other_kit)
                 hint = "Setup started with an earlier kit. Recreate bottle makes it again; saves and settings are kept.";
             else if (runtime && (status == "Needs recovery" || status == "Failed")) {
@@ -5293,7 +5295,7 @@ void Simulation::rebuild_view() {
             suffix.subtitle = "Name game titles like \"Half-Life 2 (Steam)\". Prepared games change with their next Update.";
             auto& cloud = add("settings-cloud-saves", RowKind::Toggle, "Sync Cloud saves automatically", "toggle-cloud-saves");
             cloud.selected = state_.cloud_saves_auto;
-            cloud.subtitle = state_.cloud_saves_auto ? "Before Play, after each game and when Playden starts."
+            cloud.subtitle = state_.cloud_saves_auto ? "Before Play, after each game and when XoDen starts."
                                                      : "Off: saves move only when you choose Sync in Saves.";
         }
         section = "Storage";
@@ -5368,20 +5370,20 @@ void Simulation::rebuild_view() {
             beta.selected = state_.beta_updates;
             beta.subtitle = "Get test versions before they are released. They can have new bugs.";
             const auto& update = state_.self_update;
-            auto& item = add("settings-update", RowKind::Action, "Playden updates", "self-update");
+            auto& item = add("settings-update", RowKind::Action, "XoDen updates", "self-update");
             if (update.phase == "checking") {
                 item.value = "Checking…";
-                item.subtitle = "Looking for a newer Playden on GitHub";
+                item.subtitle = "Looking for a newer XoDen on GitHub";
             } else if (update.phase == "available") {
                 item.value = update.available + " available";
                 item.subtitle = "Download " + format_bytes(update.download_bytes);
             } else if (update.phase == "downloading" || update.phase == "unpacking") {
                 item.value = update.total ? std::to_string(update.done * 100 / update.total) + "%" : "Working…";
-                item.subtitle = update.phase == "downloading" ? "Downloading Playden " + update.available
-                                                               : "Unpacking Playden " + update.available;
+                item.subtitle = update.phase == "downloading" ? "Downloading XoDen " + update.available
+                                                               : "Unpacking XoDen " + update.available;
             } else if (update.phase == "staged") {
                 item.value = update.available + " ready";
-                item.subtitle = "Restart Playden to finish the update";
+                item.subtitle = "Restart XoDen to finish the update";
             } else if (update.phase == "failed") {
                 item.value = "Check again";
                 item.subtitle = update.error;
@@ -5393,7 +5395,7 @@ void Simulation::rebuild_view() {
         }
         if (live() && !state_.gamepass_only && !state_.beta_updates && state_.self_update.current.find("-beta.") != std::string::npos) {
             auto& note = add("settings-beta-wait", RowKind::Status, "You have a beta", "");
-            note.subtitle = "Playden moves to the next stable version when it is out.";
+            note.subtitle = "XoDen moves to the next stable version when it is out.";
             note.enabled = false;
         }
         // The kit-only install, while it has something to offer or say.
@@ -5424,16 +5426,16 @@ void Simulation::rebuild_view() {
         }
         if (kOfferGoBack && live() && !state_.gamepass_only && !state_.self_update.previous.empty() &&
             state_.self_update.phase != "downloading" && state_.self_update.phase != "unpacking") {
-            auto& back = add("settings-update-back", RowKind::Action, "Go back to Playden " + state_.self_update.previous,
+            auto& back = add("settings-update-back", RowKind::Action, "Go back to XoDen " + state_.self_update.previous,
                              "self-update-back");
             back.subtitle = "Put the previous version and its runtime kit back";
         }
         if (live() && !state_.gamepass_only && !state_.self_update.current_notes_url.empty()) {
             auto& notes = add("settings-release-notes", RowKind::Action, "Release notes", "self-update-notes");
-            notes.subtitle = "What changed in Playden " + state_.self_update.current;
+            notes.subtitle = "What changed in XoDen " + state_.self_update.current;
         }
         section = "About";
-        add("settings-about", RowKind::Action, "About", "about").subtitle = "Playden for PlayStation 5";
+        add("settings-about", RowKind::Action, "About", "about").subtitle = "XoDen for PlayStation 5";
         auto& logs = add("settings-logs", RowKind::Action, "Logs", live() ? "logs-pick" : "logs");
         if (live()) {
             logs.subtitle = state_.gamepass_only ? "Install, sign-in and launch diagnostics"
@@ -5448,9 +5450,9 @@ void Simulation::rebuild_view() {
         auto& reset = add("settings-reset", RowKind::Action, "Reset UI data", "reset-confirm");
         reset.dangerous = true;
         reset.subtitle = "Forget favorites, collections and view state on this console";
-        section = "Quit Playden";
+        section = "Quit XoDen";
         // As on macOS, the rail entry itself quits: the section has no rows to review.
-        auto& quit = add("settings-quit", RowKind::Action, "Quit Playden", "quit-confirm");
+        auto& quit = add("settings-quit", RowKind::Action, "Quit XoDen", "quit-confirm");
         quit.dangerous = true;
         quit.rail_only = true;
     } else if (state_.navigation.route == Route::Session) {
@@ -5593,7 +5595,7 @@ void Simulation::start_logs() {
         state_.log_context = "Transfer fixture · game " + ToKey(state_.navigation.selected_game_id);
     else if (state_.navigation.selected_game_id.valid())
         state_.log_context = "Game fixture · " + ToKey(state_.navigation.selected_game_id);
-    else state_.log_context = "Playden fixture diagnostics";
+    else state_.log_context = "XoDen fixture diagnostics";
 }
 
 void Simulation::SetLogDirectory(std::filesystem::path directory) {
@@ -6184,7 +6186,7 @@ void Simulation::ask_upload_all() {
     if (count == 0 || state_.saves_job.kind != SavesJobKind::None) return;
     ModalEntry confirm{"confirmation", count == 1 ? "Upload saves to this Steam account?" : "Upload all saves to this Steam account?",
                        state_.navigation.focus_key, {"cloud-confirm-account-all", "cancel"}, 0, false};
-    confirm.body = "Playden has not synced " + (count == 1 ? std::string("1 game's saves") : std::to_string(count) + " games' saves") +
+    confirm.body = "XoDen has not synced " + (count == 1 ? std::string("1 game's saves") : std::to_string(count) + " games' saves") +
                    " for " + (state_.account().display_name.empty() ? std::string("this account") : state_.account().display_name) +
                    " before. Confirm to upload this console's saves to its Steam Cloud.";
     open_modal(std::move(confirm));
@@ -6294,8 +6296,8 @@ void Simulation::quit_to_home() {
     state_.quit_waiting = true;
     ModalEntry wait{"confirmation", quit_wait_title_, state_.navigation.focus_key, {"cancel"}, 0, false};
     wait.body = preparing != state_.runtime_games.end()
-        ? name + " is being prepared. Playden quits to the PS5 Home screen once it is done, so it is not left half-made."
-        : "Playden quits to the PS5 Home screen once the queued games are held, so none is left half-made.";
+        ? name + " is being prepared. XoDen quits to the PS5 Home screen once it is done, so it is not left half-made."
+        : "XoDen quits to the PS5 Home screen once the queued games are held, so none is left half-made.";
     open_modal(std::move(wait));
 }
 
@@ -6596,7 +6598,7 @@ void Simulation::activate() {
         if (phase == "staged") actions.push_back("self-update-restart");
         else actions.push_back("self-update-cancel");
         actions.push_back("cancel");
-        open_modal({"job-actions", "Playden update", selected.key, std::move(actions), 0, false});
+        open_modal({"job-actions", "XoDen update", selected.key, std::move(actions), 0, false});
     } else if (action_name == "job-action") {
         const auto id = selected.key.substr(4);
         const auto* job = find_job(state_, id);
@@ -6815,7 +6817,7 @@ void Simulation::activate() {
                 const auto size = format_bytes(bytes);
                 return std::to_string(files) + (files == 1 ? " file" : " files") + (size.empty() ? "" : ", " + size) + age(latest);
             };
-            ModalEntry choice{"confirmation", "Which saves should Playden keep?", state_.navigation.focus_key,
+            ModalEntry choice{"confirmation", "Which saves should XoDen keep?", state_.navigation.focus_key,
                               {"cloud-use-cloud", "cloud-use-local", "cancel"}, 0, false};
             choice.body = "Steam Cloud: " + side(facts.remote_files, facts.remote_bytes, facts.remote_latest) +
                           ". This console: " + side(facts.local_files, facts.local_bytes, facts.local_latest) +
@@ -6824,7 +6826,7 @@ void Simulation::activate() {
         } else if (cloud != state_.cloud.end() && cloud->second.status == CloudStatus::NeedsAccount) {
             ModalEntry confirm{"confirmation", "Upload saves to this Steam account?", state_.navigation.focus_key,
                                {"cloud-confirm-account", "cancel"}, 0, false};
-            confirm.body = "Playden has not synced this game's saves for " +
+            confirm.body = "XoDen has not synced this game's saves for " +
                            (state_.account().display_name.empty() ? std::string("this account") : state_.account().display_name) +
                            " before. Confirm to upload this console's saves to its Steam Cloud.";
             open_modal(std::move(confirm));
@@ -6858,7 +6860,7 @@ void Simulation::activate() {
         ModalEntry confirm{"confirmation", "Clean up unused game settings data?", state_.navigation.focus_key,
                            {"cancel", "runtime-cleanup-confirm"}, 0, true};
         confirm.body = std::to_string(count) + (count == 1 ? " request" : " requests") +
-                       " left by interrupted or finished preparations. Playden removes only what no game is using; "
+                       " left by interrupted or finished preparations. XoDen removes only what no game is using; "
                        "games and saves are not touched.";
         open_modal(std::move(confirm));
     } else if (live() && action_name == "runtime-cleanup-confirm") {
@@ -7050,7 +7052,7 @@ void Simulation::activate() {
         if (action_name == "uninstall") title = "Uninstall this fixture game? Saves are preserved.";
         else if (action_name == "reset-confirm") title = "Reset preferences and organization? Installs, saves, and history remain.";
         else if (action_name == "signout-confirm") title = "Sign out? Account-visible cache will be cleared.";
-        else if (action_name == "quit-confirm") title = "Quit Playden? Active jobs will recover after restart.";
+        else if (action_name == "quit-confirm") title = "Quit XoDen? Active jobs will recover after restart.";
         else title = "Quit the simulated game? Download jobs continue.";
         std::string body;
         if (live()) {
@@ -7059,7 +7061,7 @@ void Simulation::activate() {
                 title = "Sign out of Steam?";
                 body = "The saved sign-in, this account's library cache and its organization are removed from this console. Signing in again needs the Steam mobile app.";
             } else if (action_name == "quit-confirm") {
-                title = "Quit Playden?";
+                title = "Quit XoDen?";
                 body = "Your sign-in, library and settings are kept for next time.";
             } else if (action_name == "reset-confirm") {
                 body = "Favorites, collections, notes and display preferences return to their defaults.";
@@ -7079,7 +7081,7 @@ void Simulation::activate() {
                 // uninstall does not sync them (Controller::BeginUninstall).
                 if (!Traits(id.store).cloud_saves) body += " Its saves exist only on this console.";
                 else if (no_cloud) body += " This game has no Steam Cloud saves: its saves exist only on this console.";
-                else if (state_.cloud_saves_auto) body += " Steam Cloud saves are synced first; if that fails, Playden asks before going on.";
+                else if (state_.cloud_saves_auto) body += " Steam Cloud saves are synced first; if that fails, XoDen asks before going on.";
                 else body += " Automatic Cloud sync is off, so its saves are not synced first.";
             }
         }
@@ -7126,7 +7128,7 @@ void Simulation::activate() {
             quit_sync_game_ = id;
             pending_cloud_requests_.push_back({CloudRequestKind::Sync, id});
             ModalEntry wait{"confirmation", "Syncing Cloud saves…", state_.navigation.focus_key, {"saves-quit-anyway", "cancel"}, 1, false};
-            wait.body = "Playden quits to the PS5 Home screen once this game's saves are in step with Steam Cloud.";
+            wait.body = "XoDen quits to the PS5 Home screen once this game's saves are in step with Steam Cloud.";
             open_modal(std::move(wait));
         }
     } else if (action_name == "ready-later" || action_name == "alert-ok") {
@@ -7453,7 +7455,7 @@ void Simulation::activate() {
             settings_after_prepare_.insert(id);
             const auto* game = find_game(state_, id);
             push_notice({"settings-" + ToKey(id), "Checking the game", "", false, kLiveNoticeSeconds, false,
-                         (game ? game->title : std::string("The game")) + " · Game settings opens when Playden has looked at its files."});
+                         (game ? game->title : std::string("The game")) + " · Game settings opens when XoDen has looked at its files."});
         } else {
             open_game_settings();
         }
@@ -7481,13 +7483,13 @@ void Simulation::activate() {
                    "The game doesn't start; saves are not touched.";
         } else if (action_name == "maintenance-repair") {
             heading = "Repair the game?";
-            body = "Playden checks the files " + title + " needs to start, fixes their permissions and writes its settings again. Saves are not touched.";
+            body = "XoDen checks the files " + title + " needs to start, fixes their permissions and writes its settings again. Saves are not touched.";
         } else if (action_name == "maintenance-shader") {
             heading = "Clear the shader cache?";
             body = "DXVK's shader cache for " + title + " is deleted. Shaders compile again on the next start, which may stutter at first.";
         } else if (action_name == "maintenance-backup") {
             heading = "Back up saves?";
-            body = "The Windows user folders of " + title + " are copied aside on this console. Playden keeps the newest 3 backups. Saves the game keeps in its own folder are not included.";
+            body = "The Windows user folders of " + title + " are copied aside on this console. XoDen keeps the newest 3 backups. Saves the game keeps in its own folder are not included.";
         } else if (action_name == "maintenance-recreate") {
             pending_destructive_action_ = action_name;
             open_modal(recreate_confirmation(title, action_name));
@@ -7650,7 +7652,7 @@ void Simulation::activate() {
     }
     else if (action_name == "note") {
         ModalEntry modal{"compatibility", "Compatibility and note", "note", {"rating-untested", "rating-works", "rating-playable", "rating-broken", "edit-note", "cancel"}, 0, false};
-        modal.body = "Your rating and note stay on this console. They are not submitted to Playden or any compatibility database.";
+        modal.body = "Your rating and note stay on this console. They are not submitted to XoDen or any compatibility database.";
         open_modal(std::move(modal));
     }
     else if (action_name.rfind("rating-", 0) == 0) {
@@ -7730,10 +7732,10 @@ void Simulation::activate() {
         state_.navigation.settings_rail_focused = false;
         state_.navigation.focus_key = "settings-about";
         settings_focus_section_ = "About";
-        open_modal({"about", live() ? "About Playden" : "About Playden UI simulation", "settings-about",
+        open_modal({"about", live() ? "About XoDen" : "About XoDen UI simulation", "settings-about",
             {"about-version", "about-build", "about-framework", "about-platform", "about-kit", "about-kit-source", "about-back"}, 4, false});
     }
-    else if (action_name == "about") open_modal({"about", live() ? "About Playden" : "About Playden UI simulation", state_.navigation.focus_key,
+    else if (action_name == "about") open_modal({"about", live() ? "About XoDen" : "About XoDen UI simulation", state_.navigation.focus_key,
         {"about-version", "about-build", "about-framework", "about-platform", "about-kit", "about-kit-source", "about-back"}, 0, false});
     else if (action_name == "about-back") close_modal();
     else if (live() && action_name == "toggle-beta-updates") {
@@ -7765,9 +7767,9 @@ void Simulation::activate() {
     else if (live() && action_name == "self-update-notes") open_release_notes(false);
     else if (action_name == "release-notes-ok") close_modal();
     else if (live() && action_name == "self-update-back") {
-        ModalEntry confirm{"confirmation", "Go back to Playden " + state_.self_update.previous + "?",
+        ModalEntry confirm{"confirmation", "Go back to XoDen " + state_.self_update.previous + "?",
                            state_.navigation.focus_key, {"self-update-back-confirm", "cancel"}, 1, false};
-        confirm.body = "Playden closes, puts version " + state_.self_update.previous +
+        confirm.body = "XoDen closes, puts version " + state_.self_update.previous +
                        " and its runtime kit back, and opens again. If it doesn't open by itself, open it from the "
                        "Home screen.";
         open_modal(std::move(confirm));
@@ -8979,7 +8981,7 @@ void Simulation::export_recipe(GameId id) {
         return;
     }
     ModalEntry done{"confirmation", "Recipe exported", "export-recipe", {"alert-ok"}, 0, false};
-    done.body = "Saved to " + path.string() + ". Add your name as author, then send it as a pull request to Playden's "
+    done.body = "Saved to " + path.string() + ". Add your name as author, then send it as a pull request to XoDen's "
                 "repository (docs/community-recipes.md).";
     open_modal(std::move(done));
 }
@@ -9017,7 +9019,7 @@ void Simulation::announce_settings_saved() {
     if (changes == 0) return;
     const auto game = state_.navigation.selected_game_id;
     const auto* preset = preset_for(game);
-    const std::string name = preset ? preset->name : "Playden default";
+    const std::string name = preset ? preset->name : "XoDen default";
     // Say when the changes apply: a running game gets them from its next start in Playden.
     std::string when = std::to_string(changes) + (changes == 1 ? " change applies" : " changes apply");
     // Only a game known to run waits for its next start from Playden; an unanswered check
@@ -9027,7 +9029,7 @@ void Simulation::announce_settings_saved() {
                                       (runtime_game->second.activity == TitleActivity::Running ||
                                        runtime_game->second.play_status == "Playing")
                                 : !game_closed(game);
-    when += running ? " the next time Playden starts the game" : " on next launch";
+    when += running ? " the next time XoDen starts the game" : " on next launch";
     push_notice({"settings-saved", "Settings saved · " + (after.overrides.empty() ? name : "Custom · from " + name), "", false,
                  kLiveNoticeSeconds, false, when});
     // A prepared title gets the new settings now when it is stopped, a new program or folder

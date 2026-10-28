@@ -120,7 +120,7 @@ runtime::NativeActivity ReadTitleActivity(const std::string& title, std::string*
     return ProcessTitleIdentity{value.app_id, std::string(value.title_id, static_cast<std::size_t>(end - value.title_id))};
   };
   const auto self_pid = ::getpid(); auto self = self_pid > 0 ? identity(self_pid) : std::nullopt;
-  if (!self || !self->app_id || !ValidTitleId(self->title_id)) return unknown("Playden's own identity unavailable");
+  if (!self || !self->app_id || !ValidTitleId(self->title_id)) return unknown("XoDen's own identity unavailable");
   TitleActivityApi api; api.identity = identity;
   api.processes = [self_pid, &failed]() -> std::optional<std::vector<std::int32_t>> {
     const auto fail = [&failed](const std::string& why) {
@@ -139,7 +139,7 @@ runtime::NativeActivity ReadTitleActivity(const std::string& title, std::string*
     if (!pids) return fail("process records malformed bytes=" + std::to_string(length));
     // Qualify the snapshot's PID field against this independently known PID.
     if (std::find(pids->begin(), pids->end(), self_pid) == pids->end())
-      return fail("process list lacks Playden's pid=" + std::to_string(self_pid));
+      return fail("process list lacks XoDen's pid=" + std::to_string(self_pid));
     return pids;
   };
   std::string query_reason;

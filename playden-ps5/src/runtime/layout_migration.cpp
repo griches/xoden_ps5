@@ -243,8 +243,8 @@ std::optional<std::string> PendingJournal(const LayoutPaths& paths, const Layout
     Log(ops, "pending launch title=" + (title ? *title : std::string("unreadable")) + " running=" +
                  (running ? (*running ? "yes" : "no") : "unknown"));
     if (!running || *running)
-      return std::string("the last game you started from Playden may still be running or suspended. Close it, and "
-                         "Playden moves them the next time it starts");
+      return std::string("the last game you started from XoDen may still be running or suspended. Close it, and "
+                         "XoDen moves them the next time it starts");
   } else if (launch.error() != StorageError::kNotFound) {
     return "the pending launch session can't be read (" + launch.message() + ")";
   }
@@ -276,7 +276,7 @@ std::optional<std::string> PendingJournal(const LayoutPaths& paths, const Layout
     if (ops.title_running && !record.title_id.empty()) {
       const auto running = ops.title_running(record.title_id);
       if (!running || *running)
-        return "the game " + record.title_id + " may still be running or suspended. Close it, and Playden moves "
+        return "the game " + record.title_id + " may still be running or suspended. Close it, and XoDen moves "
                "them the next time it starts";
     }
     if (record.journal)
@@ -399,7 +399,7 @@ LayoutResult MigrateLayout(const LayoutPaths& paths, const LayoutOps& ops) {
   };
   const auto hold = [&](const std::string& why) {
     Log(ops, why);
-    result.notice = "Playden kept some data in its app folder: " + why;
+    result.notice = "XoDen kept some data in its app folder: " + why;
     return finish();
   };
 
@@ -441,7 +441,7 @@ LayoutResult MigrateLayout(const LayoutPaths& paths, const LayoutOps& ops) {
       const int kind = Kind(tree.to);
       if (kind == 2 || (kind == 1 && !EmptyDirectory(tree.to)))
         return hold(tree.to.string() + " already has files; " + tree.from.string() + " was kept. "
-                    "Move them aside and restart Playden.");
+                    "Move them aside and restart XoDen.");
     }
     if (!EnsureSharedDirectory(ops, tree.to)) return hold(tree.to.string() + " can't be created");
     if (journal.step != tree.name && !save(tree.name, tree.from, tree.to))
@@ -479,19 +479,19 @@ LayoutResult MigrateLayout(const LayoutPaths& paths, const LayoutOps& ops) {
     if (!save("games", old_games, paths.games_root, count)) Log(ops, "the move record can't be written (" + error + ")");
     Log(ops, "games move postponed (" + std::to_string(count) + "): " + why);
     if (tell_now || count >= kLayoutPostponeNoticeAfter)
-      result.notice = "Playden couldn't move your games to " + paths.games_root.string() + " yet: " + why;
+      result.notice = "XoDen couldn't move your games to " + paths.games_root.string() + " yet: " + why;
     return finish();
   };
   if (old_kind != 1) {
     Log(ops, "games: " + old_games.string() + " is not a folder; nothing was moved");
-    result.notice = old_games.string() + " is not a folder, so Playden left it in place.";
+    result.notice = old_games.string() + " is not a folder, so XoDen left it in place.";
     return finish();
   }
   const int new_kind = Kind(paths.games_root);
   if (new_kind == 2 || (new_kind == 1 && !EmptyDirectory(paths.games_root))) {
     Log(ops, "games: " + paths.games_root.string() + " already has files; " + old_games.string() + " was kept");
-    result.notice = paths.games_root.string() + " already has files, so Playden kept your games in " +
-                    old_games.string() + ". Move them aside and restart Playden.";
+    result.notice = paths.games_root.string() + " already has files, so XoDen kept your games in " +
+                    old_games.string() + ". Move them aside and restart XoDen.";
     return finish();
   }
   if (const auto pending = PendingJournal(paths, ops)) return postpone(*pending, false);
