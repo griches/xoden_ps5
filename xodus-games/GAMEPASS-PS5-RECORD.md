@@ -1827,3 +1827,19 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
 - Microsoft device-identity baseline retained privately for Gary's next install
   comparison. Remote Play was disconnected after each screenshot. User's
   running Donut County was left alone. Brotato package selected but not downloaded.
+
+
+## 2026-10-28 — Owner compatibility updates and Windows sign-in instructions
+
+Gary confirmed Call of the Elder Gods, Donut County, DOOM 64, Hollow Knight
+and MIO: Memories in Orbit work. The current compatibility chart now marks
+these as Works, attributed to Gary's report. Exact new settings, input method,
+save/reload and extended-play details were not supplied. DREDGE was removed
+from the current chart at his request; the historical investigation is retained.
+
+Both sign-in READMEs now have explicit Windows PC instructions: install Node
+24+ and Chrome, extract the ZIP, open PowerShell beside server.mjs, run
+node --version and node .\server.mjs, then open the loopback page on that
+Windows PC. macOS instructions and shared PS5 pairing steps are separate.
+Windows sign-in remains unverified; documentation does not claim a Windows test.
+The release documentation is refreshed without changing the PS5 executable/tag.

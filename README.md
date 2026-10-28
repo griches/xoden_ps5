@@ -14,8 +14,10 @@ PS5, and launch each installed game from its own PS5 Home tile.
 **Node.js 24+ and Google Chrome**. **macOS is tested; Windows is not verified.**
 It is a Node-based helper, not a standalone Windows `.exe`. The release ZIP
 includes the built helper, so normal use does not require npm installation.
-On Mac, double-click `start.command`; alternatively run `node server.mjs` in
-its folder. Open **http://127.0.0.1:47832 on that same computer**, not on a phone.
+**Windows PC:** extract the ZIP, open PowerShell in the folder containing
+`server.mjs`, and run `node .\server.mjs` ([Windows steps](#windows-pc)).
+**macOS:** double-click `start.command` ([Mac steps](#macos)).
+Open **http://127.0.0.1:47832 on that same computer**, not on a phone.
 After sign-in, downloads and games run on the PS5 without the helper.
 See [the sign-in steps](#sign-in-with-microsoft) below.
 
@@ -79,19 +81,61 @@ upstream Playden's FAKE77031.
 `http://127.0.0.1:47832` means that computer; it is not a page hosted by the PS5.
 Entering it on a phone points at the phone and will not reach the helper.
 
-1. Download and unzip `xoden-signin-helper-0.1.0.zip` on your computer.
-2. On macOS, double-click `start.command`. Alternatively, open a terminal in
-   that folder and run `node server.mjs --open`. Keep the helper running.
-3. In XoDen, open **Game Pass account** or **Settings → Xbox account →
+Download and extract the [computer helper ZIP](https://github.com/griches/xoden_ps5/releases/download/0.1/xoden-signin-helper-0.1.0.zip), then follow the steps for your computer.
+
+### Windows PC
+
+Windows sign-in is **not yet verified end to end**; these are the Windows steps
+for running the supplied Node-based helper.
+
+1. Install [Node.js 24 or newer for Windows](https://nodejs.org/en/download)
+   and [Google Chrome](https://www.google.com/chrome/). Open a new terminal
+   after installing Node so the `node` command is available.
+2. Download the helper ZIP and choose **Extract All** in File Explorer. Open
+   the extracted folder that contains **`server.mjs`**. Do not run it from
+   inside the ZIP.
+3. In that folder, click File Explorer's address bar, type **`powershell`**
+   and press Enter. In the PowerShell window, run:
+
+   ```powershell
+   node --version
+   node .\server.mjs
+   ```
+
+   The version must be **v24 or newer**. Leave the window open when it prints
+   `XoDen sign-in: http://127.0.0.1:47832`.
+4. On **that Windows PC**, open
+   [http://127.0.0.1:47832](http://127.0.0.1:47832) in your browser, then follow
+   **Pair the helper with your PS5** below. The local page may use Edge or
+   another browser; Microsoft approval opens in a separate Chrome window.
+
+### macOS
+
+Install [Node.js 24 or newer](https://nodejs.org/en/download) and
+[Google Chrome](https://www.google.com/chrome/). Extract the helper ZIP and
+double-click **`start.command`**. Alternatively, open Terminal in the folder
+containing `server.mjs` and run:
+
+```sh
+node server.mjs --open
+```
+
+Keep Terminal open. Open [http://127.0.0.1:47832](http://127.0.0.1:47832) on
+that Mac if it did not open automatically, then follow the pairing steps below.
+
+### Pair the helper with your PS5
+
+1. In XoDen, open **Game Pass account** or **Settings → Xbox account →
    Sign in with Microsoft**. The console shows a pairing code.
-4. On the **same computer as the helper**, open
+2. On the **computer running the helper**, open
    [http://127.0.0.1:47832](http://127.0.0.1:47832). Enter the PS5's local
-   network address and the pairing code shown on the PS5.
-5. Complete Microsoft's approval in the separate temporary **Chrome** window.
-   The local helper page itself can open in Safari or another browser.
-6. Wait for XoDen to confirm sign-in and refresh the library. You can then
-   close the helper. It is not needed to keep downloading or playing games;
-   start it again if XoDen asks you to sign in again.
+   network address and its 16-character pairing code in the form. The PS5
+   address belongs in this form; the browser address stays `127.0.0.1:47832`.
+3. Complete Microsoft's approval in the separate temporary **Chrome** window.
+4. Wait for XoDen to confirm sign-in and refresh the library. You can then
+   close the helper or press **Ctrl+C** in its terminal. It is not needed to
+   keep downloading or playing games; start it again if XoDen asks you to sign
+   in again.
 
 The helper relays browser approval; the console performs the account exchange
 and saves the session. It does not copy your computer's Xbox wallet or use your

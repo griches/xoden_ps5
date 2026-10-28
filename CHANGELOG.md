@@ -1,5 +1,14 @@
 # Changelog
 
+## Documentation and compatibility update — 2026-10-28
+
+- Added explicit Windows PC setup and PowerShell commands to both sign-in READMEs.
+  Windows end-to-end sign-in remains unverified; macOS remains the tested platform.
+- Recorded Gary's working reports for Call of the Elder Gods, Donut County,
+  DOOM 64, Hollow Knight and MIO: Memories in Orbit.
+- Removed DREDGE from the current compatibility list at Gary's request.
+- Refreshed release documentation and checksums; the PS5 executable is unchanged.
+
 ## 0.1.0 — 2026-10-28
 
 First XoDen early-beta release. Git tag: `0.1`.
@@ -17,8 +26,8 @@ First XoDen early-beta release. Git tag: `0.1`.
 
 Gameplay is confirmed for several titles, including LIMBO, but compatibility is
 limited. Halo: Campaign Evolved, High on Life 2, Balatro and BLiNX have recorded
-startup/runtime failures. Donut County downloaded and registered; its gameplay
-verdict is pending. Read COMPATIBILITY.md for edition/settings/test details.
+startup/runtime failures. See the current COMPATIBILITY.md for later working
+reports and edition/settings/test details.
 
 Registration can need a return to PS5 Home, long-term sign-in renewal needs more
 testing, some notifications truncate text, and other issues remain in ROADMAP.md.

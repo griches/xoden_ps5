@@ -15,15 +15,59 @@ not a standalone Windows executable. **macOS is tested; Windows is unverified.**
 You need the helper for sign-in only, not to keep downloading or playing games
 on the PS5 afterward. Keep this helper folder on your computer, not on the PS5.
 
-1. On the PS5, open **Settings → Xbox account → Sign in with Microsoft**.
-2. On the Mac, double-click `start.command`, or run `node server.mjs` in this
-   folder. Open <http://127.0.0.1:47832> on that same computer. The PS5 does
-   not host this page, and opening it on a phone will not reach the helper.
-3. Enter the PS5's local IPv4 address and the 16-character pairing code on the TV.
-4. Complete Microsoft's sign-in in the temporary Chrome window using the same
-   Microsoft account as the currently connected console account. To switch
-   accounts, sign out on the console first.
-5. Wait for the console's saved confirmation before closing the helper.
+### Windows PC
+
+Windows sign-in is **not yet verified end to end**; these are the Windows steps
+for running the supplied Node-based helper.
+
+1. Install [Node.js 24 or newer for Windows](https://nodejs.org/en/download)
+   and [Google Chrome](https://www.google.com/chrome/). Open a new terminal
+   after installing Node so the `node` command is available.
+2. Download the helper ZIP and choose **Extract All** in File Explorer. Open
+   the extracted folder that contains **`server.mjs`**. Do not run it from
+   inside the ZIP.
+3. In that folder, click File Explorer's address bar, type **`powershell`**
+   and press Enter. In the PowerShell window, run:
+
+   ```powershell
+   node --version
+   node .\server.mjs
+   ```
+
+   The version must be **v24 or newer**. Leave the window open when it prints
+   `XoDen sign-in: http://127.0.0.1:47832`.
+4. On **that Windows PC**, open
+   [http://127.0.0.1:47832](http://127.0.0.1:47832) in your browser, then follow
+   **Pair the helper with your PS5** below. The local page may use Edge or
+   another browser; Microsoft approval opens in a separate Chrome window.
+
+### macOS
+
+Install [Node.js 24 or newer](https://nodejs.org/en/download) and
+[Google Chrome](https://www.google.com/chrome/). Extract the helper ZIP and
+double-click **`start.command`**. Alternatively, open Terminal in the folder
+containing `server.mjs` and run:
+
+```sh
+node server.mjs --open
+```
+
+Keep Terminal open. Open [http://127.0.0.1:47832](http://127.0.0.1:47832) on
+that Mac if it did not open automatically, then follow the pairing steps below.
+
+### Pair the helper with your PS5
+
+1. In XoDen, open **Game Pass account** or **Settings → Xbox account →
+   Sign in with Microsoft**. The console shows a pairing code.
+2. On the **computer running the helper**, open
+   [http://127.0.0.1:47832](http://127.0.0.1:47832). Enter the PS5's local
+   network address and its 16-character pairing code in the form. The PS5
+   address belongs in this form; the browser address stays `127.0.0.1:47832`.
+3. Complete Microsoft's approval in the separate temporary **Chrome** window.
+4. Wait for XoDen to confirm sign-in and refresh the library. You can then
+   close the helper or press **Ctrl+C** in its terminal. It is not needed to
+   keep downloading or playing games; start it again if XoDen asks you to sign
+   in again.
 
 The console performs the original Xodus hosted-login exchange using its own
 registered device. It verifies the fresh browser account and atomically saves
