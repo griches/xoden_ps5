@@ -5,6 +5,20 @@
 Browse your PC Game Pass library, download Windows games directly to a jailbroken
 PS5, and launch each installed game from its own PS5 Home tile.
 
+## Two downloads: PS5 app and computer sign-in helper
+
+1. **[PS5 app — xoden-ps5-0.1.0.zip](https://github.com/griches/xoden_ps5/releases/download/0.1/xoden-ps5-0.1.0.zip)** — install this folder on your PS5.
+2. **[Computer helper — xoden-signin-helper-0.1.0.zip](https://github.com/griches/xoden_ps5/releases/download/0.1/xoden-signin-helper-0.1.0.zip)** — run this separately on your computer to sign in to Microsoft.
+
+**The computer helper is required for Microsoft sign-in.** It requires
+**Node.js 24+ and Google Chrome**. **macOS is tested; Windows is not verified.**
+It is a Node-based helper, not a standalone Windows `.exe`. The release ZIP
+includes the built helper, so normal use does not require npm installation.
+On Mac, double-click `start.command`; alternatively run `node server.mjs` in
+its folder. Open **http://127.0.0.1:47832 on that same computer**, not on a phone.
+After sign-in, downloads and games run on the PS5 without the helper.
+See [the sign-in steps](#sign-in-with-microsoft) below.
+
 **Very early beta.** Compatibility varies widely: some games work, others fail
 at startup or require settings changes. Installing successfully does not mean a
 game will run. Check the [compatibility chart](COMPATIBILITY.md) before a large download.

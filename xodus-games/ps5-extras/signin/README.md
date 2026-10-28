@@ -1,15 +1,24 @@
 # Microsoft browser sign-in for Game Pass on PS5
 
-Development helper for the console's single Microsoft sign-in flow, covering
+Separate computer helper for XoDen's single Microsoft sign-in flow, covering
 the account, library, licensing and game authorisation. Node.js 24+ and Google
 Chrome are required. It does not
 read the computer's Xodus Keychain or copy device credentials between machines.
 The local page can open in Safari or any default browser. Microsoft login uses
 a separate temporary Chrome window; changing the default browser is unnecessary.
 
+## Run the release helper
+
+The release download is **xoden-signin-helper-0.1.0.zip**. It includes the built
+browser adapter. Install **Node.js 24+ and Google Chrome** separately; this is
+not a standalone Windows executable. **macOS is tested; Windows is unverified.**
+You need the helper for sign-in only, not to keep downloading or playing games
+on the PS5 afterward. Keep this helper folder on your computer, not on the PS5.
+
 1. On the PS5, open **Settings → Xbox account → Sign in with Microsoft**.
-2. On the Mac, double-click `start.command`, or run `npm ci --ignore-scripts`,
-   `npm run build` and `npm start` here. Open <http://127.0.0.1:47832>.
+2. On the Mac, double-click `start.command`, or run `node server.mjs` in this
+   folder. Open <http://127.0.0.1:47832> on that same computer. The PS5 does
+   not host this page, and opening it on a phone will not reach the helper.
 3. Enter the PS5's local IPv4 address and the 16-character pairing code on the TV.
 4. Complete Microsoft's sign-in in the temporary Chrome window using the same
    Microsoft account as the currently connected console account. To switch
@@ -38,7 +47,10 @@ credentials are not yet persisted between launches. Library refresh can renew
 the main saved session. Long-term renewal and a completely empty console's
 first device setup remain unverified.
 
-Offline tests, using synthetic callbacks and a temporary local TLS fixture:
+## Build from source and test
+
+For a source checkout, build the browser adapter first. Release ZIP users do not
+need this step. Offline tests use synthetic callbacks and a temporary local TLS fixture:
 
 ```sh
 npm ci --ignore-scripts
