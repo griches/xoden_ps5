@@ -1784,6 +1784,40 @@ int main(int argc, char** argv) {
       std::filesystem::remove(game_root / "Limbo.exe");
     }
     {
+      const std::string program = "Obscure/Binaries/WinGDK/Obscure-WinGDK-Shipping.exe";
+      WritePe(game_root / program, true);
+      const std::vector<LaunchEntry> launches = {{"", "Choo-Choo Charles", program, "", ""}};
+      auto kit = KitCapabilities{};
+      kit.vkd3d_proton = true;
+      GameRecipe charles;
+      CHECK(GenerateGameRecipe(playden::GameId::Xbox("9P17KJLSCR59"), 0xf0000047u, "Choo-Choo Charles", launches,
+                               game_root.string(), &charles, &reason, kit));
+      EffectiveSettings effective;
+      SettingsError error;
+      CHECK(BuildEffectiveSettings(charles, nullptr, {}, kit, &effective, &error));
+      CHECK(effective.vkd3d_proton && effective.arguments == "-dx12");
+      CHECK(effective.dll_overrides.find("d3d12,d3d12core=n") != std::string::npos);
+      CHECK(BuildEffectiveSettings(charles, nullptr, {{"d3d12", "wine"}}, kit, &effective, &error));
+      CHECK(!effective.vkd3d_proton && effective.arguments == "-dx11");  // An explicit player choice wins.
+      // Existing saved recipes receive the same default while retaining the
+      // other settings of the configuration that Gary tested successfully.
+      charles.defaults.erase("d3d12");
+      charles.graphics = "dxvk";
+      charles.arguments = "-dx11";
+      ApplyXboxCompatibilityDefaults(&charles);
+      ApplyXboxCompatibilityDefaults(&charles);
+      CHECK(charles.defaults.at("d3d12") == "vkd3d-proton");
+      CHECK(charles.graphics == "dxvk" && charles.arguments == "-dx11");
+      charles.defaults.erase("d3d12");
+      charles.game = playden::GameId::Xbox("9MSVBF0KZFVW");
+      ApplyXboxCompatibilityDefaults(&charles);
+      CHECK(!charles.defaults.count("d3d12"));
+      charles.game = playden::GameId::Xbox("9P17KJLSCR59");
+      charles.launch_entries.front().executable = "Other.exe";
+      ApplyXboxCompatibilityDefaults(&charles);
+      CHECK(!charles.defaults.count("d3d12"));
+    }
+    {
       // The Program folder row shows it as the game folder; "." chooses it, empty the program's own folder.
       EffectiveSettings root_settings;
       SettingsError root_error;

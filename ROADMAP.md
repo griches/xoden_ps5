@@ -56,6 +56,9 @@ test evidence; this page tracks outstanding functionality.
 - [ ] Verify subscription expiry and account changes end to end, including
   launch-time behavior; do not claim enforcement beyond the checks actually tested.
 - [ ] Expand compatibility tests, including save/reload and longer sessions.
+  Choo-Choo Charles works with Direct3D 12 set to vkd3d-proton. The verified
+  product/executable default is implemented in source for the next release;
+  the published 0.1.0 app still needs the manual setting.
   Gary confirmed LIMBO works. Its pinned Microsoft shader compiler and
   product-specific default are now bundled in XoDen; automatic bottle installation
   and title-screen acceptance passed. Donut County hit Microsoft content-licence

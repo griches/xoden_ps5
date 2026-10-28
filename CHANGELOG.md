@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Select vkd3d-proton automatically for the tested Choo-Choo Charles PC Game
+  Pass executable, including older generated recipes. This fixes its D3D12
+  startup check while preserving explicit user settings. Gary confirmed the
+  equivalent manual setting works. The 0.1.0 release is unchanged.
+
 ## Public repository and README badges — 2026-10-28
 
 - Opened the repository and release downloads to the public.

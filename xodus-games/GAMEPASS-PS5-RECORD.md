@@ -1843,3 +1843,26 @@ node --version and node .\server.mjs, then open the loopback page on that
 Windows PC. macOS instructions and shared PS5 pairing steps are separate.
 Windows sign-in remains unverified; documentation does not claim a Windows test.
 The release documentation is refreshed without changing the PS5 executable/tag.
+
+
+## 2026-10-28 — Choo-Choo Charles D3D12 startup diagnosis and default
+
+Read existing logs only; the game was not relaunched during diagnosis. Product
+9P17KJLSCR59 uses Obscure/Binaries/WinGDK/Obscure-WinGDK-Shipping.exe. Its
+initial generated profile selected DXVK with -dx11 and no native D3D12
+provider. Session 0 logged the game dialog "D3D12 is not supported!", then
+exited before game frames. Gary subsequently confirmed the game works after
+changing Direct3D 12 to vkd3d-proton. The saved revision 1 contains that
+single override. Normal effective-settings handling also switches the generated
+Unreal argument to -dx12 when this backend is selected.
+
+At Gary's request, the source now supplies this product/x64/executable-bound
+default for fresh installs and older generated recipes on the next app release.
+Explicit user choices remain higher priority. The published 0.1.0 release and
+the running console are unchanged. Compatibility is marked Works based on
+Gary's report; save/reload, performance and extended play were not supplied.
+
+Validation: full 153 host tests and PS5 package build passed for this change.
+Regression coverage checks fresh and older recipes, native D3D12 selection and
+argument rewriting, explicit user override precedence and product/executable
+isolation. Source is prepared for the next release; no console deployment.

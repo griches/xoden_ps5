@@ -1891,12 +1891,23 @@ bool NeedsNativeD3DCompiler43(const GameRecipe& recipe) {
 }
 
 void ApplyXboxCompatibilityDefaults(GameRecipe* recipe) {
-  if (!recipe || !NeedsNativeD3DCompiler43(*recipe)) return;
-  const auto entries = SplitDllOverrides(recipe->dll_overrides);
-  if (std::find(entries.begin(), entries.end(), "d3dcompiler_43=n") == entries.end()) {
-    if (!recipe->dll_overrides.empty()) recipe->dll_overrides += ";";
-    recipe->dll_overrides += "d3dcompiler_43=n";
+  if (!recipe) return;
+  if (NeedsNativeD3DCompiler43(*recipe)) {
+    const auto entries = SplitDllOverrides(recipe->dll_overrides);
+    if (std::find(entries.begin(), entries.end(), "d3dcompiler_43=n") == entries.end()) {
+      if (!recipe->dll_overrides.empty()) recipe->dll_overrides += ";";
+      recipe->dll_overrides += "d3dcompiler_43=n";
+    }
   }
+  // This WinGDK build fails its D3D12 check with Wine's builtin library.
+  // The user-verified fix enables vkd3d-proton; normal effective-settings
+  // handling also selects -dx12 from the Unreal recipe's -dx11 argument.
+  // Saved player overrides still take precedence over this recipe default.
+  auto program = recipe->launch_entries.empty() ? std::string() : LowerAscii(recipe->launch_entries.front().executable);
+  std::replace(program.begin(), program.end(), '\\', '/');
+  if (RecipeGame(*recipe) == GameId::Xbox("9P17KJLSCR59") && recipe->architecture == "pe64" &&
+      program == "obscure/binaries/wingdk/obscure-wingdk-shipping.exe")
+    recipe->defaults["d3d12"] = "vkd3d-proton";
 }
 
 std::string GameProgramArchitecture(const std::string& install_root, const std::string& relative) {
