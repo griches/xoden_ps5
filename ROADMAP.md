@@ -14,8 +14,9 @@ test evidence; this page tracks outstanding functionality.
   approval cache avoids repeating browser login after failed verification.
   Gary also confirmed Call of the Elder Gods is signed in and its existing saves
   are visible. Verify MIO and expiry/account-change behavior before considering
-  this complete across games. Bounded automatic verification retries are now
-  installed to avoid a second menu attempt; fresh first-pass acceptance is pending.
+  this complete across games. Bounded automatic verification retries are
+  installed. Fresh browser approval, session save and automatic library refresh
+  completed in one menu attempt on 2026-10-28.
 - [ ] Verify sign-in persistence, expiry, account changes and game runtime end
   to end. Earlier device-code login proved library, subscription and PC licence
   access but not MIO's game grant. It is not the user-facing sign-in route.
@@ -30,7 +31,9 @@ test evidence; this page tracks outstanding functionality.
 - [ ] Finish multi-job queue scheduling and acceptance for interruption,
   restart, insufficient storage and cleanup.
 - [ ] Complete standalone app identity, separate title/package assets, settings
-  and update ownership. Remove remaining Steam-specific product flows.
+  and update ownership. XoDen's visible name, original icon/background and larger
+  pairing screen are installed; existing IDs/storage retain compatibility.
+  Remove remaining Steam-specific product flows.
 - [ ] Refresh generated PS5 Home artwork on already registered titles. New
   MIO installation shows icon0 and pic0 correctly on the actual Home screen;
   Elder Gods artwork remains cached by ShellUI despite owned disk-cache updates.

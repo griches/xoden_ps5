@@ -1,10 +1,12 @@
-# Game Pass on PS5
+# XoDen
+
+<img src="playden-ps5/sce_sys/icon0.png" alt="XoDen's original green portal icon" width="128">
 
 Private development repository for a PS5 app that browses PC Game Pass, downloads
 games directly to the console, and prepares individual PS5 Home entries.
-The app is currently based on Playden; its separate identity and packaging are
-still in progress. A working console account is currently required: fresh PS5
-sign-in is unfinished.
+XoDen combines Xodus authentication and downloads, the Nexus browser sign-in
+bridge, and Playden's console interface and runtime preparation. Each component
+retains its source attribution and license.
 
 **[Game compatibility](COMPATIBILITY.md)** ·
 **[Remaining work](ROADMAP.md)** ·
@@ -16,8 +18,19 @@ sign-in is unfinished.
 - Full Game Pass catalogue browsing and search, persistent cover cache and green UI.
 - Direct console downloads, package/size review, pause/resume and cancel cleanup.
 - Gameplay verified for Minishoot' Adventures and A Game About Digging A Hole.
-- Call of the Elder Gods launch reported by Gary after restarting and jailbreaking.
-- Fresh console sign-in, download efficiency and registration recovery need work.
+- Fresh Microsoft sign-in, verified session save and automatic library refresh
+  completed in one menu attempt on the PS5. Call of the Elder Gods game sign-in
+  and visibility of existing saves were also confirmed by Gary.
+- Download efficiency, registration recovery, other games and session-expiry
+  behavior still need work; see the roadmap for the remaining acceptance checks.
+
+The current sign-in helper requires **Google Chrome installed on a computer on
+the same network**. Its local page can open in Safari or another default browser;
+Microsoft approval opens in a separate temporary Chrome window. XoDen keeps one
+Microsoft sign-in flow for the library, licensing and game authorization.
+
+The original icon, background and generation prompts are kept in
+[the branding folder](playden-ps5/assets/branding/xoden-prompts.md).
 
 ## Source layout
 
