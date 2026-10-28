@@ -55,7 +55,7 @@ bool capture_synthetic_qr(const char* output, int width, int height)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-    SDL_Window* window = SDL_CreateWindow("Playden QR verification", SDL_WINDOWPOS_CENTERED,
+    SDL_Window* window = SDL_CreateWindow("XoDen QR verification", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, width, height,
                                           SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
     SDL_GLContext context = window == nullptr ? nullptr : SDL_GL_CreateContext(window);

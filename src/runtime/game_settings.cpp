@@ -187,9 +187,9 @@ std::vector<SettingDefinition> BuildCatalogue() {
                         "100", 4));
   // Compatibility.
   // Shown only for a game whose program Playden refuses for a reason a run could get past.
-  list.push_back(Choice("start_check", "Known problems", "What Playden does with a problem it found in the game's program.",
+  list.push_back(Choice("start_check", "Known problems", "What XoDen does with a problem it found in the game's program.",
                         ".NET · shared section", G::kCompatibility,
-                        {{"stop", "Don't start", "Playden stops before a program it expects to fail."},
+                        {{"stop", "Don't start", "XoDen stops before a program it expects to fail."},
                          {"try", "Try anyway", "Prepares the game anyway. It may not start."}},
                         "stop", 1));
   // Compatibility › Graphics.
@@ -230,7 +230,7 @@ std::vector<SettingDefinition> BuildCatalogue() {
   // Compatibility › Windows.
   list.push_back(Choice("steam_features", "Steam features", "How the game reaches Steam without the Steam client.",
                         "steam_api.dll · steam_api64.dll", G::kWindows,
-                        {{"emulate", "Offline emulation", "Playden's Steam emulator answers the game."},
+                        {{"emulate", "Offline emulation", "XoDen's Steam emulator answers the game."},
                          {"game", "Game's own files", "The game's Steam library, unchanged."}},
                         "game", 1, ApplyMode::kGameClosed));
   list.push_back(Choice("windows_version", "Windows version", "Which Windows the game is told it runs on.",
@@ -507,7 +507,7 @@ std::string Unavailable(const SettingDefinition& definition, const std::string& 
   // Control Panel\International, so a registry value alone would be overwritten.
   if (id == "locale") return "Needs a prospero-win update that sets the game's language (LANG).";
   // The title publication carries only the two registry values it owns (Windows version, text scale).
-  if (id == "registry_dll_overrides") return "Needs a prospero-win update that lets Playden write more registry values.";
+  if (id == "registry_dll_overrides") return "Needs a prospero-win update that lets XoDen write more registry values.";
   // Wine reads WINE_CPU_TOPOLOGY from the [environment] section; [debug] env does not take WINE_ names.
   if (id == "cpu_topology" && !kit.environment) return "Needs a prospero-win update that reads [environment].";
   if (id == "performance_overlay" && graphics == "gdi") return "Only available with DXVK or OpenGL.";
@@ -1869,7 +1869,7 @@ bool GenerateGameRecipe(const GameId& game, std::uint32_t runtime_number, const 
   GameRecipe checked;
   std::string why;
   if (!ParseGameRecipe(SerializeGameRecipe(out), &checked, &why))
-    return fail("Playden could not set up this game: " + why, false);
+    return fail("XoDen could not set up this game: " + why, false);
   *recipe = std::move(checked);
   return true;
 }
@@ -2187,7 +2187,7 @@ bool ApplyGameSettings(const GameRecipe& recipe, const EffectiveSettings& settin
   const bool has_config = read_config == RelativeRead::kPresent;
   if (has_config && existing.compare(0, std::char_traits<char>::length(kDxvkHeader), kDxvkHeader) != 0)
   {
-    return fail("the game folder has its own dxvk.conf; Playden will not replace it");
+    return fail("the game folder has its own dxvk.conf; XoDen will not replace it");
   }
 
   if (!PublishProsperoProfile(prospero_root, profile, reason)) return false;
@@ -3022,7 +3022,7 @@ bool ApplySettingsFiles(const SettingsLaunchPlan& plan, const std::string& insta
   const auto close_fail = [&](std::string why) { return fail(std::move(why)); };
   if (read == RelativeRead::kError) return close_fail("cannot read dxvk.conf");
   if (has_config && existing.compare(0, std::char_traits<char>::length(kDxvkHeader), kDxvkHeader) != 0)
-    return close_fail("the game folder has its own dxvk.conf; Playden will not replace it");
+    return close_fail("the game folder has its own dxvk.conf; XoDen will not replace it");
   // This is a stopped-title file operation, not a cross-directory transaction.
   // Restore config bytes/mode on registry failure and surface failed rollback.
   // The integration owner journals readiness and reconciles any interrupted apply.

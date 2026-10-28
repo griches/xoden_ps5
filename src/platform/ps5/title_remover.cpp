@@ -65,7 +65,7 @@ TitleRemoverOutcome RunTitleRemover(const TitleRemoverConfig& config, const std:
   }
   if (!S_ISDIR(info.st_mode) || info.st_uid != geteuid() ||
       ((info.st_mode & 07777) != 0755 && chmod(directory.c_str(), 0755) != 0)) {
-    outcome.detail = "request directory is not Playden's";
+    outcome.detail = "request directory is not XoDen's";
     return outcome;
   }
   unlink((directory / "result").c_str());

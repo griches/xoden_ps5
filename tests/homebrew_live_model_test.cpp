@@ -227,7 +227,7 @@ void live_120hz_waits_for_the_title_update(const std::filesystem::path& base) {
     std::filesystem::create_directories(base);
     auto model = make_live(base);
     model.SetGameSettingsFile(base / "display-settings.json");
-    model.SetSettingsData({{"playden-default", "Playden default", "Most games", "", {}}}, {});
+    model.SetSettingsData({{"playden-default", "XoDen default", "Most games", "", {}}}, {});
     model.SetKitCapabilities(playden::runtime::KitCapabilitiesFromManifest({"dxvk", "display-120hz"}, true));
     model.UpdateAccount({AuthState::SignedIn, "account", "Owner", {}, {}, false});
     playden::GameSummary game;
@@ -277,7 +277,7 @@ void live_120hz_waits_for_the_title_update(const std::filesystem::path& base) {
     const auto& saved = model.state().game_settings.at(SteamId(220)).overrides;
     check(saved.count("refresh") && saved.at("refresh") == "120" && saved.count("frame_limit") && saved.at("frame_limit") == "120",
           "both choices are saved at once");
-    check(find_row(model, "preset-picker")->value == "Custom · from Playden default", "the sheet marks the settings as changed");
+    check(find_row(model, "preset-picker")->value == "Custom · from XoDen default", "the sheet marks the settings as changed");
     activate(model, "setting-frame_limit");
     check(find_row(model, "choice-1")->selected && find_row(model, "choice-1")->value == "Your choice" &&
               !find_row(model, "choice-0")->selected,
@@ -346,7 +346,7 @@ void live_refresh_rate_keeps_off_over_a_preset_cap(const std::filesystem::path& 
     std::filesystem::create_directories(base);
     auto model = make_live(base);
     model.SetGameSettingsFile(base / "capped-settings.json");
-    model.SetSettingsData({{"playden-default", "Playden default", "Most games", "", {{"refresh", "120"}, {"frame_limit", "120"}}}}, {});
+    model.SetSettingsData({{"playden-default", "XoDen default", "Most games", "", {{"refresh", "120"}, {"frame_limit", "120"}}}}, {});
     model.SetKitCapabilities(playden::runtime::KitCapabilitiesFromManifest({"dxvk", "display-120hz"}, true));
     model.UpdateAccount({AuthState::SignedIn, "account", "Owner", {}, {}, false});
     playden::GameSummary game;
@@ -386,7 +386,7 @@ void live_update_runtime_from_maintenance(const std::filesystem::path& base) {
     std::filesystem::create_directories(base);
     auto model = make_live(base);
     model.SetGameSettingsFile(base / "update-settings.json");
-    model.SetSettingsData({{"playden-default", "Playden default", "Most games", "", {}}}, {});
+    model.SetSettingsData({{"playden-default", "XoDen default", "Most games", "", {}}}, {});
     model.SetKitCapabilities(playden::runtime::KitCapabilitiesFromManifest({"dxvk", "display-120hz"}, true));
     model.UpdateAccount({AuthState::SignedIn, "account", "Owner", {}, {}, false});
     playden::GameSummary game;
@@ -474,7 +474,7 @@ void live_settings_follow_the_prepared_title(const std::filesystem::path& base) 
     std::filesystem::create_directories(base);
     auto model = make_live(base);
     model.SetGameSettingsFile(base / "prepared-settings.json");
-    model.SetSettingsData({{"playden-default", "Playden default", "Most games", "", {}},
+    model.SetSettingsData({{"playden-default", "XoDen default", "Most games", "", {}},
                            {"mouse", "Mouse-driven game", "Point and click", "", {{"controller", "keyboard"}}}}, {});
     model.SetKitCapabilities(playden::runtime::KitCapabilitiesFromManifest({"settings-dxvk-config"}, true));
     model.UpdateAccount({AuthState::SignedIn, "account", "Owner", {}, {}, false});
@@ -594,7 +594,7 @@ void live_program_change_applies_like_other_settings(const std::filesystem::path
     std::filesystem::create_directories(base);
     auto model = make_live(base);
     model.SetGameSettingsFile(base / "program-settings.json");
-    model.SetSettingsData({{"playden-default", "Playden default", "Most games", "", {}}}, {});
+    model.SetSettingsData({{"playden-default", "XoDen default", "Most games", "", {}}}, {});
     model.UpdateAccount({AuthState::SignedIn, "account", "Owner", {}, {}, false});
     playden::GameSummary game;
     game.id = SteamId(22380);
@@ -800,7 +800,7 @@ void live_kit_install(const std::filesystem::path& base) {
     newer.available = "0.7.0";
     newer.kit_phase = "available";
     both.UpdateSelfUpdate(newer);
-    check(both.state().navigation.modals.empty(), "kit: no kit offer while a newer Playden is on offer");
+    check(both.state().navigation.modals.empty(), "kit: no kit offer while a newer XoDen is on offer");
 }
 
 // Playden's own update: the prompts, the Downloads job, the Settings row and the requests.
@@ -825,7 +825,7 @@ void live_self_update(const std::filesystem::path& base) {
     model.UpdateSelfUpdate(update);
     check(find_row(model, "settings-beta-wait") &&
           find_row(model, "settings-beta-wait")->subtitle ==
-              "Playden moves to the next stable version when it is out.",
+              "XoDen moves to the next stable version when it is out.",
           "opting out on a beta explains waiting for stable");
     update.current = "0.2.0";
     model.UpdateSelfUpdate(update);
@@ -842,7 +842,7 @@ void live_self_update(const std::filesystem::path& base) {
     model.UpdateSelfUpdate(update);
     check(std::any_of(model.state().notices.begin(), model.state().notices.end(),
                       [](const Notice& notice) { return notice.id == "self-update-check"; }),
-          "update: a check from Settings says Playden is up to date");
+          "update: a check from Settings says XoDen is up to date");
 
     // A newer release: one prompt, with the download size.
     update.phase = "available";
@@ -852,7 +852,7 @@ void live_self_update(const std::filesystem::path& base) {
     update.notes = "New things.";
     model.UpdateSelfUpdate(update);
     check(!model.state().navigation.modals.empty() &&
-              model.state().navigation.modals.back().title == "Playden 0.3.0 is available" &&
+              model.state().navigation.modals.back().title == "XoDen 0.3.0 is available" &&
               model.state().navigation.modals.back().body.find("runtime kit") != std::string::npos,
           "update: a newer release is offered");
     check(model.action("cross") && model.state().navigation.modals.empty() &&
@@ -869,7 +869,7 @@ void live_self_update(const std::filesystem::path& base) {
     model.UpdateSelfUpdate(update);
     const auto job = std::find_if(model.state().jobs.begin(), model.state().jobs.end(),
                                   [](const Job& item) { return item.id == "playden-update"; });
-    check(job != model.state().jobs.end() && job->title == "Playden 0.3.0" &&
+    check(job != model.state().jobs.end() && job->title == "XoDen 0.3.0" &&
               job->stage_text == "Downloading the runtime kit" && job->completed_bytes == 100,
           "update: the download shows on Downloads");
     check(find_row(model, "settings-update")->value == "25%", "update: Settings shows the progress");
@@ -880,17 +880,17 @@ void live_self_update(const std::filesystem::path& base) {
     update.phase = "unpacking";
     update.part = "app";
     model.UpdateSelfUpdate(update);
-    check(model.state().jobs.back().stage_text == "Unpacking Playden", "update: unpacking shows too");
+    check(model.state().jobs.back().stage_text == "Unpacking XoDen", "update: unpacking shows too");
 
     // Staged: the restart prompt; Restart asks to apply at quit and quits.
     update.phase = "staged";
     model.UpdateSelfUpdate(update);
     check(!model.state().navigation.modals.empty() &&
-              model.state().navigation.modals.back().title == "Playden 0.3.0 is ready",
+              model.state().navigation.modals.back().title == "XoDen 0.3.0 is ready",
           "update: a staged update asks for a restart");
     check(model.action("cross") && model.state().quit_requested &&
               model.TakeSelfUpdateRequests() == std::vector<std::string>{"restart"},
-          "update: Restart Playden applies the update at quit");
+          "update: Restart XoDen applies the update at quit");
 
     // Go back: offered when a previous version is kept, confirmed, then Playden quits for it.
     auto going_back = make_live(base);
@@ -902,11 +902,11 @@ void live_self_update(const std::filesystem::path& base) {
     kept.previous = "0.2.0";
     going_back.UpdateSelfUpdate(kept);
     check(find_row(going_back, "settings-update-back") &&
-              find_row(going_back, "settings-update-back")->title == "Go back to Playden 0.2.0",
+              find_row(going_back, "settings-update-back")->title == "Go back to XoDen 0.2.0",
           "update: Settings offers going back");
     activate(going_back, "settings-update-back");
     check(!going_back.state().navigation.modals.empty() &&
-              going_back.state().navigation.modals.back().title == "Go back to Playden 0.2.0?" &&
+              going_back.state().navigation.modals.back().title == "Go back to XoDen 0.2.0?" &&
               going_back.state().navigation.modals.back().focused_action == 1,
           "update: going back asks first, with Cancel focused");
     check(going_back.action("left") && going_back.action("cross") && going_back.state().quit_requested &&
@@ -935,11 +935,11 @@ void live_self_update(const std::filesystem::path& base) {
     fresh.current = "0.3.0";
     fresh.current_notes = "Faster downloads.";
     fresh.current_notes_url = "https://github.com/o/r/releases/tag/v0.3.0";
-    fresh.finished_message = "Playden was updated to 0.3.0.";
+    fresh.finished_message = "XoDen was updated to 0.3.0.";
     fresh.whats_new = true;
     updated.UpdateSelfUpdate(fresh);
     check(!updated.state().navigation.modals.empty() &&
-              updated.state().navigation.modals.back().title == "What's new in Playden 0.3.0" &&
+              updated.state().navigation.modals.back().title == "What's new in XoDen 0.3.0" &&
               updated.state().navigation.modals.back().body.find("Faster downloads.") != std::string::npos &&
               updated.state().navigation.modals.back().link == fresh.current_notes_url,
           "update: what's new opens with the notes and the release page");
@@ -952,7 +952,7 @@ void live_self_update(const std::filesystem::path& base) {
     check(find_row(updated, "settings-release-notes") != nullptr, "update: Settings lists the release notes");
     activate(updated, "settings-release-notes");
     check(!updated.state().navigation.modals.empty() &&
-              updated.state().navigation.modals.back().title == "Playden 0.3.0 release notes" &&
+              updated.state().navigation.modals.back().title == "XoDen 0.3.0 release notes" &&
               updated.state().navigation.modals.back().link == fresh.current_notes_url,
           "update: the release notes open from Settings");
 
@@ -963,18 +963,18 @@ void live_self_update(const std::filesystem::path& base) {
         check(late.UpdateLibrary({{}, false, {}, false, true, 100}), "update: empty library delivered");
         LiveSelfUpdate waiting;
         waiting.current = "0.3.0";
-        waiting.finished_message = "Playden was updated to 0.3.0.";
+        waiting.finished_message = "XoDen was updated to 0.3.0.";
         waiting.whats_new = true;
         late.UpdateSelfUpdate(waiting);
         check(!late.state().navigation.modals.empty() &&
-                  late.state().navigation.modals.back().title == "What's new in Playden 0.3.0",
+                  late.state().navigation.modals.back().title == "What's new in XoDen 0.3.0",
               "update: what's new opens before the games arrive");
         playden::GameSummary game;
         game.id = SteamId(220);
         game.title = "Half-Life 2";
         check(late.UpdateLibrary({{game}, false, {}, false, true, 100}), "update: games delivered");
         check(!late.state().navigation.modals.empty() &&
-                  late.state().navigation.modals.back().title == "What's new in Playden 0.3.0",
+                  late.state().navigation.modals.back().title == "What's new in XoDen 0.3.0",
               "update: the games arriving leave what's new open");
     }
 
@@ -997,7 +997,7 @@ void live_self_update(const std::filesystem::path& base) {
         available.available = "0.3.0";
         offered.UpdateSelfUpdate(available);
         check(!offered.state().navigation.modals.empty() &&
-                  offered.state().navigation.modals.back().title == "Playden 0.3.0 is available",
+                  offered.state().navigation.modals.back().title == "XoDen 0.3.0 is available",
               "update: the offer opens over the library");
         games.pop_back();
         games.erase(games.begin() + 2);
@@ -1019,12 +1019,12 @@ void live_self_update(const std::filesystem::path& base) {
     step.error = "The kit download failed.";
     failing.UpdateSelfUpdate(step);
     check(!failing.state().navigation.modals.empty() &&
-              failing.state().navigation.modals.back().title == "Playden update stopped" &&
+              failing.state().navigation.modals.back().title == "XoDen update stopped" &&
               failing.state().navigation.modals.back().body == "The kit download failed.",
           "update: a failed install is reported");
     check(failing.action("cross") && failing.state().navigation.modals.empty(), "update: OK closes the report");
     step.phase = "idle";
-    step.finished_message = "Playden was updated to 0.3.0.";
+    step.finished_message = "XoDen was updated to 0.3.0.";
     failing.UpdateSelfUpdate(step);
     check(failing.TakeSelfUpdateRequests() == std::vector<std::string>{"acknowledge"} &&
               std::any_of(failing.state().notices.begin(), failing.state().notices.end(),
@@ -1040,7 +1040,7 @@ void live_root_access_missing() {
     const auto& view = model.view();
     check(model.state().navigation.route == Route::Startup && view.title == "Root access is missing",
           "root access: the screen shows its title");
-    check(view.subtitle.find("Load kstuff and the autoloader, then open Playden again.") != std::string::npos,
+    check(view.subtitle.find("Load kstuff and the autoloader, then open XoDen again.") != std::string::npos,
           "root access: the body says how to fix it");
     const auto detail = std::find_if(view.rows.begin(), view.rows.end(),
                                      [](const auto& row) { return row.key == "root-detail"; });
@@ -1083,9 +1083,9 @@ void live_root_access_missing() {
     const std::string data_error = "managed runtime data root is inaccessible";
     granted.ShowRootAccessMissing(data_error, true);
     const auto& data_view = granted.view();
-    check(data_view.title == "Playden can't start", "root access: a data failure after the grant has its own title");
-    check(data_view.subtitle == "Playden has root access but can't use its data in /data/playden. "
-                                "Restart Playden; if it stays, check that folder's permissions over FTP.",
+    check(data_view.title == "XoDen can't start", "root access: a data failure after the grant has its own title");
+    check(data_view.subtitle == "XoDen has root access but can't use its data in /data/playden. "
+                                "Restart XoDen; if it stays, check that folder's permissions over FTP.",
           "root access: the body points at /data/playden");
     check(data_view.subtitle.find("kstuff") == std::string::npos, "root access: no kstuff advice after the grant");
     const auto data_detail = std::find_if(data_view.rows.begin(), data_view.rows.end(),
@@ -1101,32 +1101,32 @@ void live_root_access_missing() {
     struct Case { const char* error; bool granted; const char* title; const char* advice; };
     const Case cases[] = {
         {"native data grant failed (code 2); helper stage=find-helper status=unavailable error=2", false,
-         "Playden's app folder is incomplete", "Copy the whole app folder"},
-        {"launcher source identity is unavailable", false, "Playden's app folder is incomplete", "release zip"},
-        {"launcher source is invalid: trust store is unavailable", false, "Playden's app folder is incomplete",
+         "XoDen's app folder is incomplete", "Copy the whole app folder"},
+        {"launcher source identity is unavailable", false, "XoDen's app folder is incomplete", "release zip"},
+        {"launcher source is invalid: trust store is unavailable", false, "XoDen's app folder is incomplete",
          "console_title_deploy.py"},
         {"native data grant failed (code 2); helper stage=open-helper status=unavailable error=2", false,
-         "Playden's app folder is incomplete", "Copy the whole app folder"},
+         "XoDen's app folder is incomplete", "Copy the whole app folder"},
         {"native data grant failed (code 61); helper stage=connect status=unavailable error=61", false,
          "The ELF loader isn't running", "port 9021"},
         {"native data grant failed (code 50); helper stage=network status=unavailable error=50", false,
-         "Playden can't start", "network did not start"},
+         "XoDen can't start", "network did not start"},
         {"native data grant failed (code 55); helper stage=socket status=unavailable error=55", false,
-         "Playden can't start", "network did not start"},
+         "XoDen can't start", "network did not start"},
         {"native data grant failed (code 32); helper stage=stream-helper status=unavailable error=32", false,
          "Root access is missing", "Load the ELF loader again"},
         {"native data grant failed (code 60); helper stage=receive-prepare status=unavailable error=60", false,
          "Root access is missing", "firmware version"},
         {"native data grant failed (code 13); helper stage=helper-prepare status=6 error=1", false,
          "Root access is missing", "Load kstuff and the autoloader"},
-        {"stable launcher source is invalid: assets root is unavailable", true, "Playden's app folder is incomplete",
+        {"stable launcher source is invalid: assets root is unavailable", true, "XoDen's app folder is incomplete",
          "Copy the whole app folder"},
-        {"stable launcher source identity does not match", true, "Playden can't start", "restart the PS5"},
+        {"stable launcher source identity does not match", true, "XoDen can't start", "restart the PS5"},
         {"launcher is not installed in /data/homebrew/FAKE77031; helper stage=done status=0 error=0", true,
-         "Install Playden on console storage", "Playden runs only from /data/homebrew/FAKE77031, on the console's"},
-        {"launcher is not installed in /data/homebrew/FAKE77031", false, "Install Playden on console storage",
+         "Install XoDen on console storage", "XoDen runs only from /data/homebrew/FAKE77031, on the console's"},
+        {"launcher is not installed in /data/homebrew/FAKE77031", false, "Install XoDen on console storage",
          "set Settings > Install location to /data/homebrew, hold Uninstall"},
-        {"launcher is not installed in /data/homebrew/FAKE77031", false, "Install Playden on console storage",
+        {"launcher is not installed in /data/homebrew/FAKE77031", false, "Install XoDen on console storage",
          "move the app folder to /data/homebrew."},
     };
     for (const auto& item : cases) {
@@ -1136,7 +1136,7 @@ void live_root_access_missing() {
         const auto case_detail = std::find_if(case_view.rows.begin(), case_view.rows.end(),
                                               [](const auto& row) { return row.key == "root-detail"; });
         // The wrong-location screen says all there is to do; the others keep the error line for reports.
-        const bool elsewhere = item.title == std::string("Install Playden on console storage");
+        const bool elsewhere = item.title == std::string("Install XoDen on console storage");
         check(case_view.title == item.title && case_view.subtitle.find(item.advice) != std::string::npos &&
                   (elsewhere ? case_detail == case_view.rows.end()
                              : case_detail != case_view.rows.end() &&
@@ -1185,7 +1185,7 @@ void live_imported_game_steam_app_id(const std::filesystem::path& base) {
     std::filesystem::create_directories(base);
     auto model = make_live(base);
     model.SetGameSettingsFile(base / "imported-settings.json");
-    model.SetSettingsData({{"playden-default", "Playden default", "Most games", "", {}}}, {});
+    model.SetSettingsData({{"playden-default", "XoDen default", "Most games", "", {}}}, {});
     const auto id = playden::GameId::Local("6d1f3a52-0c55-4f3e-9b2a-5d1c7e0a9f11");
     playden::GameSummary game;
     game.id = id;

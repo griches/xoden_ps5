@@ -996,25 +996,25 @@ SteamStubResult UnpackSteamStubPrograms(const std::string& install_root, const s
     }
     result.found.push_back(relative);
     if (info.kind == SteamStubKind::kUnsupported)
-      return fail("This game's program has Steam DRM in a form Playden can't unpack yet.");
+      return fail("This game's program has Steam DRM in a form XoDen can't unpack yet.");
     std::uint64_t size = 0;
     mode_t mode = 0755;
     const int source = OpenRegular(path, &size, &mode);
-    if (source < 0) return fail("Playden could not read the game's " + relative + ".");
+    if (source < 0) return fail("XoDen could not read the game's " + relative + ".");
     // A first unpack, or a newer wrapped program from a game update: keep it first.
     if (RegularSize(orig) != size || !SameFile(orig, path, chunk)) {
       const auto kept = path.parent_path() / (".playden-" + orig.filename().string() + ".tmp");
       const int copy = CopyToTemporary(source, size, kept, mode, chunk);
       if (copy < 0 || !Commit(copy, kept, orig)) {
         ::close(source);
-        return fail("Playden could not keep a copy of the game's " + relative + ".");
+        return fail("XoDen could not keep a copy of the game's " + relative + ".");
       }
     }
     // The unpacked program is made in a copy next to it, then takes its place.
     const auto temporary = path.parent_path() / (".playden-" + path.filename().string() + ".tmp");
     const int file = CopyToTemporary(source, size, temporary, mode, chunk);
     ::close(source);
-    if (file < 0) return fail("Playden could not write the game's unpacked " + relative + ".");
+    if (file < 0) return fail("XoDen could not write the game's unpacked " + relative + ".");
     Image image;
     image.read = [&](std::uint64_t offset, void* buffer, std::size_t count) { return ReadAt(file, offset, buffer, count); };
     image.write = [&](std::uint64_t offset, const void* buffer, std::size_t count) {
@@ -1029,9 +1029,9 @@ SteamStubResult UnpackSteamStubPrograms(const std::string& install_root, const s
     if (!unpacked) {
       ::close(file);
       ::unlink(temporary.c_str());
-      return fail("Playden could not unpack the game's " + relative + ".");
+      return fail("XoDen could not unpack the game's " + relative + ".");
     }
-    if (!Commit(file, temporary, path)) return fail("Playden could not write the game's unpacked " + relative + ".");
+    if (!Commit(file, temporary, path)) return fail("XoDen could not write the game's unpacked " + relative + ".");
     result.changed.push_back(relative);
   }
   result.ok = true;

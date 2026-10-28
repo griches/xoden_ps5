@@ -537,7 +537,7 @@ int main() {
     root_only_on_this_thread();
     CHECK(!Exists(fixture.root + "/playden/self-update/state.json"));
     next.Check(false);  // queued behind the cleanup, not dropped
-    CHECK(next.Snapshot().finished_message == "Playden was updated to 0.3.0." && !next.Snapshot().finished_failed);
+    CHECK(next.Snapshot().finished_message == "XoDen was updated to 0.3.0." && !next.Snapshot().finished_failed);
     // What's new: the release notes travel with the update and stay for Settings.
     CHECK(next.Snapshot().whats_new && next.Snapshot().current_notes == "New things." &&
           next.Snapshot().current_notes_url == "https://github.com/o/r/releases/tag/v0.3.0");
@@ -568,7 +568,7 @@ int main() {
     CHECK(Read(fixture.root + "/user/appmeta/FAKE77031/param.json") == "old param");
     UpdateService back(record_root(fixture.Config({0, 2, 0})));
     back.Start();
-    CHECK(back.Snapshot().finished_message == "Playden went back to version 0.2.0." && back.Snapshot().previous.empty());
+    CHECK(back.Snapshot().finished_message == "XoDen went back to version 0.2.0." && back.Snapshot().previous.empty());
     CHECK(!Exists(fixture.root + "/playden/self-update/state.json"));
     Wait(back);
     root_only_on_this_thread();
@@ -662,7 +662,7 @@ int main() {
     {
       UpdateService back(fixture.Config({0, 2, 0}));
       back.Start();
-      CHECK(back.Snapshot().finished_message == "Playden went back to version 0.2.0.");
+      CHECK(back.Snapshot().finished_message == "XoDen went back to version 0.2.0.");
       Wait(back);
       CHECK(Exists(kits + "/oldkit/runtime/wine.bin") && Exists(kits + "/kitid/runtime/wine.bin"));
       // Updating again finds the new kit in place: only the app is downloaded.

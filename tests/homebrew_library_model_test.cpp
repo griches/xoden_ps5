@@ -384,7 +384,7 @@ void live_install_volumes() {
               && volumes[1].reserved_bytes == 800, "a reported drive uses its own figures plus full install reservations");
     check(!volumes[2].available, "an absent drive stays listed as unavailable");
     check(volumes[3].available && !volumes[3].writable && volumes[3].capacity_known && volumes[3].capacity_bytes == 4'000,
-          "an attached drive Playden can't write to keeps its space report");
+          "an attached drive XoDen can't write to keeps its space report");
 
     // Settings shows the default and changes it through the install service.
     model.action("l1");
@@ -396,7 +396,7 @@ void live_install_volumes() {
           "the picker lists every drive and disables an absent one");
     const auto* locked = find_row(model, "volume-ext0");
     check(locked && !locked->enabled && locked->subtitle == "No write access" && usb->subtitle == "Disconnected",
-          "an attached drive Playden can't write to is told apart from an absent one");
+          "an attached drive XoDen can't write to is told apart from an absent one");
     const auto* m2 = find_row(model, "volume-m2");
     check(m2 && m2->value.find("free") != std::string::npos, "a reported drive shows its free space");
     activate(model, "volume-m2");
@@ -1061,8 +1061,8 @@ void live_uninstall_removes_title_and_keeps_saves() {
           "a stopped uninstall says why in a dialog with OK");
     activate(model, "alert-ok");
     check(model.state().navigation.modals.empty(), "OK dismisses the failure dialog");
-    model.NotifyPlayStopped(SteamId(42), "This game's program has Steam DRM that Playden can't unpack on the PS5 yet.");
-    model.NotifyPlayStopped(SteamId(42), "This game's program has Steam DRM that Playden can't unpack on the PS5 yet.");
+    model.NotifyPlayStopped(SteamId(42), "This game's program has Steam DRM that XoDen can't unpack on the PS5 yet.");
+    model.NotifyPlayStopped(SteamId(42), "This game's program has Steam DRM that XoDen can't unpack on the PS5 yet.");
     check(model.state().navigation.modals.size() == 1 && model.state().navigation.modals.back().title == "Can't play" &&
               model.state().navigation.modals.back().body.find("Steam DRM") != std::string::npos,
           "a refused Play says why, once however often it is pressed");
@@ -1205,7 +1205,7 @@ void live_storage_section_and_installed_games() {
     std::vector<std::string> sections;
     for (const auto& row : model.view().rows)
         if (sections.empty() || sections.back() != row.section) sections.push_back(row.section);
-    check(sections == std::vector<std::string>{"Account", "Library", "Storage", "Display", "Updates", "About", "Quit Playden"},
+    check(sections == std::vector<std::string>{"Account", "Library", "Storage", "Display", "Updates", "About", "Quit XoDen"},
           "the rail order is Account, Library, Storage, Display, Updates, About, Quit");
     const auto* empty = find_row(model, "settings-installed");
     check(empty && !empty->enabled && empty->value == "None", "nothing installed says None");
@@ -1589,7 +1589,7 @@ void live_ready_to_play_quits_to_home() {
     model.UpdateInstalls({}, {{SteamId(42), 600'000'000}, {SteamId(43), 100}});
     LiveRuntimeGame waiting; waiting.game_id = SteamId(42); waiting.status = "Waiting for the PS5"; waiting.awaiting_registration = true;
     waiting.can_prepare = true; waiting.has_title = true;
-    waiting.detail = "Waiting for the PS5, which adds the game to Home when Playden quits";
+    waiting.detail = "Waiting for the PS5, which adds the game to Home when XoDen quits";
     model.UpdateRuntime(RuntimeState::Ready, {waiting});
 
     // Details: Finish setup quits to Home without asking; SETUP explains the pending registration.
@@ -1714,7 +1714,7 @@ void live_ready_to_play_quits_to_home() {
     check(!busy.state().quit_requested, "still waiting while it prepares");
     busy.UpdateRuntime(RuntimeState::Ready, {waiting, prepared});
     check(busy.state().quit_requested && !busy.state().quit_waiting && busy.state().navigation.modals.empty(),
-          "Playden quits once the preparation is done");
+          "XoDen quits once the preparation is done");
     // Games queued while none is being prepared (between two): the quit waits until the queue is held.
     auto queued = make_live();
     queued.UpdateAccount({AuthState::SignedIn, "123", "Synthetic", {}, {}, true});
@@ -1730,7 +1730,7 @@ void live_ready_to_play_quits_to_home() {
               queued.state().navigation.modals.back().title == "Waiting for the queue",
           "a queued game holds the quit");
     queued.UpdateRuntime(RuntimeState::Ready, {waiting, next});
-    check(queued.state().quit_requested, "with the queue held and nothing preparing, Playden quits");
+    check(queued.state().quit_requested, "with the queue held and nothing preparing, XoDen quits");
     auto cancelled = make_live();
     cancelled.UpdateAccount({AuthState::SignedIn, "123", "Synthetic", {}, {}, true});
     check(cancelled.UpdateLibrary({{game(SteamId(42), "Synthetic"), game(SteamId(43), "Other")}, false, {}, false, false, {}}), "library loaded");
@@ -1741,7 +1741,7 @@ void live_ready_to_play_quits_to_home() {
     activate(cancelled, "details-play");
     activate(cancelled, "cancel");
     cancelled.UpdateRuntime(RuntimeState::Ready, {waiting, prepared});
-    check(!cancelled.state().quit_requested && !cancelled.state().quit_waiting, "Cancel keeps Playden open");
+    check(!cancelled.state().quit_requested && !cancelled.state().quit_waiting, "Cancel keeps XoDen open");
     // A game held behind another game's preparation says what it waits for.
     auto held = make_live();
     held.UpdateAccount({AuthState::SignedIn, "123", "Synthetic", {}, {}, true});
@@ -1833,11 +1833,11 @@ void live_play_does_the_next_useful_thing() {
         {"Kit update available", "Play", "Kit update first", "", "Kit update available", "busy", "runtime-play"},
         {"Needs repair", "Play", "Repairs first", "Some of Synthetic's setup files changed.", "Needs repair", "attention", "runtime-play"},
         {"Needs recovery", "Finish setup", "", "Setup stopped early.", "Interrupted", "attention", "runtime-prepare"},
-        {"Waiting for the PS5", "Finish setup", "Quits to Home", "Quit Playden and Synthetic appears on the PS5 Home screen.", "Waiting for the PS5", "busy", "quit-to-home"},
+        {"Waiting for the PS5", "Finish setup", "Quits to Home", "Quit XoDen and Synthetic appears on the PS5 Home screen.", "Waiting for the PS5", "busy", "quit-to-home"},
         {"Failed", "Finish setup", "", "Setup failed.", "Failed", "problem", "runtime-prepare"},
         {"Registration pending", "Check again", "", "The PS5 hasn't confirmed Synthetic yet.", "Not confirmed", "attention", "runtime-prepare"},
         {"Removal incomplete", "Finish removing", "", "Removing Synthetic from the PS5 Home screen stopped partway.", "Removing", "attention", "runtime-remove-retry"},
-        {"No kit", "Open Settings", "", "Playden needs its runtime kit to set up games.", "No kit", "problem", ""},
+        {"No kit", "Open Settings", "", "XoDen needs its runtime kit to set up games.", "No kit", "problem", ""},
     };
     for (const auto& expected : cases) {
         LiveRuntimeGame state; state.game_id = SteamId(42); state.status = expected.status;
@@ -2316,7 +2316,7 @@ void live_sign_in_on_full_storage_offers_uninstall() {
     model.UpdateInstalls({}, {{SteamId(12), 5 * gb, "internal"}, {SteamId(13), 1 * gb, "internal"}});
     playden::homebrew::AccountUpdate full;
     full.authentication = AuthState::Failed;
-    full.error = "Playden can't save your sign-in.";
+    full.error = "XoDen can't save your sign-in.";
     full.storage_full = true;
     model.UpdateAccount(full);
     check(model.view().title == "Console storage is full", "a sign-in that can't be saved says storage is full");
@@ -2354,7 +2354,7 @@ const playden::homebrew::ViewRow* queue_row(const Simulation& model, const std::
     return nullptr;
 }
 
-// Queue: an imported game copied into Playden runs in Downloads, counted as copying, not downloading.
+// Queue: an imported game copied into XoDen runs in Downloads, counted as copying, not downloading.
 void live_queue_counts_copies() {
     using namespace playden::homebrew;
     auto model = make_live();
@@ -2903,8 +2903,8 @@ void live_import_sheet_sends_requests() {
               model.view().subtitle.rfind("Starts with Delores.exe, which you can change in Game settings.", 0) == 0,
           "one program besides an installer skips the program list");
     check(model.view().surface == "import-choice" && find_row(model, "import-play-in-place")->title == "Play from the drop folder" &&
-              find_row(model, "import-copy")->title == "Import into Playden" && !has_row(model, "import-move"),
-          "a drop-folder game plays from there or is imported into Playden");
+              find_row(model, "import-copy")->title == "Import into XoDen" && !has_row(model, "import-move"),
+          "a drop-folder game plays from there or is imported into XoDen");
     activate(model, "import-play-in-place");
     requests = model.TakeImportRequests();
     check(requests.size() == 1 && requests.front().kind == ImportRequestKind::Add && requests.front().volume_id == "internal" &&
@@ -2961,13 +2961,13 @@ void live_import_choice_and_details() {
               find_row(model, "import-play-in-place")->subtitle.find("characters the PS5 can't start a game from") != std::string::npos &&
               model.state().navigation.focus_key == "import-copy" &&
               model.view().subtitle == "Starts with Rally.exe, which you can change in Game settings. "
-                                        "You can import it into Playden later from the game's page.",
+                                        "You can import it into XoDen later from the game's page.",
           "a folder the PS5 can't play from can only be imported");
     activate(model, "import-play-in-place");
     check(model.view().surface == "import-choice" && model.TakeImportRequests().empty(), "its Play from the drive does nothing");
     model.action("circle");
 
-    // A drive folder: play in place, or Import into Playden with its size (no estimate), then the drive.
+    // A drive folder: play in place, or Import into XoDen with its size (no estimate), then the drive.
     activate(model, "import-candidate-usb0:playden/import/Rally");
     check(find_row(model, "import-play-in-place")->title == "Play from the USB drive" &&
               find_row(model, "import-play-in-place")->value.empty() &&
@@ -3020,26 +3020,26 @@ void live_import_choice_and_details() {
     model.UpdateInstalls({}, {});
 
     // Its page while it plays from the drive, then while it copies.
-    check(find_row(model, "details-copy") && find_row(model, "details-copy")->title == "Import into Playden" &&
+    check(find_row(model, "details-copy") && find_row(model, "details-copy")->title == "Import into XoDen" &&
               find_row(model, "details-remove") && !has_row(model, "details-cloud") && !has_row(model, "details-uninstall"),
-          "an imported game on a drive offers Copy into Playden and Remove from library");
-    // The page's Import into Playden opens step 2 with the folder's size (from the scan, the game has none).
+          "an imported game on a drive offers Copy into XoDen and Remove from library");
+    // The page's Import into XoDen opens step 2 with the folder's size (from the scan, the game has none).
     activate(model, "details-copy");
     check(model.view().surface == "import-storage" && model.view().subtitle == "8.9 GB will be copied there." &&
               !find_row(model, "volume-usb0")->enabled && model.view().eyebrow == "Import games · Rally",
-          "the page's Import into Playden opens the drive choice with the folder's size");
+          "the page's Import into XoDen opens the drive choice with the folder's size");
     model.action("circle");
     check(model.state().navigation.modals.empty(), "Back closes the page's drive choice");
     // A folder the PS5 can't play from (its name) still offers the copy.
     model.UpdateExternalGames({{id, "usb0", true, "The game's folder name has characters the PS5 can't play from."}});
     check(has_row(model, "details-installed") && has_row(model, "details-copy") && has_row(model, "details-remove"),
-          "a copy-only folder says why and offers Import into Playden");
+          "a copy-only folder says why and offers Import into XoDen");
     model.UpdateExternalGames({{id, "usb0", true, ""}});
     model.UpdateInstalls({{id, playden::homebrew::JobState::Downloading, 4'450'000'000, 8'900'000'000, {}, "usb1"}}, {});
     const auto* copying = find_row(model, "details-download");
     check(copying && copying->title == "Copying" && copying->progress > 0.49F && copying->progress < 0.51F &&
               !has_row(model, "details-copy") && !find_row(model, "details-remove")->enabled,
-          "the copy's progress replaces Import into Playden");
+          "the copy's progress replaces Import into XoDen");
     // A failed copy can be cancelled from the page; the game plays in place again.
     model.UpdateInstalls({{id, playden::homebrew::JobState::Failed, 4'450'000'000, 8'900'000'000, "Copy failed", "usb1"}}, {});
     check(find_row(model, "details-cancel-copy") && !find_row(model, "details-remove")->enabled, "a failed copy offers Cancel copy");
@@ -3154,7 +3154,7 @@ void xbox_install_does_not_wait_for_steam() {
     check(!has_row(model,"details-xbox-discard"),"completed cleanup removes its action");
     const std::string content = "11111111-1111-4111-8111-111111111111";
     model.UpdateXboxPackages(id,{{content,"PC edition",1024}});
-    check(has_row(model,"xbox-package-0"),"package selection opens in Playden");
+    check(has_row(model,"xbox-package-0"),"package selection opens in XoDen");
     activate(model,"xbox-package-0");
     const auto choice = model.TakeInstallRequests();
     check(choice.size() == 1 && choice.front().game_id == id && choice.front().xbox_content_id == content,"selected package keeps its product binding");
@@ -3248,10 +3248,12 @@ void xbox_browser_pairing_is_transient_and_cancellable() {
     activate(model,"settings-xbox-account");activate(model,"xbox-browser-signin");
     check(model.TakeXboxBrowserSignIn() && !model.TakeXboxBrowserSignIn(),"browser sign-in requests one account operation");
     model.UpdateXboxBrowserSignIn("Pairing","0123456789abcdef",true);
-    check(model.view().subtitle.find("0123 4567 89AB CDEF")!=std::string::npos,"browser fingerprint is grouped for pairing");
-    check(model.view().subtitle.find("http://127.0.0.1:47832")!=std::string::npos,"sign-in displays the page address without helper jargon");
+    check(model.view().pairing_code=="0123 4567 89AB CDEF","browser fingerprint is grouped separately for pairing");
+    check(model.view().pairing_url=="http://127.0.0.1:47832","sign-in displays the page address without helper jargon");
+    check(model.view().subtitle.find("0123")==std::string::npos,"the large code is separate from the instructions");
     check(model.state().navigation.modals.back().link.empty(),"browser pairing never pretends to be a Microsoft device-code link");
     model.UpdateXboxBrowserSignIn("Invalid code hidden","untrusted-value",true);
+    check(model.view().pairing_code.empty() && model.view().pairing_url.empty(),"invalid codes clear all pairing display data");
     check(model.view().subtitle.find("untrusted-value")==std::string::npos,"invalid browser pairing data is hidden");
     model.action("circle");check(model.TakeXboxPhoneCancel(),"closing active browser sign-in requests cancellation");
 }

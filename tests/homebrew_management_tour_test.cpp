@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
     choose(importing, "details-copy");
     require(importing.view().surface == "import-storage" && has_row(importing, "volume-internal") &&
                 !has_row(importing, "import-play-in-place"),
-            "Import into Playden asks for the drive");
+            "Import into XoDen asks for the drive");
     choose(importing, "volume-internal");
     require(importing.state().navigation.route == Route::Details && has_row(importing, "details-download") &&
                 !has_row(importing, "details-copy"),
@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
     for (int tick = 0; tick < 600 && has_row(importing, "details-download"); ++tick) importing.tick(1);
     require(!has_row(importing, "details-download") && has_row(importing, "details-uninstall") &&
                 !has_row(importing, "details-remove") && has_row(importing, "details-play"),
-            "the copy finishes: the game plays from Playden and uninstalls");
+            "the copy finishes: the game plays from XoDen and uninstalls");
     choose(importing, "details-uninstall");
     require(importing.state().navigation.focus_key == "cancel", "uninstall defaults to decline");
     choose(importing, "confirm-destructive");

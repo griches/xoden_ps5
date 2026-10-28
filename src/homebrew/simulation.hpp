@@ -501,6 +501,8 @@ struct ModalEntry {
     std::string body;  // explanatory text; empty uses the simulation's default wording
     std::string setting_id;  // Game settings picker: the catalogue setting being chosen
     std::string link;  // a validated web page shown as a QR code with its address
+    std::string pairing_code;  // validated, grouped code shown separately from instructions
+    std::string pairing_url;
 };
 
 struct Navigation {
@@ -670,6 +672,8 @@ struct ViewData {
     std::string title;
     std::string subtitle;
     std::string eyebrow;  // a sheet's label above its title; empty: the sheet's place (view.cpp)
+    std::string pairing_code;
+    std::string pairing_url;
     std::vector<ViewRow> rows;
     std::vector<ViewRow> actions;
     struct Shelf {

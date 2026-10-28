@@ -68,7 +68,7 @@ constexpr std::int64_t kPreflightFreshMs = 5000;
 // The console's process list could not show whether the title runs (the reason is in
 // runtime.log). Closing the game cannot help when no game runs; a restart usually does.
 constexpr char kActivityUnknown[] =
-    "The PS5 could not tell Playden whether the game is running. Restart the PS5, then try again.";
+    "The PS5 could not tell XoDen whether the game is running. Restart the PS5, then try again.";
 
 // A relocated game's republish refused because its old publication can't be verified against the
 // new folder (VerifyMovedPublication, or the title's artifacts): only a new title gets past that.
@@ -656,7 +656,7 @@ std::string RuntimeHost::KitReplaced(const Composition& c) const {
   if (!c.kit || c.kit->manifest_sha256.empty() || !config_.package_operations.hash_file) return {};
   const auto current = config_.package_operations.hash_file(c.kit->view.root / "manifest.json");
   if (current && *current == c.kit->manifest_sha256) return {};
-  return "The runtime kit changed while Playden was running. Quit Playden and start it again.";
+  return "The runtime kit changed while XoDen was running. Quit XoDen and start it again.";
 }
 
 // What a game's preparation steps work from: its recipe and effective settings, its folder, the bottle
@@ -997,7 +997,7 @@ void RuntimeHost::MfcStep(const GameFiles& files) {
     if (downloads)
       fetch = [&](const std::string& url, std::uint64_t offset, std::uint64_t length, std::string* error) -> std::optional<std::string> {
         if (cancel_downloads_) {
-          *error = "Playden is closing";
+          *error = "XoDen is closing";
           return std::nullopt;
         }
         if (redist_work_.play_app && !shown) {
@@ -1019,7 +1019,7 @@ void RuntimeHost::MfcStep(const GameFiles& files) {
     if (result.download_failed) redist_download_failed_[redist->sha256] = std::chrono::steady_clock::now();
     const bool not_downloaded = !fetch && !waits;  // no kept copy, and this work doesn't download
     if (not_downloaded)
-      Log(line + " waits for Play: " + (redist_work_.downloads ? std::string("Playden can't download here")
+      Log(line + " waits for Play: " + (redist_work_.downloads ? std::string("XoDen can't download here")
                                                                  : std::string("start-up and background work don't download")));
     else if (waits && !result.download_failed)
       Log(line + " skipped: its download failed " +
@@ -1300,7 +1300,7 @@ rt::NativeActivity RuntimeHost::ActivityNow(std::uint32_t app_id, std::chrono::m
 RuntimeRelocationResult RuntimeHost::Relocate(RuntimeRelocation request, std::chrono::milliseconds timeout) {
   RuntimeRelocationResult busy;
   busy.outcome = RuntimeRelocationResult::Outcome::kBusy;
-  busy.message = "Playden is busy with this game. Try again in a moment.";
+  busy.message = "XoDen is busy with this game. Try again in a moment.";
   RuntimeRelocationResult closing = busy;
   closing.message = kRelocationClosing;
   auto pending = std::make_shared<PendingRelocation>();
@@ -1455,7 +1455,7 @@ rt::PackageActionResult RuntimeHost::DrivePublication(Composition& c, const rt::
   const rt::GameRecipe* recipe = nullptr;
   for (const auto& candidate : c.recipes)
     if (RecipeFits(candidate, record) && candidate.id == record.recipe_id) recipe = &candidate;
-  if (!recipe) return failed("recipe-unavailable", "Playden no longer knows how to start this game; prepare it again.");
+  if (!recipe) return failed("recipe-unavailable", "XoDen no longer knows how to start this game; prepare it again.");
   rt::SettingsLaunchInput input;
   input.recipe = recipe;
   input.record = config_.settings_record
@@ -1768,7 +1768,7 @@ std::string RuntimeHost::PublishSavedSettings(Composition& c, const rt::RuntimeI
     if (RecipeFits(candidate, record) && candidate.id == record.recipe_id &&
         std::to_string(candidate.version) == record.recipe_version)
       recipe = &candidate;
-  if (!recipe) return again("Playden no longer knows how to start this game; prepare it again.");
+  if (!recipe) return again("XoDen no longer knows how to start this game; prepare it again.");
   // Older generated Xbox recipes may name the Unreal bootstrap. Refresh only
   // automatic entries; an explicitly chosen program remains the player's choice.
   std::optional<rt::GameRecipe> refreshed_xbox;
@@ -2322,14 +2322,14 @@ void RuntimeHost::RunPlay(Composition& c, std::uint32_t app_id) {
         // Its folder moved in 0.6: the title starts only once its publication names the new one.
         if (!idle) {
           auto busy = MaintenanceRefusal(c, *record);
-          settings = "This game needs an update for Playden 0.6 first: " + (busy.empty() ? "Close the game first." : busy);
+          settings = "This game needs an update for XoDen 0.6 first: " + (busy.empty() ? "Close the game first." : busy);
         } else {
           Publish([&](RuntimeSnapshot& s) { s.play_progress[app_id] = kPlayUpdatingForLayout; });
           bool again = false;
           settings = RepublishSettings(c, *record, nullptr, true, &again);
           Publish([&](RuntimeSnapshot& s) { s.play_progress.erase(app_id); });
           if (!settings.empty())
-            settings = "This game could not be updated for Playden 0.6: " + settings + (again ? kRecreateHint : "");
+            settings = "This game could not be updated for XoDen 0.6: " + settings + (again ? kRecreateHint : "");
           Log("play moved app=" + std::to_string(app_id) + " " + (settings.empty() ? "republished" : settings));
         }
       } else if (idle) {
@@ -2624,7 +2624,7 @@ const rt::GameRecipe* RuntimeHost::RecipeForPrepare(Composition& c, const Runtim
   const auto written = c.storage.WriteAtomicPrivate(GeneratedRecipeFile(generated.id), Bytes(text.begin(), text.end()));
   if (!written.ok()) {
     Log("generated recipe write failed app=" + std::to_string(request.runtime_number) + " message=" + written.message());
-    *reason = "Playden could not save how to start this game.";
+    *reason = "XoDen could not save how to start this game.";
     return nullptr;
   }
   Log("generated recipe app=" + std::to_string(request.runtime_number) + " detected=" + generated.detected +
@@ -2676,7 +2676,7 @@ std::string RuntimeHost::RunPrepare(Composition& c, const RuntimePrepareRequest&
   // A game being started or played keeps its title and bottle as they are.
   if (c.launch_journal) {
     const auto pending = c.launch_journal->LoadPending();
-    if (!pending.ok) return "The launch record cannot be read; restart Playden before preparing.";
+    if (!pending.ok) return "The launch record cannot be read; restart XoDen before preparing.";
     if (pending.session && pending.session->install_id == ToInstallId(GameOf(request.game, request.runtime_number)))
       return "Close the game before updating or repairing its PS5 title.";
   }
@@ -3056,7 +3056,7 @@ std::string RuntimeHost::RunPrepare(Composition& c, const RuntimePrepareRequest&
         // Only a ShadowMountPlus that does not answer at all is fixed by loading it again.
         if (report.shadowmount.reason == "no-response")
           return "ShadowMountPlus isn't answering. Load it again (or restart the PS5 and jailbreak it again), then try again.";
-        return "Playden could not check that a PS5 title is free for this game. Try again; if it still fails, "
+        return "XoDen could not check that a PS5 title is free for this game. Try again; if it still fails, "
                "open Logs in Settings for details.";
       }
       Log(log_prefix + " occupied=" + std::to_string(occupied) + (first_occupied.empty() ? "" : " first=" + first_occupied));
@@ -3341,7 +3341,7 @@ std::string RuntimeHost::MaintenanceRefusal(Composition& c, const rt::RuntimeIns
   if (record.journal) return "Finish the PS5 title's recovery first.";
   if (!c.launch_journal) return "Play is unavailable.";
   const auto pending = c.launch_journal->LoadPending();
-  if (!pending.ok) return "The launch record cannot be read; restart Playden.";
+  if (!pending.ok) return "The launch record cannot be read; restart XoDen.";
   if (pending.session) return "Close the game first.";
   const auto activity = c.coordinator->Activity(record.title_id);
   if (activity == rt::NativeActivity::kUnknown) return kActivityUnknown;
@@ -3362,7 +3362,7 @@ std::string RuntimeHost::RunMaintenance(Composition& c, std::uint32_t app, Runti
   if (const auto replaced = KitReplaced(c); !replaced.empty()) return replaced;
   if (const auto refused = MaintenanceRefusal(c, *record); !refused.empty()) {
     // Settings saved while the game runs reach it on the next Play from Playden.
-    if (action == RuntimeMaintenance::kApplySettings) return "Changes apply the next time Playden starts the game.";
+    if (action == RuntimeMaintenance::kApplySettings) return "Changes apply the next time XoDen starts the game.";
     return refused;
   }
   switch (action) {
@@ -3449,7 +3449,7 @@ std::string RuntimeHost::RunMaintenance(Composition& c, std::uint32_t app, Runti
       Log("maintenance backup app=" + std::to_string(app) + " stamp=" + stamp);
       PublishInstalls(c, record->install_id);
       *ok = true;
-      return "Saves backed up. Playden keeps the newest " + std::to_string(kSaveBackupsKept) + " backups.";
+      return "Saves backed up. XoDen keeps the newest " + std::to_string(kSaveBackupsKept) + " backups.";
     }
   }
   return {};
@@ -3527,7 +3527,7 @@ std::string RuntimeHost::RunRemove(Composition& c, std::uint32_t app, bool delet
     PublishInstalls(c);
     if (!loaded.ok()) {
       Log("remove records unavailable: " + loaded.message());
-      return "Playden's records of PS5 titles cannot be read: " + loaded.message() + ".";
+      return "XoDen's records of PS5 titles cannot be read: " + loaded.message() + ".";
     }
     Log("remove records read again installs=" + std::to_string(c.repository.Snapshot().size()));
   }
@@ -3539,7 +3539,7 @@ std::string RuntimeHost::RunRemove(Composition& c, std::uint32_t app, bool delet
   if (!config_.unregister_title) return "Removing PS5 titles is not available in this build.";
   if (c.launch_journal) {
     const auto pending = c.launch_journal->LoadPending();
-    if (!pending.ok) return "The launch record cannot be read; restart Playden before uninstalling.";
+    if (!pending.ok) return "The launch record cannot be read; restart XoDen before uninstalling.";
     if (pending.session && pending.session->install_id == record.install_id)
       return "Close the game before uninstalling it.";
   }
@@ -3602,11 +3602,11 @@ std::string RuntimeHost::RunRemove(Composition& c, std::uint32_t app, bool delet
     struct stat info{};
     if (lstat(source.c_str(), &info) == 0) {
       if (!S_ISDIR(info.st_mode) || info.st_uid != geteuid())
-        return fail("source-foreign", "The PS5 title's folder is not Playden's; it was left as it is.");
+        return fail("source-foreign", "The PS5 title's folder is not XoDen's; it was left as it is.");
       std::string reason;
       const auto trash = config_.state_root / "trash";
       if (!rt::EnsurePrivateDirectories(config_.boundary, config_.state_root, trash, &reason))
-        return fail("trash-unavailable", "Playden could not prepare its private trash: " + reason);
+        return fail("trash-unavailable", "XoDen could not prepare its private trash: " + reason);
       const auto retired = trash / (record.title_id + "-" + record.journal->operation_id);
       if (rename(source.c_str(), retired.c_str()) != 0)
         return fail("retire-failed", "The PS5 title's folder could not be moved away (error " +
@@ -3634,7 +3634,7 @@ std::string RuntimeHost::RunRemove(Composition& c, std::uint32_t app, bool delet
     }
     if (listed) {
       if (!result.sent)
-        return fail("remover-unavailable", "Playden could not start its title remover. Retry to try again.");
+        return fail("remover-unavailable", "XoDen could not start its title remover. Retry to try again.");
       if (result.code && *result.code != 0) {
         char code[16]; std::snprintf(code, sizeof(code), "0x%08x", static_cast<unsigned>(*result.code));
         return fail("unregister-refused", std::string("The console refused to remove the PS5 title (") + code + ").");
@@ -3862,7 +3862,7 @@ bool RuntimeHost::RunServices() {
             if (RecipeFits(recipe, record) && recipe.id == record.recipe_id &&
                 std::to_string(recipe.version) == record.recipe_version)
               return rt::CompatibilityResult{true, {}};
-          return rt::CompatibilityResult{false, "Playden no longer knows how to start this game; prepare it again."};
+          return rt::CompatibilityResult{false, "XoDen no longer knows how to start this game; prepare it again."};
         },
         [this] { return Stopping(); },
         [this, &c](const rt::RuntimeInstall& record) { return DrivePublication(c, record); });

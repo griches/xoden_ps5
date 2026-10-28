@@ -222,7 +222,7 @@ void TestBurnBundle() {
   CHECK(!ReadBurnMsiPackage(MfcBundle(true), "vcRuntimeAdditional_arm64", &package, &reason));
   CHECK(reason == "the bundle has no package vcRuntimeAdditional_arm64");
   CHECK(!ReadBurnMsiPackage("MZ not a bundle", "x", &package, &reason));
-  CHECK(reason == "not a setup bundle Playden can read");
+  CHECK(reason == "not a setup bundle XoDen can read");
   // A payload that isn't the size the manifest lists is refused.
   auto bundle = MfcBundle(true);
   const auto listed = "FileSize=\"" + std::to_string(MfcCabinet(true).size()) + "\"";
@@ -434,7 +434,7 @@ void TestMfcInstall() {
   WriteText(kept, "damaged");
   const auto third = MakeBottle(base / "three");
   result = InstallMfcRuntime(x64, cache.string(), third.string(), nullptr, 1700000300);
-  CHECK(result.result == "failed" && result.detail == "Playden can't download it here" && !std::filesystem::exists(kept));
+  CHECK(result.result == "failed" && result.detail == "XoDen can't download it here" && !std::filesystem::exists(kept));
   CHECK(!std::filesystem::exists(third / ".playden-redist"));
   result = InstallMfcRuntime(x64, cache.string(), third.string(), fetch, 1700000300);
   CHECK(result.result == "installed" && result.source == "download" && ReadText(kept) == x64_bundle);

@@ -164,7 +164,7 @@ bool start_xbox_handoff(const std::string& request_id, const std::string& worker
                         const std::string& package_root, std::string* error, bool game_session = false) {
     playden::Storage storage("/data/playden/xbox"), package(package_root);
     const auto elf = package.Read("xbox-handoff.elf", 1024 * 1024);
-    if (!elf.ok()) { *error = "The Xbox handoff helper is missing from Playden."; return false; }
+    if (!elf.ok()) { *error = "The Xbox handoff helper is missing from XoDen."; return false; }
     const auto text = request_id + "\n" + worker + "\n" PLAYDEN_PS5_TITLE_ID "\n" +
         (game_session ? std::string("game-session\n") : std::string{});
     if (!storage.WriteAtomicPrivate("handoff-request.txt", playden::Bytes(text.begin(),text.end())).ok()) {
@@ -230,7 +230,7 @@ std::vector<playden::steam::InstallRequest> take_install_requests(bool runtime_r
 void show_root_access_missing(hui::ps5::Display& display, const playden::ps5::NativeAccessResult& access) {
     // granted: the grant ran but its data (/data/playden) failed; the screen says so.
     const char* what = access.granted ? "runtime data unusable after the grant" : "root access missing";
-    hui::sys::log("Playden %s: %s", what, access.error.c_str());
+    hui::sys::log("XoDen %s: %s", what, access.error.c_str());
     playden::app::AppendLogLine("/app0/logs", "launch.log", std::string(what) + ": " + access.error);
     // The pad belongs to a user; the bootstrap may have stopped before UserService started.
     sceUserServiceInitialize(nullptr);
@@ -264,7 +264,7 @@ int main() {
     auto native_access = playden::ps5::PrepareNativeStartup(PLAYDEN_PS5_TITLE_ID);
     hui::ps5::Display display;
     if (display.width() <= 0 && !display.open(3840, 2160)) {
-        hui::sys::log("Playden Hui display failed"); hui::sys::park();
+        hui::sys::log("XoDen Hui display failed"); hui::sys::park();
     }
 #if PLAYDEN_UI_SIMULATION
     // Fixtures need only the package.
@@ -288,7 +288,7 @@ int main() {
     playden::app::AppendLogLine(log_root, "launch.log", "display open width=" + std::to_string(display.width()) +
                                                         " height=" + std::to_string(display.height()));
     if (!native_access.runtime_ready)
-        hui::sys::log("Playden native runtime unavailable: %s", native_access.error.c_str());
+        hui::sys::log("XoDen native runtime unavailable: %s", native_access.error.c_str());
     {
 #if PLAYDEN_UI_SIMULATION
         mkdir((paths.title_root + "/playden-hui-comparison").c_str(), 0777);
@@ -476,7 +476,7 @@ int main() {
         update_config.local_release_dir = paths.title_root + "/dev/update-local";
         playden::update::UpdateService self_update(std::move(update_config));
         playden::app::AppendLogLine(log_root, "update.log",
-                                    "self-update: Playden " + playden::update::CurrentVersion().ToString() + " started");
+                                    "self-update: XoDen " + playden::update::CurrentVersion().ToString() + " started");
         self_update.Start();
         self_update.Check(false);
         // "Export as recipe" writes next to the logs, which are read over FTP already.
@@ -627,7 +627,7 @@ int main() {
                         for (const auto& [name, value] : response.headers)
                             if (strcasecmp(name.c_str(), "location") == 0) target = value;
                         if (target.rfind("https://", 0) != 0) {
-                            *error = "redirected to an address Playden doesn't follow";
+                            *error = "redirected to an address XoDen doesn't follow";
                             return std::nullopt;
                         }
                         continue;

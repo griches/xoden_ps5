@@ -1020,7 +1020,7 @@ void Controller::TickRuntime() {
         if (!HoldForDropFolder(id, DropFolderNext::kRecreate)) {
           SubmitPrepare(id);
         } else if (!drop_folder_opens_.count(id)) {
-          finish(false, "Playden is busy. Try again in a moment.");
+          finish(false, "XoDen is busy. Try again in a moment.");
           continue;
         }
         ++it;
@@ -1034,7 +1034,7 @@ void Controller::TickRuntime() {
       if (!pending.seen_preparing && !unseen_too_long) { ++it; continue; }
       const auto* record = record_of(id);
       if (record && (ready(record) || record->awaiting_registration))
-        finish(true, record->awaiting_registration ? "Bottle recreated. The PS5 adds the game to Home when Playden quits."
+        finish(true, record->awaiting_registration ? "Bottle recreated. The PS5 adds the game to Home when XoDen quits."
                                                    : "Bottle recreated with the saves and settings brought back.");
       else
         finish(false, refusal_of(id).empty() ? "The game could not be prepared again; press Prepare on the game page."
@@ -1247,7 +1247,7 @@ void Controller::TickRuntime() {
       // Staged and submitted: ShadowMountPlus registers it as soon as Playden quits,
       // so the game is ready to play from Home. Checking only asks the console.
       game.status = "Waiting for the PS5"; game.awaiting_registration = true;
-      game.detail = "Waiting for the PS5, which adds the game to Home when Playden quits";
+      game.detail = "Waiting for the PS5, which adds the game to Home when XoDen quits";
       game.can_prepare = usable;
     } else if (record && record->recovery_pending &&
                (record->step == "register" || record->step == "await-native" || record->step == "query-native")) {
@@ -1255,7 +1255,7 @@ void Controller::TickRuntime() {
       // console; an uncertain registration is never submitted again.
       game.status = "Registration pending";
       game.detail = "The console has not confirmed " + record->title_id +
-                    " yet. Check again only asks the console; Playden never registers a title twice.";
+                    " yet. Check again only asks the console; XoDen never registers a title twice.";
       game.can_prepare = usable;
     } else if (record && record->recovery_pending) {
       game.status = "Needs recovery";
@@ -1464,7 +1464,7 @@ std::string Controller::UninstallStatus(GameId id) const {
   }
   // An imported game played from its drive leaves the library; its files stay.
   const auto* location = LocationOf(id);
-  return location && !location->managed() ? "Removing from Playden…" : "Deleting files…";
+  return location && !location->managed() ? "Removing from XoDen…" : "Deleting files…";
 }
 void Controller::TickUninstalls() {
   if (!runtime_) return;
@@ -1532,7 +1532,7 @@ void Controller::TickUninstalls() {
               import_requests_[number] = {ImportRequestKind::Remove, id};
             } else {
               uninstalls_.Abandon(id);
-              StopUninstall(id, "Playden could not take the game out of the library now. Uninstall again to try again.");
+              StopUninstall(id, "XoDen could not take the game out of the library now. Uninstall again to try again.");
             }
           }
         } else if (installs_) {
@@ -1648,7 +1648,7 @@ void Controller::TickImports() {
         if (std::any_of(snapshot->games.begin(), snapshot->games.end(),
                         [&id](const stores::local::ImportEntry& entry) { return GameId::Local(entry.id) == id; })) {
           uninstalls_.Abandon(id);
-          StopUninstall(id, "Playden could not take the game out of the library. Uninstall again to try again.");
+          StopUninstall(id, "XoDen could not take the game out of the library. Uninstall again to try again.");
         }
         it = import_requests_.erase(it);
         continue;
@@ -1728,7 +1728,7 @@ bool Controller::HoldForDropFolder(GameId id, DropFolderNext next) {
   if (!open.request) {
     // The Local store is busy: the caller stops (a Recreate bottle loop finishes its own entry).
     drop_folder_opens_.erase(id);
-    if (asked) model_.NotifyPlayStopped(id, "Playden is busy. Press Play again in a moment.");
+    if (asked) model_.NotifyPlayStopped(id, "XoDen is busy. Press Play again in a moment.");
     return true;
   }
   switch (next) {
@@ -1757,7 +1757,7 @@ void Controller::ReleaseDropFolderOpens(std::vector<GameId>& plays, std::vector<
     const auto& open = it->second;
     if (play_notes_.erase(id)) ++play_notes_revision_;
     if (timed_out || !outcome->ok) {
-      const auto message = timed_out ? std::string("Playden couldn't open the game's folder in time.") : outcome->message;
+      const auto message = timed_out ? std::string("XoDen couldn't open the game's folder in time.") : outcome->message;
       if (open.play || open.prepare) model_.NotifyPlayStopped(id, message);
       if (open.recreate) {
         recreate_results_[id] = {false, message};
@@ -1924,7 +1924,7 @@ void Controller::TickInstalls() {
       if (!worker_ready) { model_.ShowLayoutNotice("The Xbox download worker needs to be set up before installing games."); continue; }
       if (!catalog || !xbox_jobs_->Install(request.game_id,catalog->account_key,catalog->market,request.xbox_content_id))
         model_.ShowLayoutNotice("An Xbox download is already starting, or the Xbox account needs refreshing.");
-      else model_.ShowLayoutNotice(job->native ? "Xbox download started. View progress in Downloads." : "Opening the Xbox download screen. Playden will return when it finishes.");
+      else model_.ShowLayoutNotice(job->native ? "Xbox download started. View progress in Downloads." : "Opening the Xbox download screen. XoDen will return when it finishes.");
       continue;
     }
     switch (request.kind) {
@@ -2113,9 +2113,9 @@ void Controller::SubmitPrepare(GameId id, bool announce) {
   } else if (!steam)
     request.launch_reason = "Choose the program that starts this game in Game settings.";
   else if (const auto reason = launch_options_reason_.find(id); reason != launch_options_reason_.end())
-    request.launch_reason = "Playden could not read how to start this game from Steam: " + reason->second;
+    request.launch_reason = "XoDen could not read how to start this game from Steam: " + reason->second;
   else if (!launch_options_.count(id))
-    request.launch_reason = "Sign in to Steam so Playden can read how to start this game.";
+    request.launch_reason = "Sign in to Steam so XoDen can read how to start this game.";
   // After a failed answer, ask Steam again so a later Prepare can use the options.
   if (auto* details = Details(id.store); steam && details && !launch_options_.count(id))
     details->Request(id, model_.state().account_generation);
@@ -2228,7 +2228,7 @@ void Controller::Apply(const steam::SteamEvent& event) {
           if (!volumes.empty()) space = steam::QueryVolumeSpace(volumes.front().games_root, steam::kConsoleSystemReserve);
         }
         if (space && space->free_bytes == 0)
-          Update(AuthState::Failed, "Playden can't save your sign-in. Uninstall games to free up space; it signs in again on its own.",
+          Update(AuthState::Failed, "XoDen can't save your sign-in. Uninstall games to free up space; it signs in again on its own.",
                  false, {}, SignInStep::Qr, nullptr, true, true);
         else
           Update(AuthState::Failed, "Account storage is unavailable. Retrying your saved sign-in…", false, {}, SignInStep::Qr,

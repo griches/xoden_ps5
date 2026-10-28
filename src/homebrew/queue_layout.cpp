@@ -81,7 +81,7 @@ std::string downloads_words(const QueueSection& section, std::size_t paused, std
     if (section.waiting) join(text, std::to_string(section.waiting) + " waiting");
     if (paused) join(text, std::to_string(paused) + " paused");
     if (failed) join(text, std::to_string(failed) + " failed");
-    if (section.updates) join(text, "Playden update ready");
+    if (section.updates) join(text, "XoDen update ready");
     return text;
 }
 
@@ -166,7 +166,7 @@ QueueSection preparations(const State& state) {
         item.tone = "attention";
         if (game.status == "Waiting for the PS5") {
             item.status = "Waiting for the PS5";
-            item.note = "Quit Playden and the PS5 adds it to Home";
+            item.note = "Quit XoDen and the PS5 adds it to Home";
         } else if (game.status == "Registration pending") {
             item.status = "Registration pending";
         } else if (game.status == "Needs recovery") {
@@ -322,7 +322,7 @@ QueueLayout BuildQueueLayout(const State& state) {
     if (download.waiting + prepare.waiting) join(summary, std::to_string(download.waiting + prepare.waiting) + " waiting");
     if (download.attention + prepare.attention)
         join(summary, need_attention(download.attention + prepare.attention));
-    if (download.updates) join(summary, "Playden update ready");
+    if (download.updates) join(summary, "XoDen update ready");
     if (summary.empty() && !layout.nothing())
         summary = "No active work · " + std::to_string(download.completed + prepare.completed) + " completed";
     layout.summary = summary;

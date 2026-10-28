@@ -461,7 +461,7 @@ int main(int argc, char** argv) {
 
     const Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
                          (options->headless ? SDL_WINDOW_HIDDEN : SDL_WINDOW_SHOWN);
-    SDL_Window* window = SDL_CreateWindow("Playden — ps5-homebrew-ui", SDL_WINDOWPOS_CENTERED,
+    SDL_Window* window = SDL_CreateWindow("XoDen", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, options->width, options->height,
                                           flags);
     SDL_GLContext context = window ? SDL_GL_CreateContext(window) : nullptr;

@@ -75,7 +75,7 @@ ui::Theme playden_theme()
 {
     ui::Theme theme{};
     theme.id = "playden";
-    theme.name = "Playden";
+    theme.name = "XoDen";
     theme.family = "Green console";
     theme.summary = "Dark green surfaces with clear green focus";
     theme.backdrop.mode = gfx::BackdropMode::gradient;
@@ -1049,7 +1049,7 @@ class Render::Impl
 
     void draw_startup(ui::Canvas &, const ViewData &view, const State &state)
     {
-        section_label("Playden", 96.0F, 78.0F);
+        section_label("XoDen", 96.0F, 78.0F);
         if (state.root_access_missing)
         {
             // No artwork or account here: the problem, the startup error and the way out.
@@ -1204,10 +1204,10 @@ class Render::Impl
         scene_.rounded_rect(panel, 14.0F, kPanel);
         const char *title = "Account name and password";
         const char *detail = state.stay_signed_in
-            ? "Playden sends your password to Steam, encrypted, and never saves it. It keeps Steam's sign-in token "
+            ? "XoDen sends your password to Steam, encrypted, and never saves it. It keeps Steam's sign-in token "
               "on this PS5 so you stay signed in."
-            : "Playden sends your password to Steam, encrypted, and never saves it. It keeps Steam's sign-in token "
-              "only until you close Playden. You will sign in again next time.";
+            : "XoDen sends your password to Steam, encrypted, and never saves it. It keeps Steam's sign-in token "
+              "only until you close XoDen. You will sign in again next time.";
         if (form.step == SignInStep::Submitting)
         {
             title = "Signing in";
@@ -2739,9 +2739,9 @@ class Render::Impl
         std::string note;
         const auto status = cloud == nullptr ? CloudStatus::None : cloud->status;
         if (cloud != nullptr && (status == CloudStatus::Checking || status == CloudStatus::Syncing || cloud->queued))
-            note = "Playden is checking this game with Steam Cloud. Its actions come back when that is done; you can leave this page meanwhile.";
+            note = "XoDen is checking this game with Steam Cloud. Its actions come back when that is done; you can leave this page meanwhile.";
         else if (cloud != nullptr && cloud->after_play)
-            note = "The game may be running. Playden syncs its saves once it stops.";
+            note = "The game may be running. XoDen syncs its saves once it stops.";
         else if (status == CloudStatus::Conflict)
             note = cloud->first_sync ? "Never synced on this PS5, and both sides already have saves. Pick which to keep; the other side is backed up first."
                    : cloud->first_overwrite
@@ -2750,7 +2750,7 @@ class Render::Impl
         else if (status == CloudStatus::NeedsAccount)
             note = "Saves here were never synced with this Steam account. Confirm to upload them.";
         else if (status == CloudStatus::Failed)
-            note = cloud->message + " Playden tries again on the next check.";
+            note = cloud->message + " XoDen tries again on the next check.";
         else if (status == CloudStatus::Synced || status == CloudStatus::UpToDate)
             note = "Matches Steam Cloud.";
         else if (status == CloudStatus::Unsupported)
@@ -3468,7 +3468,7 @@ class Render::Impl
     {
         static const std::map<std::string, std::string> names = {
             {"choice-picker", "Game settings"}, {"preset-picker", "Game settings"}, {"button-mapping", "Game settings"}, {"controller-tuning", "Game settings"},
-            {"game-settings", "Playden"}, {"game-maintenance", "Playden"}, {"kept-data", "Settings"}, {"installed-games", "Settings"},
+            {"game-settings", "XoDen"}, {"game-maintenance", "XoDen"}, {"kept-data", "Settings"}, {"installed-games", "Settings"},
             {"import-games", "Library"}, {"import-programs", "Import games"}, {"steam-programs", "Setup"}, {"import-choice", "Import games"},
             {"import-storage", "Import games"},
             {"job-actions", "Downloads"}, {"prep-actions", "Preparation"}, {"storage-details", "Storage"}, {"context", "Game"}, {"compatibility", "Game"}, {"collections", "Game"}, {"collections-manage", "Library"},
@@ -3506,6 +3506,34 @@ class Render::Impl
         draw_overlay_rows(view, {panel.x + 40.0F, y, panel.w - 80.0F, 120.0F}, false);
     }
 
+    void draw_browser_pairing(const ViewData &view, const gfx::Rect &panel, float drop)
+    {
+        const float x = panel.x + 48.0F;
+        const float width = panel.w - 96.0F;
+        ui::text(overlay_, fonts_.semibold, "1  OPEN ON YOUR COMPUTER", x, 278.0F + drop, 18.0F, kSecondary);
+        overlay_.rounded_rect({x, 300.0F + drop, width, 80.0F}, 12.0F, kBackground);
+        ui::text(overlay_, fonts_.semibold, view.pairing_url, x + 24.0F, 352.0F + drop, 32.0F, kText);
+        ui::paragraph(overlay_, fonts_.regular, "Chrome is required for the Microsoft sign-in window.", x, 416.0F + drop,
+                      21.0F, width, 30.0F, kSecondary, 2);
+        ui::text(overlay_, fonts_.semibold, "2  ENTER THIS PAIRING CODE", x, 488.0F + drop, 18.0F, kSecondary);
+        ui::text(overlay_, fonts_.regular, "Enter your PS5 address and the code on the page.", x, 526.0F + drop, 22.0F, kSecondary);
+        const float gap = 16.0F;
+        const float group_width = (width - gap * 3) / 4;
+        for (std::size_t index = 0; index < 4; ++index)
+        {
+            const float left = x + index * (group_width + gap);
+            overlay_.rounded_rect({left, 554.0F + drop, group_width, 122.0F}, 14.0F, kAccent.with_alpha(0.12F));
+            const auto group = view.pairing_code.substr(index * 5, 4);
+            const float size = 60.0F;
+            const float text_width = fonts_.semibold.measure(group, size);
+            ui::text(overlay_, fonts_.semibold, group, left + (group_width - text_width) * 0.5F,
+                     635.0F + drop, size, kText);
+        }
+        ui::paragraph(overlay_, fonts_.regular, "Finish sign-in on your computer. XoDen saves it on your PS5.",
+                      x, 724.0F + drop, 22.0F, width, 32.0F, kSecondary, 2);
+        draw_overlay_rows(view, {panel.x + 40.0F, 830.0F + drop, panel.w - 80.0F, 112.0F - drop});
+    }
+
     void draw_sheet_overlay(const ViewData &view)
     {
         const float ease = overlay_transition_.enter();
@@ -3541,7 +3569,9 @@ class Render::Impl
         if (!view.subtitle.empty())
             ui::paragraph(overlay_, fonts_.regular, view.subtitle, panel.x + 48.0F, 190.0F + drop, 23.0F,
                           panel.w - 96.0F, 32.0F, kSecondary, (view.surface == "install" || view.surface == "xbox-account" || view.surface == "browser-sign-in") ? 6 : 3);
-        if (view.surface == "storage")
+        if (view.surface == "browser-sign-in" && view.pairing_code.size() == 19)
+            draw_browser_pairing(view, panel, drop);
+        else if (view.surface == "storage")
             draw_storage_overlay_rows(view, {panel.x + 40.0F, 246.0F, panel.w - 80.0F, 710.0F});
         else if (view.surface == "import-storage")
             // The wizard's drive choice: the drive cards of the storage picker, under a one-line subtitle.

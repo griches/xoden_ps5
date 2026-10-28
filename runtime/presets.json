@@ -2,7 +2,7 @@
   "presets": [
     {
       "id": "playden-default",
-      "name": "Playden default",
+      "name": "XoDen default",
       "try_when": "Every game starts here. Uses the recipe's values.",
       "short_hint": "Most games",
       "settings": {}

@@ -738,7 +738,7 @@ void PrepareNamesUnfixableFolder() {
   CHECK(WaitFor(host, Started).kit_available);
   host.Prepare(Hl2());
   const auto done = WaitFor(host, [](const RuntimeSnapshot& s) { return !s.preparing_app && s.refusals.count(220); }, 60);
-  CHECK(done.refusals.at(220) == "Playden can't write to " + homebrew.string() +
+  CHECK(done.refusals.at(220) == "XoDen can't write to " + homebrew.string() +
                                  ". Make the folder writable over FTP (permissions 777), then try again.");
   CHECK(raises == 1);
   CHECK(done.installs.empty());
@@ -781,7 +781,7 @@ void TitleRefusalNamesTheSourceThatCannotAnswer() {
     else if (scenario == 3)
       CHECK(refusal == "Every PS5 title this runtime kit offers is in use. Uninstall a game, then try again.");
     else
-      CHECK(refusal == "Playden could not check that a PS5 title is free for this game. Try again; if it still fails, "
+      CHECK(refusal == "XoDen could not check that a PS5 title is free for this game. Try again; if it still fails, "
                        "open Logs in Settings for details.");
     CHECK(done.installs.empty() && fixture.registry_mutations == 0);
     host.Shutdown();
@@ -1413,11 +1413,11 @@ void ReplacedKitAsksForRestart() {
   host.Play(220);
   const auto refused = WaitFor(host, [handled](const RuntimeSnapshot& s) { return s.plays_handled > handled; }, 30);
   CHECK(refused.play_refusals.count(220) &&
-        refused.play_refusals.at(220).find("Quit Playden and start it again") != std::string::npos);
+        refused.play_refusals.at(220).find("Quit XoDen and start it again") != std::string::npos);
   CHECK(!refused.handoff_ready && launches.empty());
   host.Prepare(Hl2());
   const auto held = WaitFor(host, [](const RuntimeSnapshot& s) { return s.refusals.count(220) != 0; }, 30);
-  CHECK(held.refusals.at(220).find("changed while Playden was running") != std::string::npos);
+  CHECK(held.refusals.at(220).find("changed while XoDen was running") != std::string::npos);
 }
 
 void XboxHandoffIsArmedOnWorkerBeforeLauncherExit() {
@@ -1775,7 +1775,7 @@ void MaintainsReadyTitle() {
   saved.overrides = {{"resolution", "1280x720"}, {"frame_limit", "30"}};
   fixture.activity->store(static_cast<int>(NativeActivity::kActive));
   auto result = maintain(RuntimeMaintenance::kApplySettings);
-  CHECK(!result.maintenance.at(220).ok && result.maintenance.at(220).message == "Changes apply the next time Playden starts the game.");
+  CHECK(!result.maintenance.at(220).ok && result.maintenance.at(220).message == "Changes apply the next time XoDen starts the game.");
   CHECK(result.installs[0].settings_revision == 0 && Read(profile).find("desktop = 1920x1080") != std::string::npos);
   fixture.activity->store(static_cast<int>(NativeActivity::kUnknown));
   CHECK(!maintain(RuntimeMaintenance::kClearShaderCache).maintenance.at(220).ok);
@@ -4155,7 +4155,7 @@ void PlayBeforeRepublishRepublishesFirst() {
   // While it runs, Play says why it can't update the game.
   host.Play(220);
   const auto refused = WaitFor(host, [](const RuntimeSnapshot& s) { return s.play_refusals.count(220) != 0; });
-  CHECK(refused.play_refusals.at(220) == "This game needs an update for Playden 0.6 first: Close the game first.");
+  CHECK(refused.play_refusals.at(220) == "This game needs an update for XoDen 0.6 first: Close the game first.");
   fixture.activity->store(static_cast<int>(NativeActivity::kStopped));
   host.Play(220);
   const auto played = WaitFor(host, [](const RuntimeSnapshot& s) { return s.handoff_ready; }, 30);
@@ -4270,7 +4270,7 @@ void RestartDuringRepublishResumes() {
   CHECK(move.Done() == 0);
   host.Play(220);
   const auto refused = WaitFor(host, [](const RuntimeSnapshot& s) { return s.play_refusals.count(220) != 0; });
-  CHECK(refused.play_refusals.at(220).rfind("This game needs an update for Playden 0.6 first: ", 0) == 0);
+  CHECK(refused.play_refusals.at(220).rfind("This game needs an update for XoDen 0.6 first: ", 0) == 0);
   host.Prepare({220, "/data/playden-games/220", "internal", "Half-Life \"2\""});
   const auto resumed = WaitFor(host, [](const RuntimeSnapshot& s) {
     return !s.preparing_app && s.prepares_handled > 0 && !s.installs.empty() && !s.installs[0].recovery_pending;

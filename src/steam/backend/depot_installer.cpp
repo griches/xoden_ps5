@@ -871,7 +871,7 @@ bool RemoveManagedInstall(const std::string& install_root, std::string* failure)
   const std::string copy_dir = install_root + "/" + kCopyJournalDir;
   if (!Exists(install_root + "/" + DepotInstaller::kInstallRecord) &&
       !Exists(install_root + "/" + DepotInstaller::kJournalDir) && !Exists(copy_dir))
-    return fail("The game's folder holds no Playden install record, so it was left as it is.");
+    return fail("The game's folder holds no XoDen install record, so it was left as it is.");
   // Remove exactly the paths the install recorded, deepest first, then Playden's own files.
   std::vector<std::string> files;
   std::vector<std::string> directories;

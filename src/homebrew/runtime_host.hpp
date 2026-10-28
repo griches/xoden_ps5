@@ -364,7 +364,7 @@ inline bool PrepareQueued(const RuntimeSnapshot& snapshot, std::uint32_t runtime
          snapshot.queued_prepares.end();
 }
 
-inline constexpr const char* kPlayUpdatingForLayout = "Updating this game for Playden 0.6…";
+inline constexpr const char* kPlayUpdatingForLayout = "Updating this game for XoDen 0.6…";
 inline constexpr const char* kPlayDownloadingMfc = "Downloading Microsoft's MFC for this game…";
 inline constexpr const char* kPlayMfcNotDownloaded = "Microsoft's MFC could not be downloaded. Play again to retry.";
 inline constexpr const char* kPlayMfcNotInstalled = "Microsoft's MFC could not be installed for this game.";
@@ -401,7 +401,7 @@ struct RuntimeRelocation {
 };
 
 // What RuntimeHost::Relocate answers once Playden is closing (BeginClosing).
-inline constexpr const char* kRelocationClosing = "Playden is closing.";
+inline constexpr const char* kRelocationClosing = "XoDen is closing.";
 
 struct RuntimeRelocationResult {
   enum class Outcome {

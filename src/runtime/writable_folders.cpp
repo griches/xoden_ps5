@@ -95,7 +95,7 @@ std::string EnsureWritableFolders(const std::vector<std::filesystem::path>& fold
          (!mode ? " fix=outside-approved-roots" : !as_root ? " fix=unavailable"
                    : !ran ? " fix=root-refused"
                           : fixed ? " after-fix=" + Error(second) : " chmod=" + Error(fix_error)));
-    return "Playden can't write to " + folder.string() +
+    return "XoDen can't write to " + folder.string() +
            ". Make the folder writable over FTP (permissions 777), then try again.";
   }
   return {};
@@ -104,7 +104,7 @@ std::string EnsureWritableFolders(const std::vector<std::filesystem::path>& fold
 std::string PrepareRuntimeRoot(const std::filesystem::path& root, const WritableFoldersAsRoot& as_root,
                                const std::function<void(const std::string&)>& log,
                                const std::filesystem::path& namespace_root) {
-  if (root != namespace_root / "data/playden") return "Playden can't fix this runtime folder.";
+  if (root != namespace_root / "data/playden") return "XoDen can't fix this runtime folder.";
   // The step that failed and its errno, for the startup screen: the log may not be writable yet.
   std::string failed = "root access";
   int failed_error = 0;
@@ -135,7 +135,7 @@ std::string PrepareRuntimeRoot(const std::filesystem::path& root, const Writable
   if (prepared) return {};
   const std::string detail = failed + " failed" + (failed_error ? " error=" + Error(failed_error) : "");
   if (log) log("runtime root repair failed path=" + root.string() + " " + detail);
-  return "Playden can't write to " + root.string() + " (" + detail +
+  return "XoDen can't write to " + root.string() + " (" + detail +
          "). Make the folder writable over FTP (permissions 777), then try again.";
 }
 
@@ -144,7 +144,7 @@ std::string PrepareDropFolder(const std::filesystem::path& folder, const Writabl
                               const std::filesystem::path& namespace_root) {
   if (folder != namespace_root / "data/playden-import") {
     if (log) log("drop folder refused path=" + folder.string());
-    return "Playden can't make this import folder.";
+    return "XoDen can't make this import folder.";
   }
   std::string failed = "root access";
   int failed_error = 0;
@@ -179,7 +179,7 @@ std::string PrepareDropFolder(const std::filesystem::path& folder, const Writabl
   }
   const std::string detail = failed + " failed" + (failed_error ? " error=" + Error(failed_error) : "");
   if (log) log("drop folder failed path=" + folder.string() + " " + detail);
-  return "Playden can't make " + folder.string() + " (" + detail + "). Games can still be imported from a drive.";
+  return "XoDen can't make " + folder.string() + " (" + detail + "). Games can still be imported from a drive.";
 }
 
 std::string PrepareAppFolderStubs(const std::filesystem::path& app_root, const WritableFoldersAsRoot& as_root,
@@ -188,7 +188,7 @@ std::string PrepareAppFolderStubs(const std::filesystem::path& app_root, const W
   const auto name = app_root.filename().string();
   if (app_root.parent_path() != namespace_root / "data/homebrew" || name.empty() || name == "." || name == "..") {
     if (log) log("app folder stubs refused path=" + app_root.string());
-    return "Playden can't repair this app folder.";
+    return "XoDen can't repair this app folder.";
   }
   std::string failed = "root access", stub;
   int failed_error = 0;
@@ -229,7 +229,7 @@ std::string PrepareAppFolderStubs(const std::filesystem::path& app_root, const W
   const std::string detail = failed + " failed" + (failed_error ? " error=" + Error(failed_error) : "");
   const auto where = stub.empty() ? app_root : app_root / stub;
   if (log) log("app folder stub failed path=" + where.string() + " " + detail);
-  return "Playden can't make " + where.string() + " (" + detail + ").";
+  return "XoDen can't make " + where.string() + " (" + detail + ").";
 }
 
 }  // namespace playden::runtime

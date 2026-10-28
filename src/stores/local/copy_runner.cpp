@@ -319,12 +319,12 @@ std::string LocalCopyRunner::Enqueue(installs::InstallService& service, const Im
                                      const std::string& source, const std::string& volume_id,
                                      std::uint32_t runtime_number) {
   const auto game = GameId::Local(entry.id);
-  if (entry.state == ImportState::kCopied) return "The game is already in Playden.";
+  if (entry.state == ImportState::kCopied) return "The game is already in XoDen.";
   if (entry.state != ImportState::kInPlace) return "The game is already being copied.";
   auto snapshot = service.Snapshot();
   if (std::any_of(snapshot.installed.begin(), snapshot.installed.end(),
                   [&](const installs::InstalledGame& installed) { return installed.id == game; }))
-    return "The game is already in Playden.";
+    return "The game is already in XoDen.";
   if (std::any_of(snapshot.jobs.begin(), snapshot.jobs.end(), [&](const installs::InstallJobView& job) { return job.id == game; }))
     return "The game is already being copied.";
   const auto target = volume_id.empty() ? snapshot.default_volume_id : volume_id;
@@ -338,7 +338,7 @@ std::string LocalCopyRunner::Enqueue(installs::InstallService& service, const Im
     return build.failure;
   }
   for (const auto& name : build.skipped)
-    Log("import copy leaves out id=" + entry.id + " path=" + name + " (Playden's own name)");
+    Log("import copy leaves out id=" + entry.id + " path=" + name + " (XoDen's own name)");
   auto& plan = build.plan;
   plan.program = entry.program;
   plan.runtime_number = runtime_number;
@@ -349,7 +349,7 @@ std::string LocalCopyRunner::Enqueue(installs::InstallService& service, const Im
   // A folder left by an earlier copy is Playden's own and goes; anything else stays and refuses.
   if (!steam::RemoveManagedInstall(root) || Exists(root)) {
     Log("import copy refused id=" + entry.id + ": " + root + " is in the way");
-    return "A folder in Playden's games folder is in the way of the copy.";
+    return "A folder in XoDen's games folder is in the way of the copy.";
   }
   if (const auto saved = SaveCopyPlan(plan, root); !saved.empty()) {
     steam::RemoveManagedInstall(root);
@@ -359,7 +359,7 @@ std::string LocalCopyRunner::Enqueue(installs::InstallService& service, const Im
   if (!queued.ok()) {
     steam::RemoveManagedInstall(root);
     return queued.error() == ImportError::kWrongState ? "The game is already being copied."
-                                                      : "Playden's list of imported games could not be saved.";
+                                                      : "XoDen's list of imported games could not be saved.";
   }
   service.Install(game, plan.total, target);
   snapshot = service.Snapshot();
@@ -412,7 +412,7 @@ installs::InstallRunner::Result LocalCopyRunner::Install(
     return result;
   }
   if (entry->state == ImportState::kCopied) {
-    result.failure = "The game is already in Playden.";
+    result.failure = "The game is already in XoDen.";
     return result;
   }
   if (entry->state == ImportState::kInPlace) {
@@ -422,7 +422,7 @@ installs::InstallRunner::Result LocalCopyRunner::Install(
   if (entry->state == ImportState::kCopyQueued) {
     const auto started = store_.StartCopy(entry->id);
     if (!started.ok()) {
-      result.failure = "Playden's list of imported games could not be saved.";
+      result.failure = "XoDen's list of imported games could not be saved.";
       return result;
     }
     Changed();
@@ -576,14 +576,14 @@ std::string LocalCopyRunner::CopyChangedFiles(const std::string& id, const std::
       const int error = errno;
       if (error == ENOENT) continue;  // gone from the source: the copy keeps what it took
       Log("import copy recheck failed id=" + id + " path=" + file.path + " errno=" + std::to_string(error));
-      return "Playden can't check the game's files. Check the drive, then Resume.";
+      return "XoDen can't check the game's files. Check the drive, then Resume.";
     }
     struct stat info {};
     const bool read = ::fstat(fd, &info) == 0;
     ::close(fd);
     if (!read || !S_ISREG(info.st_mode)) {
       Log("import copy recheck failed id=" + id + " path=" + file.path + (read ? " not a file" : " fstat"));
-      return "Playden can't check the game's files. Check the drive, then Resume.";
+      return "XoDen can't check the game's files. Check the drive, then Resume.";
     }
     if (AsPlanned(info, file)) continue;
     file.bytes = info.st_size > 0 ? static_cast<std::uint64_t>(info.st_size) : 0;
@@ -636,7 +636,7 @@ std::string LocalCopyRunner::RemoveDropFolderSource(const ImportEntry& entry, co
   if (name.empty() || name.find('/') != std::string::npos || Basename(plan.source) != name ||
       Basename(drop_folder) != "playden-import") {
     Log("import copy keeps the drop folder id=" + entry.id + ": " + plan.source + " is not " + console);
-    return "The game is in Playden, but Playden didn't delete " + console + ". Delete it over FTP.";
+    return "The game is in XoDen, but XoDen didn't delete " + console + ". Delete it over FTP.";
   }
   // The copy's folders on the storage first: the drop folder goes only once its copy would survive
   // a power cut.
@@ -645,7 +645,7 @@ std::string LocalCopyRunner::RemoveDropFolderSource(const ImportEntry& entry, co
   if (!synced) {
     Log("import copy keeps the drop folder id=" + entry.id + ": the copy's folders could not be synced errno=" +
         std::to_string(errno));
-    return "The game is in Playden, but Playden didn't delete " + console + ". Delete it over FTP.";
+    return "The game is in XoDen, but XoDen didn't delete " + console + ". Delete it over FTP.";
   }
   // Only files the copy took, and only as it took them: one changed since (played from the drop
   // folder, or rewritten over FTP) stays.
@@ -663,7 +663,7 @@ std::string LocalCopyRunner::RemoveDropFolderSource(const ImportEntry& entry, co
     return {};
   }
   Log("import copy left the drop folder id=" + entry.id + " path=" + console + ": " + removal.message);
-  return "The game is in Playden, but some of its files are still in " + console + ". Delete them over FTP.";
+  return "The game is in XoDen, but some of its files are still in " + console + ". Delete them over FTP.";
 }
 
 LocalRelocationResult LocalCopyRunner::Relocate(const LocalRelocation& relocation) {
@@ -679,7 +679,7 @@ LocalRelocationResult LocalCopyRunner::Relocate(const LocalRelocation& relocatio
 std::string LocalCopyRunner::Move(installs::InstallService& service, const ImportEntry& entry, const std::string& source,
                                   std::uint32_t runtime_number) {
   const auto game = GameId::Local(entry.id);
-  if (entry.state == ImportState::kCopied) return "The game is already in Playden.";
+  if (entry.state == ImportState::kCopied) return "The game is already in XoDen.";
   // copying without a copy job: a move a restart (or a busy title) interrupted.
   const bool resuming = entry.state == ImportState::kCopying;
   if (!resuming && entry.state != ImportState::kInPlace) return "The game is already being copied.";
@@ -689,7 +689,7 @@ std::string LocalCopyRunner::Move(installs::InstallService& service, const Impor
     return "The game is already being copied.";
   const bool listed = std::any_of(snapshot.installed.begin(), snapshot.installed.end(),
                                   [&](const installs::InstalledGame& installed) { return installed.id == game; });
-  if (listed && !resuming) return "The game is already in Playden.";
+  if (listed && !resuming) return "The game is already in XoDen.";
   const auto volume = std::find_if(snapshot.volumes.begin(), snapshot.volumes.end(), [](const installs::InstallVolume& known) {
     return known.id == installs::InstallService::kPrimaryVolumeId;
   });
@@ -706,7 +706,7 @@ std::string LocalCopyRunner::Move(installs::InstallService& service, const Impor
   if (!resuming) {
     if (!Missing(root)) {
       Log("import move refused id=" + entry.id + ": " + root + " is in the way");
-      return "A folder in Playden's games folder is in the way of the move.";
+      return "A folder in XoDen's games folder is in the way of the move.";
     }
     // The files are listed first: a link refuses the move as it would a copy, and the list goes
     // into the moved folder for its uninstall.
@@ -716,7 +716,7 @@ std::string LocalCopyRunner::Move(installs::InstallService& service, const Impor
       return build.failure;
     }
     for (const auto& name : build.skipped)
-      Log("import move leaves out id=" + entry.id + " path=" + name + " (Playden's own name)");
+      Log("import move leaves out id=" + entry.id + " path=" + name + " (XoDen's own name)");
     plan = std::move(build.plan);
     if (!PlanHasFile(plan, entry.program)) return "The program is not in the game's folder.";
     MakeFolder(volume->games_root);
@@ -725,7 +725,7 @@ std::string LocalCopyRunner::Move(installs::InstallService& service, const Impor
     const auto started = queued.ok() ? store_.StartCopy(entry.id) : queued;
     if (!started.ok()) {
       if (queued.ok()) store_.CancelCopy(entry.id);
-      return "Playden's list of imported games could not be saved.";
+      return "XoDen's list of imported games could not be saved.";
     }
     Changed();
   } else {
@@ -733,7 +733,7 @@ std::string LocalCopyRunner::Move(installs::InstallService& service, const Impor
     const bool root_there = IsFolder(root);
     if (!root_there && source_there) return back_in_place({}, kMoveStoppedFailure);  // the rename never ran
     if (!root_there) return back_in_place("The game's folder is missing.", "The game's folder is missing.");
-    if (source_there) return back_in_place({}, "A folder in Playden's games folder is in the way of the move.");
+    if (source_there) return back_in_place({}, "A folder in XoDen's games folder is in the way of the move.");
     // Renamed already: the files are listed where they are now.
     auto build = BuildCopyPlan(root);
     if (!build.ok) {
@@ -768,7 +768,7 @@ std::string LocalCopyRunner::Move(installs::InstallService& service, const Impor
     const bool renamed = options_.as_root ? options_.as_root(rename) : rename();
     if (!renamed) {
       Log("import move rename failed from=" + source + " to=" + root + " errno=" + std::to_string(error));
-      return "The game could not be moved into Playden (error " + std::to_string(error) + ").";
+      return "The game could not be moved into XoDen (error " + std::to_string(error) + ").";
     }
     if (!SyncFolder(Parent(source)) || !SyncFolder(Parent(root))) {
       Log("import move sync failed from=" + source + " to=" + root + " errno=" + std::to_string(errno));
@@ -779,7 +779,7 @@ std::string LocalCopyRunner::Move(installs::InstallService& service, const Impor
   };
   const auto relocated = Relocate(relocation);
   if (relocated.outcome != LocalRelocationResult::Outcome::kDone) {
-    const auto message = relocated.message.empty() ? std::string("The game could not be moved into Playden.") : relocated.message;
+    const auto message = relocated.message.empty() ? std::string("The game could not be moved into XoDen.") : relocated.message;
     // Not renamed: it plays from the drop folder as before. Renamed but not recorded: copying, so
     // Move again (or the next start) finishes it.
     if (IsFolder(source) && Missing(root)) return back_in_place({}, message);
@@ -794,7 +794,7 @@ std::string LocalCopyRunner::Move(installs::InstallService& service, const Impor
   }
   if (!service.Adopt(game, volume->id, plan.total)) {
     Log("import move not listed id=" + entry.id);
-    return "Playden could not list the moved game. Move it again.";
+    return "XoDen could not list the moved game. Move it again.";
   }
   if (options_.before_finish && !options_.before_finish(game, root)) {
     Log("import move complete id=" + entry.id + "; entry left copying");
@@ -821,7 +821,7 @@ std::string LocalCopyRunner::Remove(const std::string& root) {
   // An uninstall Playden stopped carries on at the next start, before the library has read the
   // imports. They are read now, so the game leaves the library with its folder; while they can't
   // be read, nothing is deleted.
-  if (local && !StoreLoaded()) return "Playden's list of imported games can't be read.";
+  if (local && !StoreLoaded()) return "XoDen's list of imported games can't be read.";
   RemoveParts(root);
   std::string failure;
   const bool removed = steam::RemoveManagedInstall(root, &failure);

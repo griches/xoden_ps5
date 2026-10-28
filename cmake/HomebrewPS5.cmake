@@ -261,7 +261,7 @@ function(playden_add_homebrew_ps5_title)
 		list(APPEND native_helper_package_commands
 			COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PLAYDEN_RELAUNCH_ELF}" "${app}/self-update-relaunch.elf")
 	endif()
-	set(playden_title_name "Playden")
+	set(playden_title_name "XoDen")
 	set(PLAYDEN_XBOX_HANDOFF_ELF "" CACHE FILEPATH "Xbox handoff payload built locally")
 	if(PLAYDEN_NATIVE_RUNTIME_ACCESS AND NOT PLAYDEN_UI_SIMULATION)
 		if(NOT EXISTS "${PLAYDEN_XBOX_HANDOFF_ELF}" OR IS_SYMLINK "${PLAYDEN_XBOX_HANDOFF_ELF}")
@@ -287,7 +287,7 @@ function(playden_add_homebrew_ps5_title)
 			COMMAND "${CMAKE_COMMAND}" -E remove_directory "${app}/xbox-runtime")
 	endif()
 	if(PLAYDEN_UI_SIMULATION)
-		set(playden_title_name "Playden UI Simulation")
+		set(playden_title_name "XoDen UI Simulation")
 		file(GLOB_RECURSE simulation_inputs CONFIGURE_DEPENDS
 			"${CMAKE_SOURCE_DIR}/fixtures/ui-comparison/*"
 			"${CMAKE_SOURCE_DIR}/fixtures/library.json")

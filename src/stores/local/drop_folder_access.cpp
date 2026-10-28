@@ -88,7 +88,7 @@ class Walk {
 
   bool Fail(const fs::path& relative, const std::string& detail, const std::string& log_detail) {
     if (!message_.empty()) return false;
-    message_ = "Playden can't open the game's files in " + entry_ + ": " + detail +
+    message_ = "XoDen can't open the game's files in " + entry_ + ": " + detail +
                ". Fix it over FTP (folders 777, files 666), then try again.";
     Note("drop folder access failed entry=" + entry_ + " path=" + Console(relative) + " " + log_detail);
     return false;
@@ -516,7 +516,7 @@ bool IsDropFolderEntry(const std::string& console_path) {
 DropFolderAccessResult OpenDropFolderEntry(const std::string& entry, const DropFolderAccessOptions& options) {
   if (!IsDropFolderEntry(entry) || !options.namespace_root.is_absolute()) {
     DropFolderAccessResult refused;
-    refused.message = "Playden only opens game folders directly inside " + std::string(kDropFolder) + ", not " + entry + ".";
+    refused.message = "XoDen only opens game folders directly inside " + std::string(kDropFolder) + ", not " + entry + ".";
     if (options.log) options.log("drop folder access refused entry=" + entry);
     return refused;
   }
