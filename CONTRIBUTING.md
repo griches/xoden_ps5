@@ -3,10 +3,19 @@
 XoDen support and compatibility reports belong in this repository. Please do not
 send this fork's issues to the Xodus, Nexus or Playden teams.
 
+## Easiest option: report a result
+
+[Open the compatibility report form](https://github.com/griches/xoden_ps5/issues/new?template=compatibility-report.yml),
+enter the game and what worked or failed, and submit it. A maintainer reviews
+the report and updates the chart. You do not need to edit files, install Git,
+or know Markdown. A GitHub account and access to this repository are required.
+Reports do not automatically change a verdict.
+
 ## Propose a compatibility-list change
 
 1. Read [COMPATIBILITY.md](COMPATIBILITY.md) and its evidence definitions.
-2. Open `COMPATIBILITY.md` on GitHub and choose **Edit** (the pencil).
+2. [Open the list in GitHub’s editor](https://github.com/griches/xoden_ps5/edit/main/COMPATIBILITY.md),
+   or open `COMPATIBILITY.md` and choose **Edit** (the pencil).
 3. Make the change on a new branch, or in a fork if GitHub offers that workflow.
    Add the exact PC Game Pass product/edition, app and kit versions, firmware,
    graphics/library settings and what you actually tested.

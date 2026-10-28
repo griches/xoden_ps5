@@ -200,8 +200,9 @@ The [compatibility chart](COMPATIBILITY.md) records the **PC Game Pass edition**
 runtime, settings and actual test coverage. “Launches” means a startup/menu test;
 “Works” requires gameplay evidence. Steam results and another edition's results
 are not automatically transferable. Please report successful games as well as failures. To propose a chart change,
-edit `COMPATIBILITY.md` on a branch and open a pull request, or use the issue
-form and let a maintainer update it. See [contributing](CONTRIBUTING.md).
+use the [report form](https://github.com/griches/xoden_ps5/issues/new?template=compatibility-report.yml)
+and let a maintainer update the table, or [open the file editor](https://github.com/griches/xoden_ps5/edit/main/COMPATIBILITY.md)
+and submit a pull request. See [contributing](CONTRIBUTING.md).
 
 - **Helper page will not open:** start the helper first and open its loopback URL
   on that computer. Install Node.js 24+ and Chrome if missing.
