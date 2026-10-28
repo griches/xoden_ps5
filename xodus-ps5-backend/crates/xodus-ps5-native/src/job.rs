@@ -21,13 +21,14 @@ pub struct Snapshot {
     pub progress: Option<DownloadProgress>,
     pub error: Option<&'static str>,
 }
-struct Mailbox(Mutex<Snapshot>);
+struct Mailbox(Mutex<Snapshot>, watch::Sender<bool>);
 impl Mailbox {
     fn update(&self, f: impl FnOnce(&mut Snapshot)) {
         f(&mut self.0.lock().unwrap_or_else(|p| p.into_inner()));
     }
 }
 impl JobObserver for Mailbox {
+    fn pause_control(&self) -> Option<watch::Receiver<bool>> { Some(self.1.subscribe()) }
     fn diagnostic(&self, code: &'static str) { self.update(|s| s.error = Some(code)); }
     fn failure_code(&self) -> Option<&'static str> { self.0.lock().unwrap_or_else(|p| p.into_inner()).error }
     fn phase(&self, phase: &str) { self.update(|s| { s.phase = phase.into(); s.progress = None; }); }
@@ -51,7 +52,8 @@ impl Job {
     ) -> Result<Self, &'static str> {
         ACTIVE.compare_exchange(false,true,Ordering::AcqRel,Ordering::Acquire).map_err(|_| "job-busy")?;
         let active = Active;
-        let mailbox = Arc::new(Mailbox(Mutex::new(Snapshot { state: State::Starting, phase: "starting".into(), progress: None, error: None })));
+        let (pause, _) = watch::channel(false);
+        let mailbox = Arc::new(Mailbox(Mutex::new(Snapshot { state: State::Starting, phase: "starting".into(), progress: None, error: None }), pause));
         let (cancel, receiver) = watch::channel(false);
         let sink = mailbox.clone();
         std::thread::Builder::new().name("xodus-job".into()).spawn(move || {
@@ -68,6 +70,9 @@ impl Job {
         Ok(Self { mailbox, cancel })
     }
     pub fn snapshot(&self) -> Snapshot { self.mailbox.0.lock().unwrap_or_else(|p| p.into_inner()).clone() }
+    /// Keep the worker and its lease alive; the streaming reader checkpoints
+    /// its files and parks until resumed. Cancellation remains independent.
+    pub fn set_paused(&self, paused: bool) { self.mailbox.1.send_replace(paused); }
     pub fn cancel(&self) {
         self.mailbox.update(|s| {
             if !s.state.terminal() { s.state = State::Stopping; self.cancel.send_replace(true); }

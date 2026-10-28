@@ -18,5 +18,6 @@ struct GameSummary {
     std::optional<std::uint64_t> added_at_unix_seconds;
     // A Steam demo (PICS type "demo"), which the Library can hide.
     bool demo = false;
+    std::string hero_artwork_source;
 };
 } // namespace playden

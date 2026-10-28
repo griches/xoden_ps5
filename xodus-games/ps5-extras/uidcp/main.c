@@ -9,6 +9,7 @@
  *   ls  <dir>
  *   cp  <src> <dst>    dst must be under /data/playden/; an existing dst is
  *                      kept once as <dst>.xodus-bak
+ *   cp-executable <src> <dst> as cp, with executable mode 0755
  *   get <src> <name>   copies src to /data/xodus-drop/<name> (mode 0644)
  *   get-raw <src> <name>  as get, with a 13-byte XODUS-RAW-V1 newline prefix
  *   mkdir <dir>        dir must be under /data/playden/ (mode 0700)
@@ -270,6 +271,8 @@ int main(void)
             do_ls(a);
         else if (!strcmp(cmd, "cp") && a && b)
             do_cp(a, b, 0644);
+        else if (!strcmp(cmd, "cp-executable") && a && b)
+            do_cp(a, b, 0755);
         else if (!strcmp(cmd, "cp-private") && a && b)
             do_cp(a, b, 0600);
         else if (!strcmp(cmd, "get") && a && b)

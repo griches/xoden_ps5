@@ -47,6 +47,9 @@ typedef struct XodusJobSnapshot {
 int32_t xodus_job_start(const XodusJobConfig *, size_t, uint32_t, uint64_t *handle);
 int32_t xodus_job_poll(uint64_t handle, XodusJobSnapshot *, size_t, uint32_t);
 int32_t xodus_job_cancel(uint64_t handle);
+/* Pause/resume streaming game files without ending the job or releasing its
+ * lease. paused must be 0 or 1. Metadata/setup is not pausable. */
+int32_t xodus_job_set_paused(uint64_t handle, uint32_t paused);
 int32_t xodus_job_release(uint64_t handle);
 /* Host import used by credential writes: atomically commit the private keyring
  * snapshot at the host's approved path. Never log or publish these bytes.

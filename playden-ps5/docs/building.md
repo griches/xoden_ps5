@@ -68,13 +68,13 @@ scripts/build-homebrew-ps5.sh
 ```
 
 The first script builds the root helper that gives the title access to `/data`. The second builds the launcher
-title `FAKE77031` into `build/homebrew-ps5/dist/FAKE77031`, with the two small payloads it sends to the payload
+title `PPSA99324` into `build/homebrew-ps5/dist/PPSA99324`, with the two small payloads it sends to the payload
 loader (the title remover and the self-update's relaunch payload). Neither script contacts a console.
 
 The build checks the pinned revisions and hashes. If it stops with a mismatch, do not edit the hash: find out why
 the input changed. The PS5 build is reproducible, so the same sources give the same `eboot.bin` in any checkout.
 
-`FAKE77031` is allocated to Playden. Do not use it for another application.
+`PPSA99324` is allocated to Playden. Do not use it for another application.
 
 ## Run on a console
 
@@ -96,11 +96,11 @@ If zftpd does not start after a reboot, delete the stale `/data/zftpd/instance.p
 
 ### Install or update the launcher
 
-The first time, copy `build/homebrew-ps5/dist/FAKE77031` to `/data/homebrew/FAKE77031` on the console.
+The first time, copy `build/homebrew-ps5/dist/PPSA99324` to `/data/homebrew/PPSA99324` on the console.
 ShadowMountPlus registers it in about 10 seconds. After that, update only the changed files:
 
 ```sh
-python3 tools/console_title_deploy.py --host <PS5 IP> deploy build/homebrew-ps5/dist/FAKE77031 \
+python3 tools/console_title_deploy.py --host <PS5 IP> deploy build/homebrew-ps5/dist/PPSA99324 \
   --backup build/console-backups/<name>
 ```
 

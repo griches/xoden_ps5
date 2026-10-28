@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "runtime/xbox_runtime.h"
 #include "runtime/game_settings.h"
+#include "runtime/artifact_hash.h"
 #include "platform/managed_directory.h"
 #include <unistd.h>
 #include <cerrno>
@@ -122,6 +123,19 @@ bool InstallFile(const platform::ManagedDirectory& input, const platform::Manage
     return ok;
 }
 }
+bool InstallD3DCompiler43(const std::string& source, const std::string& prefix, std::string* reason) {
+    using platform::ManagedDirectory; using platform::DirectoryPolicy;
+    auto input = ManagedDirectory::Open(source,DirectoryPolicy::kApprovedTree);
+    auto output = ManagedDirectory::Open(prefix + "/drive_c/windows/system32",DirectoryPolicy::kApprovedTree);
+    const auto hash = input ? HashArtifactFile(input->path() / "d3dcompiler_43.dll") : std::nullopt;
+    if (!input || !output || !hash || *hash != "ffedb064adc25328b24dcf145b04045a867a5574c931516d7845babf2a08937f" ||
+        !InstallFile(*input,*output,"d3dcompiler_43.dll")) {
+        *reason = "LIMBO's Microsoft shader compiler is missing or damaged. Reinstall the latest XoDen app and try again.";
+        return false;
+    }
+    return true;
+}
+
 bool InstallXboxRuntime(const std::string& source, const std::string& prefix,
                         std::int64_t unix_time, std::string* reason, const std::string& wrapper_source) {
     using platform::ManagedDirectory; using platform::DirectoryPolicy;

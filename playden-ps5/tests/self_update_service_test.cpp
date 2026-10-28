@@ -199,6 +199,34 @@ void Installed(const std::string& root) {
 }  // namespace
 
 int main() {
+  // A separately versioned kit mirror works without an upstream app release.
+  // The compiled manifest pin still rejects a mirror advertising another kit.
+  for (bool matching_pin : {true, false}) {
+    KitOnly fixture(matching_pin ? "mirror-kit" : "mirror-wrong-kit", "");
+    Publish(fixture.fixture.server, "v0.13.0");
+    const std::string mirror = "https://api.github.com/repos/fork/runtime/releases/tags/v0.13.0";
+    fixture.fixture.server.files[mirror] = fixture.fixture.server.latest;
+    auto config = fixture.Config();
+    config.app_updates_enabled = false;
+    config.current = {1, 2, 3};
+    config.kit_release_url = mirror;
+    if (!matching_pin) config.kit_manifest_sha256 = std::string(64, 'a');
+    UpdateService service(config);
+    service.CheckKit();
+    Wait(service);
+    CHECK(service.Snapshot().kit.phase == (matching_pin ? KitInstallPhase::kAvailable : KitInstallPhase::kUnavailable));
+    if (matching_pin) {
+      service.InstallKit();
+      Wait(service);
+      CHECK(service.Snapshot().kit.phase == KitInstallPhase::kInstalled);
+      CHECK(Read(fixture.kits + "/kitid/manifest.json") == kKitSha);
+    } else {
+      CHECK(fixture.fixture.server.kit_downloads == 0);
+    }
+    service.Shutdown();
+    RemoveTree(fixture.fixture.root);
+  }
+
   // A fork must not recover/stage/apply the upstream app, even with an old
   // staged update on disk. Its admitted kit is still downloadable separately.
   {

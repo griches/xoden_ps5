@@ -10,7 +10,8 @@
     "foundation_revision": "9c0b994a048521af6fb84c73ded364504fe250e9",
     "protocol_sha256": "bb02c4aa814eaba7a7a423a31b29ff41f786212c2953678cf29434e85fa0f869",
     "variants": {
-      "FAKE77031": "910f12157ea9ddcb3fd1c84864b02a0eee95d33133bafdf9058426f66d3dd316"
+      "FAKE77031": "910f12157ea9ddcb3fd1c84864b02a0eee95d33133bafdf9058426f66d3dd316",
+      "PPSA99324": "e0bd1853d4a3c67eb5cfedd92c1190528eb59d193f076be106f9478f1254b7ea"
     },
     "payload_sdk": {
       "version": "v0.42",
@@ -227,9 +228,9 @@
   "prospero_kit": {
     "kit_id": "playden-kit",
     "published": false,
-    "status": "Kit 0.13, installed as playden-kit (kit 0.12 and earlier: hl2-fw1360-dev1; Playden retires that folder and points bottles' Wine Mono at playden-kit). Kit 0.12 with ntdll.prx and win32u.prx from prospero-win 031302d (Wine patch 0984: the game keeps its controller under the system overlay and gets WM_DEVICECHANGE when it connects or disconnects), the any-title shell from ce28942 (reads [runtime] version; capability profile-version-2) and libvulkan.prx from PS5_Mesa 15f78ec (pixel shaders in wave32 by default). Mono, Mesa WGL/Zink and template contents unchanged apart from the template's Wine Mono RuntimePath, so bottles need no Recreate. Released unchanged from dev kit 0.13-dev.20261024.4 (renamed). Earlier kits (0.12, 0.11, 0.10, H r1-r9): see this file's git history.",
-    "manifest_sha256": "d1dbc8e1b5b98691950369a89ef87c1dff5b7064a31844ccf20a4bed99b0e55b",
-    "files_sha256": "1e51857d8e19813b33cfaace0260f139b8835770a6ef5fe0d291270c77b446ca",
+    "status": "XoDen runtime 0.13.1: upstream Playden kit 0.13 with a per-title source-root fallback after the PS5 root grant; Wine, Mesa, helpers and initialized bottle template are unchanged.",
+    "manifest_sha256": "1d49095369dc3f76e1465b3ddec3bec1433810d623c7c30bf4bd1680f4d69e59",
+    "files_sha256": "aeb5f27b49dd38c6640fa06a5072e591b7a104afb145f75f908e5735e68dc708",
     "console_root": "/data/playden/kits/playden-kit",
     "firmware": [
       "13.60"
@@ -249,9 +250,9 @@
       "wine-shared-sections",
       "wow64_i386"
     ],
-    "wrapper_revision": "ce289425bb34acbcc98f77b4e00ac98b3c16e4bc",
+    "wrapper_revision": "ffd297dbe7249763bff5f1daaa1c9f9074131eec",
     "runtime_artifact_revision": "031302d-kit-0.13",
-    "runtime_inventory_source": "Kit 0.13: kit 0.12 with ntdll.prx and win32u.prx from the prospero-win 031302d cross build (0984-cross.sh, the 0.12 recipe), the any-title shell built from ce28942 with tools/build_native.sh, and libvulkan.prx from PS5_Mesa 15f78ec. Kit 0.12: kit 0.11 with libvulkan.prx and win32u.prx from the prospero-win 7c81f68 cross build and the any-title shell built from f729534. Earlier kits: see this file's git history.",
+    "runtime_inventory_source": "All runtime/template files from upstream kit 0.13. Native title shell rebuilt from prospero-win ce289425bb34acbcc98f77b4e00ac98b3c16e4bc plus the source-root fallback in ffd297dbe7249763bff5f1daaa1c9f9074131eec. Patch and complete shell source accompany the XoDen runtime release.",
     "wine_mono": {
       "version": "11.3.0",
       "url": "https://dl.winehq.org/wine/wine-mono/11.3.0/wine-mono-11.3.0-x86.tar.xz",
@@ -260,5 +261,35 @@
       "staging": "tools/kit-h/update_r4.py: symbolic links replaced by copies of their targets, lib/mono/*-api reference assemblies left out (673 files)"
     },
     "template_preparation": "hl2-fresh-v16-neutral-bceed2d"
+  },
+  "xbox_runtime": {
+    "release": "runtime-11.0-20261022-gf4adc821",
+    "archive_url": "https://github.com/domsvoboda/xodus-nexus/releases/download/runtime-11.0-20261022-gf4adc821/xodus-nexus-runtime-11.0-20261022-gf4adc821-x86_64.tar.xz",
+    "archive_sha256": "2874f6d4f6bed83985627a5d1ed7294d9cde77fbfbc8c0da22b0eaa080116735",
+    "source_url": "https://github.com/domsvoboda/xodus-nexus/releases/download/runtime-11.0-20261022-gf4adc821/xodus-nexus-runtime-11.0-20261022-gf4adc821-source.tar.xz",
+    "files": {
+      "xgameruntime_impl.dll": "731735888869afa710ed5dae4e84503e8a18ea4a8c742072d37228e7f6c25b8b",
+      "windows.web.dll": "d0c370d2637e3252a0a2b00c59f68e2d9eadca16e86b9ae69982a13df35dd5c2"
+    }
+  },
+  "directx_shader_compiler": {
+    "package": "Microsoft.DXSDK.D3DX",
+    "version": "9.29.952.8",
+    "archive_url": "https://api.nuget.org/v3-flatcontainer/microsoft.dxsdk.d3dx/9.29.952.8/microsoft.dxsdk.d3dx.9.29.952.8.nupkg",
+    "archive_sha256": "ead0906ae8a26c18a7525da7490127a2110f7c58f18293738283e30e97c6ea4b",
+    "files": {
+      "d3dcompiler_43.dll": {
+        "member": "build/native/release/bin/x64/D3DCompiler_43.dll",
+        "sha256": "ffedb064adc25328b24dcf145b04045a867a5574c931516d7845babf2a08937f"
+      },
+      "DIRECTX-LICENSE.txt": {
+        "member": "LICENSE.txt",
+        "sha256": "d287af0e16fbcee5c96fba66a3030e2cb09e3a782b80553a27fc0e19c76f02fb"
+      },
+      "DIRECTX-NOTICE.md": {
+        "member": "NOTICE.md",
+        "sha256": "4345a681ab4edb11118c2c60394b3cb1aba92d8921020cc1771f50143904d768"
+      }
+    }
   }
 }

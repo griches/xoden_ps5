@@ -1738,6 +1738,52 @@ int main(int argc, char** argv) {
     CHECK(ParseGameRecipe(SerializeGameRecipe(generated), &reread, &reason));
     CHECK(SerializeGameRecipe(reread) == SerializeGameRecipe(generated) && reread.launch_entries[1].in_install_root);
     {
+      // A verified Xbox workaround follows product identity, not the locally
+      // allocated runtime number or another game's matching filename.
+      WritePe(game_root / "DREDGE.exe", true);
+      const std::vector<LaunchEntry> dredge_launch = {{"", "DREDGE", "DREDGE.exe", "", ""}};
+      GameRecipe dredge;
+      for (const auto number : {0xf0000000u, 0xf0000047u}) {
+        CHECK(GenerateGameRecipe(playden::GameId::Xbox("9MSVVM5NS9L6"), number, "DREDGE", dredge_launch,
+                                 game_root.string(), &dredge, &reason));
+        EffectiveSettings effective;
+        SettingsError error;
+        CHECK(BuildEffectiveSettings(dredge, nullptr, {}, KitCapabilities{}, &effective, &error));
+        CHECK(effective.graphics == "opengl" && effective.arguments == "-screen-fullscreen 0");
+        CHECK(BuildEffectiveSettings(dredge, nullptr, {{"graphics", "dxvk"}}, KitCapabilities{}, &effective, &error));
+        CHECK(effective.graphics == "dxvk");
+      }
+      CHECK(GenerateGameRecipe(playden::GameId::Xbox("9MSVBF0KZFVW"), 0xf0000000u, "Other", dredge_launch,
+                               game_root.string(), &dredge, &reason));
+      CHECK(dredge.graphics != "opengl" && dredge.arguments.empty());
+      std::filesystem::remove(game_root / "DREDGE.exe");
+    }
+    {
+      WritePe(game_root / "Limbo.exe", true);
+      const std::vector<LaunchEntry> launches = {{"", "LIMBO", "Limbo.exe", "", ""}};
+      GameRecipe limbo;
+      CHECK(GenerateGameRecipe(playden::GameId::Xbox("9PNG83MDD6SH"), 0xf0000000u, "LIMBO", launches,
+                               game_root.string(), &limbo, &reason));
+      CHECK(NeedsNativeD3DCompiler43(limbo) && limbo.dll_overrides == "d3dcompiler_43=n");
+      // A stored recipe from an older app receives the same default, once.
+      limbo.dll_overrides.clear();
+      ApplyXboxCompatibilityDefaults(&limbo);
+      ApplyXboxCompatibilityDefaults(&limbo);
+      CHECK(limbo.dll_overrides == "d3dcompiler_43=n");
+      EffectiveSettings effective;
+      SettingsError error;
+      CHECK(BuildEffectiveSettings(limbo, nullptr, {}, KitCapabilities{}, &effective, &error));
+      CHECK(effective.dll_overrides.find("d3dcompiler_43=n") != std::string::npos);
+      limbo.game = playden::GameId::Xbox("9MSVBF0KZFVW");
+      limbo.dll_overrides.clear();
+      ApplyXboxCompatibilityDefaults(&limbo);
+      CHECK(!NeedsNativeD3DCompiler43(limbo) && limbo.dll_overrides.empty());
+      limbo.game = playden::GameId::Xbox("9PNG83MDD6SH");
+      limbo.launch_entries.front().executable = "Other.exe";
+      CHECK(!NeedsNativeD3DCompiler43(limbo));
+      std::filesystem::remove(game_root / "Limbo.exe");
+    }
+    {
       // The Program folder row shows it as the game folder; "." chooses it, empty the program's own folder.
       EffectiveSettings root_settings;
       SettingsError root_error;

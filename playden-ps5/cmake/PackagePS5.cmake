@@ -13,12 +13,15 @@ file(COPY "${CMAKE_CURRENT_LIST_DIR}/../sce_sys/icon0.png"
 file(COPY "${ASSETS_DIR}/" DESTINATION "${APP_DIR}/assets")
 file(COPY "${FONTS_DIR}/" DESTINATION "${APP_DIR}/assets/fonts")
 file(COPY "${CMAKE_CURRENT_LIST_DIR}/../assets/branding/generic-title-icon.png" DESTINATION "${APP_DIR}/assets")
+file(MAKE_DIRECTORY "${APP_DIR}/assets/branding")
+configure_file("${CMAKE_CURRENT_LIST_DIR}/../sce_sys/icon0.png" "${APP_DIR}/assets/branding/xoden-icon.png" COPYONLY)
+configure_file("${CMAKE_CURRENT_LIST_DIR}/../assets/branding/xoden-background-v1.png" "${APP_DIR}/assets/branding/xoden-background.png" COPYONLY)
 
 file(READ "${PARAM_SOURCE}" param)
 string(JSON param SET "${param}" titleId "\"${TITLE_ID}\"")
 string(SUBSTRING "${TITLE_ID}" 4 5 concept_id)
 string(JSON param SET "${param}" conceptId "\"${concept_id}\"")
-string(JSON param SET "${param}" contentId "\"UP9000-${TITLE_ID}_00-PLAYDENLAUNCHER1\"")
+string(JSON param SET "${param}" contentId "\"UP9000-${TITLE_ID}_00-XODEN0000000000\"")
 string(JSON param SET "${param}" localizedParameters en-US titleName "\"${TITLE_NAME}\"")
 # The package version follows the project version: major.minor.patch as MM.mmm.ppp (0.2.0 is 00.002.000), so
 # every release has its own value and later releases sort higher.

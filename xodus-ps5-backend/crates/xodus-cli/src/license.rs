@@ -4,6 +4,16 @@ use xodus::models::secrets::Token;
 use xodus::models::soap;
 use xodus::tokens::TokenManager;
 
+// Convert fixed licensing errors to bounded codes for the native download UI.
+// Never put provider response bodies, account data or tickets into job-result.
+pub(crate) fn failure_code(error: &str) -> &'static str {
+    if error.starts_with("Microsoft Store device limit reached.") {
+        "content-device-limit"
+    } else {
+        "content-license-failed"
+    }
+}
+
 pub async fn get_license(
     client: &reqwest::Client,
     tokens: &TokenManager,
@@ -148,6 +158,11 @@ mod tests {
     use super::*;
     use base64::{Engine, prelude::BASE64_STANDARD};
     use xodus::models::secrets::Device;
+    #[test]
+    fn native_license_errors_preserve_the_device_limit_without_private_text() {
+        assert_eq!(failure_code("Microsoft Store device limit reached. Open the device page."), "content-device-limit");
+        assert_eq!(failure_code("private ticket or unrecognized provider message"), "content-license-failed");
+    }
     #[test]
     fn content_license_bad_blocks_return_fixed_errors_without_touching_credentials() {
         let tokens = TokenManager::with_memory();

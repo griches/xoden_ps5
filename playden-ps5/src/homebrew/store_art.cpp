@@ -24,8 +24,9 @@ std::string CoverUrl(const Game& game) {
   return CoverUrl(game.id);
 }
 std::string HeroUrl(const Game& game) {
-  if (game.id.store == Store::kXbox && !game.artwork_source.empty())
-    return CoverUrl(game);  // The catalogue currently supplies a poster, not a wide hero.
+  if (game.id.store == Store::kXbox)
+    return game.hero_artwork_source.empty() ? std::string{} :
+        game.hero_artwork_source.substr(0, game.hero_artwork_source.find('?')) + "?w=1440&h=810&q=85";
   return HeroUrl(game.id);
 }
 std::string LogoUrl(const Game& game) { return LogoUrl(game.id); }

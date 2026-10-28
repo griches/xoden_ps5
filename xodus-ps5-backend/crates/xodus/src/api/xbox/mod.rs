@@ -63,9 +63,17 @@ pub async fn run(
         let Token::Compact(user_token) = user_token else {
             return Err(InvalidTokenResponse.into());
         };
-        let resp = authenticate_xbox_user(client, user_token)
-            .await
-            .map_err(|_| SessionError::Request)?;
+        // Match the browser-verified profile path. Fresh broker tickets can
+        // require an explicit RPS prefix even when older stored tickets did not.
+        let mut authenticated=None;
+        for ticket in auth::rps_representations(&user_token) {
+            match authenticate_xbox_user(client,ticket).await {
+                Ok(value)=>{authenticated=Some(value);break;},
+                Err(error) if error.status().is_some_and(|status|matches!(status.as_u16(),400|401|403))=>continue,
+                Err(_)=>return Err(SessionError::Request),
+            }
+        }
+        let resp=authenticated.ok_or(SessionError::Refused)?;
 
         request_xsts_token(client, resp.token, relying_party)
             .await

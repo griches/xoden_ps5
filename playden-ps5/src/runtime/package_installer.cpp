@@ -688,7 +688,7 @@ std::filesystem::path FilesystemPackageInstaller::TitleMetadataPath(const Runtim
 
 bool FilesystemPackageInstaller::TitleMetadataCurrent(const RuntimeInstall& record) {
   const auto paths = Resolve(record);
-  if (!paths || ReadBounded(TitleMetadataPath(record, kTitleMetadataMarker),16) != std::optional<std::string>("2\n")) return false;
+  if (!paths || ReadBounded(TitleMetadataPath(record, kTitleMetadataMarker),16) != std::optional<std::string>("3\n")) return false;
   for (const auto& mapping : TitleMappings(record)) {
     if (!mapping.owned) continue;
     const auto installed = paths->title / mapping.destination_relative;
@@ -739,7 +739,7 @@ PackageActionResult FilesystemPackageInstaller::WriteTitleArtwork(const RuntimeI
   const auto picture = root / kTitleMetadataFiles[2];
   if (picture_dds ? !replace(picture,*picture_dds) : (::unlink(picture.c_str()) != 0 && errno != ENOENT))
     return Failed("title-metadata", "the game's title background could not be written");
-  if (!replace(root / kTitleMetadataMarker, "2\n"))
+  if (!replace(root / kTitleMetadataMarker, "3\n"))
     return Failed("title-metadata", "the game's title metadata could not be recorded");
   return Complete();
 }

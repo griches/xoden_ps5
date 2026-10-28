@@ -32,6 +32,9 @@ fn server(routes: BTreeMap<String, (u16, Value)>, count: usize) -> (String, Arc<
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => { thread::sleep(Duration::from_millis(5)); continue; }
                 Err(error) => panic!("synthetic server: {error}"),
             };
+            // Accepted sockets can inherit the listener's nonblocking mode on
+            // macOS; the fixture reads a complete request with blocking std IO.
+            stream.set_nonblocking(false).unwrap();
             stream.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
             let mut first = String::new();

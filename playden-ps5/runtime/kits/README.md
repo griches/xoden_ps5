@@ -2,7 +2,12 @@
 
 A kit is the Windows runtime Playden installs on the console: Wine and its PS5 libraries, DXVK, the template bottle every
 game's bottle is copied from, the PS5 title shell and the shipped recipes. Kits are built outside this repository and
-uploaded to the console separately; Playden builds never build Wine or download a kit.
+installed separately from the app; app builds never build Wine or download a kit.
+At first start, XoDen offers to download its matching kit from the separate public
+[XoDen runtime mirror](https://github.com/griches/xoden-runtime/releases/tag/v0.13.1),
+using its `playden-update.json` and the compiled manifest hash. Kit 0.13.1 adds a title-specific runtime lookup fallback to the native shell; Wine, Mesa, the helper and bottle template remain unchanged. The exact shell source, patch and provenance accompany the release.
+The kit release endpoint is independent of XoDen's app version. Upstream Playden
+continues to use its own release discovery when no mirror is configured. It can also be uploaded manually.
 
 ## What Playden pins
 

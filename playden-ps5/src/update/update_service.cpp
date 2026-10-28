@@ -813,7 +813,7 @@ void UpdateService::FailKit(const std::string& message, const std::string& detai
 
 // Every release, newest first: GET .../releases next to the configured .../releases/latest. Console
 // testing reads release.json from local_release_dir as the only one.
-std::optional<std::vector<Release>> UpdateService::FetchReleases(std::string* error) {
+std::optional<std::vector<Release>> UpdateService::FetchReleases(std::string* error, const std::string& pinned_release_url) {
   if (!config_.local_release_dir.empty() && Exists(config_.local_release_dir + "/release.json")) {
     std::string text;
     if (!ReadSmallFile(config_.local_release_dir + "/release.json", &text, 2 << 20)) {
@@ -821,6 +821,15 @@ std::optional<std::vector<Release>> UpdateService::FetchReleases(std::string* er
       return std::nullopt;
     }
     auto release = ParseRelease(text, error);
+    if (!release) return std::nullopt;
+    return std::vector<Release>{std::move(*release)};
+  }
+  if (!pinned_release_url.empty()) {
+    auto options = Downloads("");
+    options.max_attempts = 2;
+    const auto body = FetchSmall(pinned_release_url, 4 << 20, options, "application/vnd.github+json", error);
+    if (!body) return std::nullopt;
+    auto release = ParseRelease(*body, error);
     if (!release) return std::nullopt;
     return std::vector<Release>{std::move(*release)};
   }
@@ -867,11 +876,11 @@ void UpdateService::DoCheckKit() {
     Set([](UpdateSnapshot& s) { s.kit.phase = KitInstallPhase::kUnavailable; });
   };
   std::string error;
-  const auto releases = FetchReleases(&error);
+  const auto releases = FetchReleases(&error, config_.kit_release_url);
   if (!releases) return FailKit("XoDen could not reach GitHub to download its runtime kit.", error);
   const Release* own = nullptr;
   for (const auto& release : *releases)
-    if (!release.draft && release.version == config_.current) own = &release;
+    if (!release.draft && (!config_.kit_release_url.empty() || release.version == config_.current)) own = &release;
   if (!own) return unavailable("no release has version " + config_.current.ToString());
   const auto* manifest_asset = own->Find(kUpdateManifestAsset);
   if (!manifest_asset) return unavailable("release " + own->tag + " has no update information");

@@ -382,6 +382,11 @@ add_custom_command(
 list(APPEND playden_barlow_outputs "${playden_greek_font}")
 
 add_custom_target(playden_homebrew_assets ALL
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${playden_homebrew_assets}/branding"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/sce_sys/icon0.png" "${playden_homebrew_assets}/branding/xoden-icon.png"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/assets/branding/xoden-background-v1.png" "${playden_homebrew_assets}/branding/xoden-background.png"
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
         "${CMAKE_SOURCE_DIR}/assets/fonts/NotoSans-OFL.txt" "${playden_homebrew_fonts}/NotoSans-OFL.txt"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory

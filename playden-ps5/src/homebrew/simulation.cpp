@@ -17,6 +17,7 @@
 #include "steam/secret.h"
 
 #include <cstring>
+#include <cstdio>
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
@@ -1898,7 +1899,7 @@ void Simulation::UpdateXboxBrowserSignIn(std::string message,std::string code,bo
         modal.link.clear();
         modal.pairing_code=valid?code.substr(0,4)+" "+code.substr(4,4)+" "+code.substr(8,4)+" "+code.substr(12,4):std::string{};
         modal.pairing_url=valid?"http://127.0.0.1:47832":std::string{};
-        modal.body=valid?"Use a computer on the same network as your PS5.":std::move(message);
+        modal.body=valid?"Requires the XoDen sign-in helper running on your computer.":std::move(message);
         modal.action_keys={busy?"cancel":"xbox-phone-done"};modal.focused_action=0;
     }
     rebuild_view();
@@ -2563,6 +2564,7 @@ bool Simulation::UpdateLibrary(LibraryUpdate update) {
             game.description = std::move(summary.description);
             game.source = std::string(Traits(update.source).name);
             game.artwork_source = std::move(summary.artwork_source);
+            game.hero_artwork_source = std::move(summary.hero_artwork_source);
             game.playtime_minutes = summary.playtime_minutes;
             if (summary.last_played_unix_seconds)
                 game.last_played = static_cast<std::int64_t>(*summary.last_played_unix_seconds);
@@ -4647,7 +4649,8 @@ void Simulation::rebuild_view() {
         view_.legends = {"Cross Quit to Home"};
     } else if (state_.navigation.route == Route::Startup) {
         view_.title = "Welcome to XoDen";
-        view_.subtitle = live() ? "Connect a store or import games to fill your library." : "Browse the local UI fixture or connect a simulated Steam account.";
+        view_.subtitle = state_.gamepass_only ? "Connect to Game Pass to load your library."
+            : live() ? "Connect a store or import games to fill your library." : "Browse the local UI fixture or connect a simulated Steam account.";
         if (state_.startup_loading || state_.account().authentication == AuthState::Restoring) {
             row("startup-loading", RowKind::Status, live() ? "Restoring your accounts…" : "Loading saved fixture state…", "").enabled = false;
             if (!live()) row("startup-advance", RowKind::Action, "Advance fixture clock", "advance-clock");
@@ -4656,9 +4659,10 @@ void Simulation::rebuild_view() {
             row("startup-retry-save", RowKind::Action, "Retry saved state", "retry-save");
             row("startup-continue", RowKind::Action, "Continue without saving", "continue-without-saving");
         } else {
-            row("startup-connect", RowKind::Action, "Connect Steam", "connect");
+            row("startup-connect", RowKind::Action, state_.gamepass_only ? "Connect to Game Pass" : "Connect Steam",
+                state_.gamepass_only ? "xbox-account" : "connect");
             // Games from a drive or the drop folder need no store account.
-            row("startup-import", RowKind::Action, "Import games", "import-manage");
+            if (!state_.gamepass_only) row("startup-import", RowKind::Action, "Import games", "import-manage");
             row("startup-skip", RowKind::Action, "Skip for now", "skip");
         }
     } else if (state_.navigation.route == Route::SignIn && state_.sign_in.step != SignInStep::Qr &&
@@ -4805,6 +4809,7 @@ void Simulation::rebuild_view() {
             if (!state_.library.query.empty()) row("clear-search", RowKind::Action, "Clear search", "clear-search");
             else if (!state_.library.filters.empty()) row("library-empty", RowKind::Action, "Reset filters", "filters-reset");
             else if (!state_.games.empty() && state_.library.scope != "all") row("library-empty", RowKind::Action, "Show all games", "library-show-all");
+            else if (state_.gamepass_only) row("library-empty", RowKind::Action, "Connect to Game Pass", "xbox-account");
             else row("library-empty", RowKind::Action, "Connect a store", "connect");
         }
         // The footer shows five legends; with a search applied, Circle clears it in place of Square Favorite.

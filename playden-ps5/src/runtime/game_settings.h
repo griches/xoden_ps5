@@ -156,6 +156,11 @@ struct GameRecipe {
   std::map<std::string, std::string> requirements;
 };
 
+// Product/program-bound fixes verified on the console. Also applied to saved
+// generated recipes so existing installs receive updated defaults.
+bool NeedsNativeD3DCompiler43(const GameRecipe& recipe);
+void ApplyXboxCompatibilityDefaults(GameRecipe* recipe);
+
 struct SettingsPreset {
   std::string id;
   std::string name;

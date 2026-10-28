@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deploy or restore the Playden FAKE77031 package files over FTP.
+"""Deploy or restore the Playden PPSA99324 package files over FTP.
 
 deploy: compares every packaged file with the console, backs up each differing
 console file locally (bytes, mode, SHA-256), then replaces it through a staged
@@ -20,7 +20,7 @@ import os
 from pathlib import Path, PurePosixPath
 import sys
 
-TITLE = "/data/homebrew/FAKE77031"
+TITLE = "/data/homebrew/PPSA99324"
 SKIP = {".packaged"}
 SKIP_DIRS = {"logs"}
 # Playden writes its early startup log (before its root grant) and keeps stub folders for

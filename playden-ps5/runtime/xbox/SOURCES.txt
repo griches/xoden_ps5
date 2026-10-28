@@ -1,0 +1,11 @@
+Wine built-in xgameruntime and windows.web components from Xodus Nexus.
+Release: https://github.com/domsvoboda/xodus-nexus/releases/tag/runtime-11.0-20261022-gf4adc821
+Complete source archive: https://github.com/domsvoboda/xodus-nexus/releases/download/runtime-11.0-20261022-gf4adc821/xodus-nexus-runtime-11.0-20261022-gf4adc821-source.tar.xz
+License: see LICENSE (LGPL 2.1).
+The XoDen xgameruntime.dll wrapper is built separately; the upstream runtime DLL is shipped as xgameruntime_impl.dll.
+
+Microsoft x64 D3DCompiler_43.dll, unmodified, from Microsoft.DXSDK.D3DX 9.29.952.8.
+Package: https://www.nuget.org/packages/Microsoft.DXSDK.D3DX/9.29.952.8
+Pinned package and file checksums: dependencies.lock.json (directx_shader_compiler).
+Microsoft terms accompany the binary as DIRECTX-LICENSE.txt, separately from LGPL components.
+Only games with a verified dependency receive this DLL in their private bottle.

@@ -232,7 +232,7 @@ def doctor(args):
 
 def setup(args):
     state = running(args.host)
-    if "FAKE77031" not in state and "idle" not in state:
+    if "PPSA99324" not in state and "idle" not in state:
         sys.exit(f"close the game first (Wine rewrites the registry on exit): {state}")
     prefix = f"{GAMES}/{args.install}/library/prefixes/game"
     console = Console(args.host)

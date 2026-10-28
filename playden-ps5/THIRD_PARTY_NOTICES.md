@@ -72,3 +72,25 @@ revisions it was built from and includes their license texts in `LICENSES/`, and
 For the GPL and LGPL components, you can get the complete source of the version we ship from the links above, or
 from the submodules and pinned revisions in this repository. If a link stops working, open an issue and we will
 provide the source.
+
+## XoDen Xbox runtime modules
+
+The XoDen package also includes Wine's built-in `xgameruntime` (installed as
+`xgameruntime_impl.dll`) and `windows.web` modules from the Xodus Nexus runtime
+release `runtime-11.0-20261022-gf4adc821`. These components retain their LGPL
+license; the license and complete-source archive URL are included in
+`xbox-runtime/LICENSE` and `xbox-runtime/SOURCES.txt` in the app package.
+Exact artifact hashes and the upstream source URL are recorded under
+`xbox_runtime` in `dependencies.lock.json`. The separately built XoDen
+`xgameruntime.dll` sign-in wrapper retains its source attribution in the
+`xodus-ps5-backend/crates/xgameruntime-wrapper` component of the combined repo.
+
+## Microsoft shader compiler
+
+The app packages unmodified x64 D3DCompiler_43.dll from Microsoft's
+Microsoft.DXSDK.D3DX 9.29.952.8 package. It is a separate proprietary component,
+not covered by the app's GPL or Wine's LGPL. Its Microsoft licence and notice
+are included as xbox-runtime/DIRECTX-LICENSE.txt and DIRECTX-NOTICE.md.
+The archive and extracted-file hashes are pinned in dependencies.lock.json;
+the builder retrieves the official NuGet package. It is installed only into
+game bottles with a verified dependency (currently the tested LIMBO PC edition).

@@ -178,7 +178,7 @@ fn service_main(key: String) {
         if phone_test || browser_mode {
             // Wine's system certificate service is not the native app's trust
             // store. Use its packaged CA bundle with full TLS verification.
-            let path=std::env::var("XODUS_CA_BUNDLE").unwrap_or_else(|_|r"Z:\data\homebrew\FAKE77031\trust\cacert.pem".into());
+            let path=std::env::var("XODUS_CA_BUNDLE").unwrap_or_else(|_|r"Z:\data\homebrew\PPSA99324\trust\cacert.pem".into());
             let pem=match std::fs::read(path) { Ok(pem) if pem.len()<=2*1024*1024=>pem,_=>return log("Phone runtime CA bundle unavailable") };
             let certificates=match reqwest::Certificate::from_pem_bundle(&pem) { Ok(certificates) if !certificates.is_empty()=>certificates,_=>return log("Phone runtime CA bundle invalid") };
             builder=builder.tls_certs_only(certificates);

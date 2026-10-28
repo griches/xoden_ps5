@@ -110,6 +110,18 @@ pub extern "C" fn xodus_job_cancel(handle: u64) -> i32 {
     match &registry.job { Some((id,job)) if *id == handle => { job.cancel(); 0 }, _ => -2 }
 }
 #[unsafe(no_mangle)]
+pub extern "C" fn xodus_job_set_paused(handle: u64, paused: u32) -> i32 {
+    if paused > 1 { return -1; }
+    let registry = registry();
+    match &registry.job {
+        Some((id,job)) if *id == handle => {
+            if job.snapshot().state.terminal() { return -3; }
+            job.set_paused(paused != 0); 0
+        },
+        _ => -2,
+    }
+}
+#[unsafe(no_mangle)]
 pub extern "C" fn xodus_job_release(handle: u64) -> i32 {
     let mut registry = registry();
     match &registry.job {

@@ -1,3 +1,6 @@
+> **XoDen users:** start with the [XoDen 0.1.0 README](../README.md).
+> The document below preserves the upstream Playden/Steam documentation and is not XoDen setup guidance.
+
 <p align="center"><img src="docs/images/icon.png" alt="Playden icon" width="128"></p>
 
 # Playden for PS5
@@ -112,7 +115,7 @@ Other versions can work, but these are the ones we know.
 
 ## Install
 
-Download `playden-ps5-<version>.zip` from the latest [release](../../releases): the Playden app (`FAKE77031`) and
+Download `playden-ps5-<version>.zip` from the latest [release](../../releases): the Playden app (`PPSA99324`) and
 the console tools used below. Unzip it into a folder of its own, `playden-ps5-<version>` (most unzip tools make it;
 with `unzip` on the command line, use `unzip playden-ps5-<version>.zip -d playden-ps5-<version>`). Installing takes one copy over the network, the app folder. Playden
 downloads its runtime kit on its first start, and after that it updates itself (see [Update Playden](#update-playden)).
@@ -122,7 +125,7 @@ ShadowMountPlus adds its tile to the Home screen.
 
 ### Install Playden
 
-1. Copy the `FAKE77031` folder from `playden-ps5-<version>` into `/data/homebrew/` on the console. Use any FTP client
+1. Copy the `PPSA99324` folder from `playden-ps5-<version>` into `/data/homebrew/` on the console. Use any FTP client
    (FileZilla, Cyberduck, etc.) or the web file manager in a browser. Create `/data/homebrew` first if it isn't there.
    You do not need to `chmod` anything: Playden checks the folders it writes to and fixes their permissions before
    it writes. If it can't fix one, it names that folder. If your FTP client leaves out the empty `logs` and
@@ -132,7 +135,7 @@ ShadowMountPlus adds its tile to the Home screen.
    only what changed, and keeps a backup of the files it replaces:
 
    ```sh
-   python3 tools/console_title_deploy.py --host <PS5 IP> deploy --install FAKE77031 --backup backups/<name>
+   python3 tools/console_title_deploy.py --host <PS5 IP> deploy --install PPSA99324 --backup backups/<name>
    ```
 
    From 0.6.0, Playden keeps its data outside the app folder and moves it there once, at startup:
@@ -176,7 +179,7 @@ kit folder (`.previous-<id>-<time>`) back to `<id>`, moving the installed folder
 After the version that added import, going back to an older version keeps your old favorites, but loses the favorites
 and collections you changed since. The console's organization data now lives in one file that older versions don't read.
 
-You can also update by hand: copy the new `FAKE77031` folder over the old one, or run the install command without
+You can also update by hand: copy the new `PPSA99324` folder over the old one, or run the install command without
 `--install`. The command copies only the changed files, keeps a backup of what it replaced, and puts those three
 folders' modes right if they changed.
 
@@ -292,11 +295,11 @@ scripts/build-lapy-helper.sh
 scripts/build-homebrew-ps5.sh
 ```
 
-The result is the Playden app, `build/homebrew-ps5/dist/FAKE77031`. Install it as in [Install Playden](#install-playden),
-with that folder in place of `FAKE77031`:
+The result is the Playden app, `build/homebrew-ps5/dist/PPSA99324`. Install it as in [Install Playden](#install-playden),
+with that folder in place of `PPSA99324`:
 
 ```sh
-python3 tools/console_title_deploy.py --host <PS5 IP> deploy --install build/homebrew-ps5/dist/FAKE77031 \
+python3 tools/console_title_deploy.py --host <PS5 IP> deploy --install build/homebrew-ps5/dist/PPSA99324 \
   --backup build/console-backups/<name>
 ```
 

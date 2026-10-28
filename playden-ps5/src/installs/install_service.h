@@ -41,7 +41,7 @@ struct InstallRequest {
 //   import <volume> <folder> <program>  add a game playing in place (volume: internal, m2, extended,
 //                                       usb0, usb1; folder: a name in that drive's import folder, or a
 //                                       path from the drive's root; program: inside the folder)
-// <game> is a Steam app ID (strict decimal) or "local-<uuid>". Words are separated by spaces or tabs;
+// <game> is a Steam app ID (strict decimal), "xbox-<product ID>" or "local-<uuid>". Words are separated by spaces or tabs;
 // a word with spaces goes in double quotes ("Old School Rally"), which can't hold a quote themselves.
 // A line that doesn't parse is skipped.
 std::vector<InstallRequest> ParseInstallRequests(const std::string& text);

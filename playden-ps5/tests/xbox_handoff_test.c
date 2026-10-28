@@ -48,7 +48,7 @@ uint32_t sceLncUtilGetAppIdOfRunningBigApp(void) {
 }
 int sceLncUtilGetAppTitleId(uint32_t app, char* title) {
     if (unknown) return -1;
-    strcpy(title, app == 1 ? "FAKE77031" : app == 2 ? "FAKE78002" : "OTHER0001");
+    strcpy(title, app == 1 ? "PPSA99324" : app == 2 ? "FAKE78002" : "OTHER0001");
     return 0;
 }
 uint32_t sceLncUtilLaunchApp(const char* title, const char** args, launch_params* params) {
@@ -65,7 +65,7 @@ uint32_t sceSystemServiceLaunchApp(const char* title, const char** args, launch_
 }
 static void request(const char* mode) {
     FILE* file = fopen("handoff-request.txt", "w"); assert(file);
-    fprintf(file, "11111111-1111-4111-8111-111111111111\nFAKE78002\nFAKE77031\n%s", mode);
+    fprintf(file, "11111111-1111-4111-8111-111111111111\nFAKE78002\nPPSA99324\n%s", mode);
     assert(fclose(file) == 0);
     launching = launches = worker_polls = busy = unknown = refuse = 0;
     home_running = 1; fake_time = 0; argument[0] = 0;
@@ -89,7 +89,7 @@ int main(void) {
     status("launched");
     request("");
     assert(payload_main() == 0 && launches == 2 && !argument[0]);
-    assert(!strcmp(targets[1], "FAKE77031")); status("returned");
+    assert(!strcmp(targets[1], "PPSA99324")); status("returned");
     request("game-session\n"); busy = 1;
     assert(payload_main() == 1 && launches == 0); status("busy");
     request("game-session\n"); unknown = 1;

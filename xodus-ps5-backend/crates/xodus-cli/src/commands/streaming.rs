@@ -119,7 +119,8 @@ pub async fn run_observed(
         return ExitCode::FAILURE;
     }
     let (tx, rx) = tokio::sync::mpsc::channel::<ProgressEvent>(256);
-    let pause = progress::controls(control_stdin, tx.clone());
+    let pause = observer.as_ref().and_then(|sink| sink.pause_control())
+        .unwrap_or_else(|| progress::controls(control_stdin, tx.clone()));
     if source.starts_with("file://") {
         let fsrc = source.strip_prefix("file://").unwrap_or_default();
         let f = match File::open(fsrc).await {
@@ -182,6 +183,7 @@ pub async fn run_observed(
                     eprintln!("Unknown Error");
                     return ExitCode::FAILURE;
                 };
+                if let Some(observer)=observer.as_deref() { observer.diagnostic(crate::package::failure_code(err.as_ref())); }
                 eprintln!("{}", err);
                 return ExitCode::FAILURE;
             };
@@ -190,10 +192,12 @@ pub async fn run_observed(
                 .iter()
                 .find(|p| p.file_name.ends_with(".msixvc"))
             else {
+                if let Some(observer)=observer.as_deref() { observer.diagnostic("package-msixvc-missing"); }
                 eprintln!("No .msixvc file found");
                 return ExitCode::FAILURE;
             };
             let Some(root) = file.cdn_root_paths.first() else {
+                if let Some(observer)=observer.as_deref() { observer.diagnostic("package-location-missing"); }
                 eprintln!("Microsoft returned no package download location."); return ExitCode::FAILURE;
             };
             format!(
@@ -466,6 +470,7 @@ where
     )
     .await;
     if let Err(err) = license {
+        if let Some(observer) = &observer { observer.diagnostic(crate::license::failure_code(&err)); }
         eprintln!("{}", err);
         return ExitCode::FAILURE;
     }

@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Playden is a controller-first launcher that runs as a native PS5 app (title `FAKE77031`, reserved for Playden) on a
-jailbroken console. It signs in to Steam, downloads games and registers each one as its own PS5 title. The same C++
+XoDen is a controller-first Game Pass launcher that runs as a native PS5 app (title `PPSA99324`, following Gary's app range; upstream Playden owns `FAKE77031`) on a
+jailbroken console. It signs in to Microsoft, downloads PC Game Pass games and registers each one as its own PS5 title. The inherited Steam implementation remains in the source. The same C++
 code also builds as a macOS desktop app (`playden-homebrew`) for development and tests.
 
 ## Commands
@@ -26,7 +26,7 @@ PS5 package (no console needed):
 
 ```sh
 scripts/build-lapy-helper.sh               # root helper payload
-scripts/build-homebrew-ps5.sh              # -> build/homebrew-ps5/dist/FAKE77031
+scripts/build-homebrew-ps5.sh              # -> build/homebrew-ps5/dist/PPSA99324
 scripts/with-env.sh <cmd>                  # run a command with the PS5 toolchain env (LLVM 18, PS5_PAYLOAD_SDK)
 ```
 
@@ -61,7 +61,7 @@ The title shell then starts Wine.
   policies and rejects symlinks in every path component.
 
 On the console (0.6+): user data `/data/playden/user/`, logs `/data/playden/logs/`, bottles `/data/playden/games/`,
-game files `/data/playden-games/`, kits `/data/playden/kits/`, the app `/data/homebrew/FAKE77031`.
+game files `/data/playden-games/`, kits `/data/playden/kits/`, the app `/data/homebrew/PPSA99324`.
 
 ## Console constraints
 

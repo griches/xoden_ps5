@@ -115,10 +115,13 @@ class Controller {
   stores::xbox::XboxLibrarySource* xbox_library_ = nullptr;
   std::uint64_t xbox_revision_ = ~0ull;
   std::string xbox_account_key_;
+  steam::DownloadRate xbox_download_rate_;
+  std::string xbox_rate_key_;
   std::string xbox_completed_request_, xbox_refreshed_request_;
   bool xbox_phone_load_library_ = false, xbox_phone_refresh_started_ = false;
   bool xbox_browser_load_library_ = false, xbox_browser_refresh_started_ = false;
   std::vector<installs::InstalledLocation> xbox_locations_;
+  std::vector<LiveInstalledGame> xbox_installed_, xbox_installed_projected_;
   std::map<GameId, std::string> xbox_programs_;
   void TickSelfUpdate();
   void TickLicenseChanges();

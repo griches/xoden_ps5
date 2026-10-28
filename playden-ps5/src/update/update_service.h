@@ -20,6 +20,8 @@ namespace playden::update {
 
 struct UpdateConfig {
   std::string latest_release_url;               // https://api.github.com/repos/<owner>/<repo>/releases/latest
+  // Optional exact release endpoint for a kit mirror, independent of the app version/repository.
+  std::string kit_release_url;
   std::string releases_page;                    // https://github.com/<owner>/<repo>/releases (release notes links)
   std::string title_id = "FAKE77031";
   std::string installed_root;                   // /data/homebrew/FAKE77031
@@ -190,7 +192,7 @@ class UpdateService {
   void DoCheckKit();
   void DoInstallKit();
   void FailKit(const std::string& message, const std::string& detail);
-  std::optional<std::vector<Release>> FetchReleases(std::string* error);
+  std::optional<std::vector<Release>> FetchReleases(std::string* error, const std::string& pinned_release_url = {});
   bool StageApp(const Release& release, const UpdateManifest& manifest);
   void Fail(const std::string& message, const std::string& detail);
   void Set(const std::function<void(UpdateSnapshot&)>& change);

@@ -78,7 +78,7 @@ int main(void) {
     FILE* file = fopen(ROOT "handoff-request.txt", "r");
     int valid = file && line(file, id, sizeof id) && line(file, worker, sizeof worker) && line(file, home, sizeof home)
         && uuid(id) && worker_title(worker)
-        && (!strcmp(home, "FAKE77031") || !strcmp(home, "PPSA97031"));
+        && !strcmp(home, "PPSA99324");
     if (valid) {
         int next = fgetc(file);
         if (next != EOF) {

@@ -99,12 +99,30 @@ fn diagnostic(stage: &'static str, status: u16, count: usize) {
     eprintln!("NEXUS_LIBRARY_DIAGNOSTIC_V1 {stage} {status} {count}");
 }
 
+fn http_error(status: u16) -> &'static str {
+    match status {
+        401 => "entitlements-http-401",
+        403 => "entitlements-http-403",
+        408 => "entitlements-http-408",
+        429 => "entitlements-http-429",
+        500..=599 => "entitlements-http-5xx",
+        _ => "entitlements-http",
+    }
+}
+
+fn retry_delay(status: u16, attempt: u32, retry_after: Option<&str>) -> Option<Duration> {
+    if attempt >= 4 || !matches!(status, 408 | 429 | 500..=599) { return None; }
+    let seconds = retry_after.and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(1 << attempt).clamp(1, 60);
+    Some(Duration::from_secs(seconds))
+}
+
 pub(super) async fn query(tokens: &TokenManager, market: &str) -> Result<Value, &'static str> {
     if market.len() != 2 || !market.bytes().all(|b| b.is_ascii_uppercase()) {
         return Err("market");
     }
     let account = tokens.active_account().map_err(|_| "stored-account")?;
-    let (client, ticket) = super::subscription::store_session(tokens, &account).await?;
+    let (mut client, mut ticket) = super::subscription::store_session(tokens, &account).await?;
     let mut all = Entitlements::default();
     let mut continuation: Option<String> = None;
     let mut seen = HashSet::new();
@@ -117,20 +135,46 @@ pub(super) async fn query(tokens: &TokenManager, market: &str) -> Result<Value, 
         let url = format!(
             "https://beige.xboxservices.com/PCGAFD/entitlements?market={market}&language=en-US&appVersion=0.2.3"
         );
-        let mut request = client
-            .get(url)
-            .header("Authorization", &ticket)
-            .header("X-MS-API-Version", "1.1")
-            .header("Calling-App-Name", "Xodus-Nexus")
-            .header("MS-CV", cv);
-        if let Some(ref cursor) = continuation {
-            request = request.header("x-ms-ct", cursor);
-        }
-        let mut response = request.send().await.map_err(|_| "entitlements-request")?;
-        if !response.status().is_success() {
-            diagnostic("entitlements-http", response.status().as_u16(), 0);
-            return Err("entitlements-http");
-        }
+        let mut attempt = 0;
+        let mut renewed = false;
+        let mut response = loop {
+            let mut request = client
+                .get(&url)
+                .header("Authorization", &ticket)
+                .header("X-MS-API-Version", "1.1")
+                .header("Calling-App-Name", "Xodus-Nexus")
+                .header("MS-CV", &cv);
+            if let Some(ref cursor) = continuation {
+                request = request.header("x-ms-ct", cursor);
+            }
+            let response = match request.send().await {
+                Ok(response) => response,
+                Err(_) if attempt < 4 => {
+                    diagnostic("entitlements-request-retry", 0, attempt as usize + 1);
+                    tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
+                    attempt += 1;
+                    continue;
+                }
+                Err(_) => return Err("entitlements-request"),
+            };
+            let status = response.status().as_u16();
+            if response.status().is_success() { break response; }
+            diagnostic("entitlements-http", status, attempt as usize);
+            if status == 401 && !renewed {
+                drop(response);
+                (client, ticket) = super::subscription::store_session(tokens, &account).await?;
+                renewed = true;
+                continue;
+            }
+            if let Some(delay) = retry_delay(status, attempt,
+                response.headers().get("retry-after").and_then(|v| v.to_str().ok())) {
+                drop(response);
+                tokio::time::sleep(delay).await;
+                attempt += 1;
+                continue;
+            }
+            return Err(http_error(status));
+        };
         continuation = match response.headers().get("x-ms-ct") {
             None => None,
             Some(value) => {
@@ -206,6 +250,19 @@ mod tests {
     const A: &str = "9AAAAAAAAAAA";
     const B: &str = "9BBBBBBBBBBB";
     const C: &str = "9CCCCCCCCCCC";
+    #[test]
+    fn retries_only_temporary_entitlement_failures_with_a_bound() {
+        for status in [408, 429, 500, 502, 503, 504] {
+            assert_eq!(retry_delay(status, 0, None), Some(Duration::from_secs(1)));
+            assert_eq!(retry_delay(status, 3, Some("15")), Some(Duration::from_secs(15)));
+            assert_eq!(retry_delay(status, 4, Some("15")), None);
+        }
+        for status in [200, 301, 400, 401, 403, 404] { assert_eq!(retry_delay(status, 0, None), None); }
+        assert_eq!(retry_delay(429, 0, Some("999999")), Some(Duration::from_secs(60)));
+        assert_eq!(retry_delay(503, 2, Some("invalid")), Some(Duration::from_secs(4)));
+        assert_eq!(http_error(401), "entitlements-http-401");
+        assert_eq!(http_error(429), "entitlements-http-429");
+    }
     fn valid() -> Value {
         json!({"status":"Active","isTrial":false,"sharingSource":"None","endDate":"2099-01-01T00:00:00Z"})
     }

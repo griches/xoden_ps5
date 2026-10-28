@@ -12,14 +12,17 @@ namespace playden::stores::xbox {
 struct PreparedGame {
     GameId game;
     std::string account_key, executable, root, content_id;
+    std::uint64_t installed_bytes = 0;
 };
 struct NativeProgress {
     std::string phase, message;
     std::uint64_t done_bytes = 0, total_bytes = 0, bytes_per_second = 0;
+    bool paused = false;
 };
 enum class NativeResult { Complete, Failed, Cancelled };
 using NativeRunner = std::function<NativeResult(
     const std::function<void(const NativeProgress&)>&,
+    const std::function<bool()>&,
     const std::function<bool()>&)>;
 struct PackageChoice {
     std::string content_id, title;
@@ -58,6 +61,7 @@ public:
     bool Discard(GameId game);
     bool Cancel(GameId game);
     bool Pause(GameId game);
+    bool Resume(GameId game);
     bool Refresh(std::string market);
     bool TestPhoneSignIn(GameId game, std::string market);
     bool BrowserSignIn(std::string market);

@@ -694,6 +694,9 @@ int main() {
   CHECK(ParseInstallRequests("0\n-1\n4294967296\n12x\nuninstall 12 extra\nunknown 12\n").empty());
   CHECK(ParseInstallRequests("  cancel 42  \r\n")[0].app == 42);
   CHECK(requests[0].game == playden::GameId::Steam(439490));
+  const auto xbox = ParseInstallRequests("xbox-9nf6xpsbttgb\ncancel xbox-9nf6xpsbttgb\nxbox-../bad\nxbox-9nf6xpsbttgb extra\n");
+  CHECK(xbox.size() == 2 && xbox[0].game == playden::GameId::Xbox("9NF6XPSBTTGB"));
+  CHECK(xbox[1].action == InstallRequest::Action::kCancel);
   {
     // Imported games: by their key, and `import` adds one in place (quoted words may hold spaces).
     const std::string uuid = "0f8fad5b-d9cb-469f-a165-70867728950e";

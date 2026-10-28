@@ -1865,6 +1865,17 @@ bool GenerateGameRecipe(const GameId& game, std::uint32_t runtime_number, const 
                                       : "The game's program " + first_missing + " is missing; verify the download.",
                 true);
   }
+  // Verified on PS5 with kit 0.13: this PC Game Pass build recreates a
+  // DXVK swapchain while another still owns the display. WineD3D/Zink
+  // reaches gameplay. Keep the workaround specific to the tested product
+  // and program; the player's Graphics setting can still override it.
+  if (game == GameId::Xbox("9MSVVM5NS9L6") && out.architecture == "pe64" &&
+      LowerAscii(out.launch_entries.front().executable) == "dredge.exe") {
+    out.version = 3;
+    out.graphics = "opengl";
+    out.arguments = CollapseSpaces(out.arguments + " -screen-fullscreen 0");
+  }
+  ApplyXboxCompatibilityDefaults(&out);
   // Round trip so a generated recipe obeys the same rules as a shipped one.
   GameRecipe checked;
   std::string why;
@@ -1872,6 +1883,20 @@ bool GenerateGameRecipe(const GameId& game, std::uint32_t runtime_number, const 
     return fail("XoDen could not set up this game: " + why, false);
   *recipe = std::move(checked);
   return true;
+}
+
+bool NeedsNativeD3DCompiler43(const GameRecipe& recipe) {
+  return RecipeGame(recipe) == GameId::Xbox("9PNG83MDD6SH") && recipe.architecture == "pe64" &&
+      !recipe.launch_entries.empty() && LowerAscii(recipe.launch_entries.front().executable) == "limbo.exe";
+}
+
+void ApplyXboxCompatibilityDefaults(GameRecipe* recipe) {
+  if (!recipe || !NeedsNativeD3DCompiler43(*recipe)) return;
+  const auto entries = SplitDllOverrides(recipe->dll_overrides);
+  if (std::find(entries.begin(), entries.end(), "d3dcompiler_43=n") == entries.end()) {
+    if (!recipe->dll_overrides.empty()) recipe->dll_overrides += ";";
+    recipe->dll_overrides += "d3dcompiler_43=n";
+  }
 }
 
 std::string GameProgramArchitecture(const std::string& install_root, const std::string& relative) {

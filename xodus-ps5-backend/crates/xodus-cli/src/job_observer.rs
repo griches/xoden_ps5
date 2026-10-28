@@ -12,6 +12,8 @@ pub struct DownloadProgress {
 /// Callbacks run on the engine/reporter workers. Implementations must return
 /// promptly and must not panic. Native hosts should copy into their UI mailbox.
 pub trait JobObserver: Send + Sync {
+    /// Optional in-process pause control for streaming file transfers.
+    fn pause_control(&self) -> Option<tokio::sync::watch::Receiver<bool>> { None }
     fn phase(&self, _phase: &str) {}
     fn diagnostic(&self, _code: &'static str) {}
     fn failure_code(&self) -> Option<&'static str> { None }

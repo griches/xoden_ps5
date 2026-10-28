@@ -62,14 +62,7 @@ fn image_data(bytes: &[u8]) -> Option<String> {
     Some(format!("data:{mime};base64,{}", BASE64_STANDARD.encode(bytes)))
 }
 
-fn rps_representations(ticket:&str) -> Vec<String> {
-    let bare=ticket.strip_prefix("d=").or_else(||ticket.strip_prefix("t=")).unwrap_or(ticket);
-    let mut output=vec![ticket.to_owned()];
-    for value in [bare.to_owned(),format!("d={bare}"),format!("t={bare}")] {
-        if !output.contains(&value){output.push(value);}
-    }
-    output
-}
+use xodus::api::xbox::auth::rps_representations;
 
 pub(super) async fn xbox_session(tokens: &TokenManager) -> Result<(reqwest::Client, String, String), &'static str> {
     xbox_session_with_diagnostics(tokens, &mut Vec::new()).await

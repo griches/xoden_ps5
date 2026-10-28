@@ -24,7 +24,7 @@ import zipfile
 
 LOGS = "/data/playden/logs"
 OLD_LOGS = "/data/homebrew/FAKE77031/logs"  # before 0.6.0
-IDENTITY = "/data/homebrew/FAKE77031/playden-package.identity"
+IDENTITY = "/data/homebrew/PPSA99324/playden-package.identity"
 KITS = "/data/playden/kits"
 KIT_ID = "playden-kit"
 TITLE_LOG = re.compile(r"^title-(FAKE\d{5})\.log$")
@@ -270,7 +270,7 @@ def main():
     except ftplib.Error:
         info["Playden package"] = None
     try:
-        info["Playden version"] = fetch(ftp, "/data/homebrew/FAKE77031/playden-version").decode("ascii").strip()
+        info["Playden version"] = fetch(ftp, "/data/homebrew/PPSA99324/playden-version").decode("ascii").strip()
     except (ftplib.Error, UnicodeError):
         info["Playden version"] = None
     info["firmware"] = firmware([playden_logs.get("runtime.log.1", ""), playden_logs.get("runtime.log", "")])

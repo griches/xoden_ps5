@@ -73,6 +73,7 @@ struct LiveInstalledGame {
     std::uint64_t install_bytes = 0;
     std::string volume_id;
     bool available = true;  // false while the game's drive is absent
+    bool operator==(const LiveInstalledGame&) const = default;
 };
 // A recent finished download, listed in Downloads after the queue.
 struct LiveCompletedDownload {
@@ -417,6 +418,7 @@ struct Game {
     bool demo = false;  // a Steam demo; Sort and filters › Demos hides it
     bool art_pending = false;
     bool art_failed = false;
+    std::string hero_artwork_source;
 };
 
 struct Collection {

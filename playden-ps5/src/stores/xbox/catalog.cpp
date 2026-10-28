@@ -23,6 +23,28 @@ bool OptionalText(const Value& value, const char* name, std::size_t max, std::st
 }
 }  // namespace
 
+std::optional<std::string> ParseHeroArtwork(std::string_view bytes, const GameId& game) {
+    if (!game.valid() || game.store != Store::kXbox) return {};
+    const auto root=steam::json::Parse(bytes,{2*1024*1024,24,50000,65536});
+    const auto* products=root?root->Find("Products"):nullptr;
+    if (!products || !products->is_array() || products->array().size()!=1) return {};
+    const auto& product=products->array().front();
+    const auto* id=Text(product,"ProductId",12);
+    const auto* localized=product.Find("LocalizedProperties");
+    if (!id || *id!=game.value || !localized || !localized->is_array() || localized->array().empty()) return {};
+    const auto* images=localized->array().front().Find("Images");
+    if (!images || !images->is_array() || images->array().size()>200) return {};
+    for (const char* purpose:{"SuperHeroArt","TitledHeroArt"})
+        for (const auto& image:images->array()) {
+            const auto* kind=Text(image,"ImagePurpose",32);const auto* uri=Text(image,"Uri",4096);
+            if (!kind || *kind!=purpose || !uri) continue;
+            const auto url=uri->compare(0,2,"//")==0?"https:"+*uri:*uri;
+            constexpr std::string_view prefix="https://store-images.s-microsoft.com/";
+            if (url.compare(0,prefix.size(),prefix)==0) return url;
+        }
+    return {};
+}
+
 std::optional<Catalog> ParseCatalog(std::string_view bytes) {
     const auto root = steam::json::Parse(bytes, {16 * 1024 * 1024, 8, 100000, 16384});
     if (!root || !root->is_object()) return std::nullopt;
@@ -55,7 +77,8 @@ std::optional<Catalog> ParseCatalog(std::string_view bytes) {
         if (!game.id.valid()) return std::nullopt;
         game.title = *title;
         if (!OptionalText(row, "developer", 512, game.developer) ||
-            !OptionalText(row, "artwork", 4096, game.artwork_source)) return std::nullopt;
+            !OptionalText(row, "artwork", 4096, game.artwork_source) ||
+            !OptionalText(row, "heroArtwork", 4096, game.hero_artwork_source)) return std::nullopt;
         const auto* description = row.Find("description");
         if (description && !description->is_null()) {
             if (!description->is_string() || description->text().size() > 8192) return std::nullopt;
@@ -63,6 +86,7 @@ std::optional<Catalog> ParseCatalog(std::string_view bytes) {
         }
         constexpr std::string_view prefix = "https://store-images.s-microsoft.com/";
         if (!game.artwork_source.empty() && game.artwork_source.compare(0, prefix.size(), prefix) != 0) return std::nullopt;
+        if (!game.hero_artwork_source.empty() && game.hero_artwork_source.compare(0, prefix.size(), prefix) != 0) return std::nullopt;
         result.games.push_back(std::move(game));
     }
     return result;

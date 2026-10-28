@@ -79,6 +79,9 @@ async fn streaming_resume_preserves_bytes_across_pause_and_process_restart_offse
         let restarter = tokio::spawn(async move {
             if initial_offset == 0 {
                 assert_eq!(observed.recv().await, Some(4096));
+                // A parked transfer must not finish or advance another checkpoint
+                // until the same control channel is resumed.
+                assert!(timeout(std::time::Duration::from_millis(50), observed.recv()).await.is_err());
                 resume.send(false).unwrap();
             }
         });

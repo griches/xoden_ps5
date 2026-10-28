@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <thread>
 #include <unistd.h>
+#include <sys/stat.h>
 using namespace playden;
 namespace {
 void Wait(stores::xbox::Jobs& jobs, const char* phase) {
@@ -18,6 +19,27 @@ void Put(Storage& store,const char* name,const std::string& text) { assert(store
 }
 int main() {
     char temp[]="/tmp/playden-xbox-jobs-XXXXXX"; assert(mkdtemp(temp)); const auto root=std::filesystem::canonical(temp);
+    // A first install has no Xbox state directory. The request must be saved
+    // privately before the native sign-in engine is called.
+    {
+        const auto fresh = root / "fresh-xbox";
+        std::atomic<bool> entered{false};
+        stores::xbox::JobConfig first;
+        first.root = fresh.string(); first.games_root = (root / "games").string();
+        first.native_run = [&](const auto&, const auto&,const auto&) {
+            struct stat directory{}, request{};
+            assert(lstat(fresh.c_str(), &directory) == 0 && (directory.st_mode & 0777) == 0700);
+            assert(lstat((fresh / "job-request.json").c_str(), &request) == 0 && (request.st_mode & 0777) == 0600);
+            const auto bytes = Storage(fresh.string()).Read("job-request.json"); assert(bytes.ok());
+            const auto value = steam::json::Parse(std::string(bytes.value().begin(), bytes.value().end()));
+            assert(value && value->Find("operation")->text() == "signin-browser");
+            entered = true;
+            return stores::xbox::NativeResult::Cancelled;
+        };
+        stores::xbox::Jobs first_run(first); Wait(first_run, "idle");
+        assert(first_run.BrowserSignIn("GB")); Wait(first_run, "cancelled");
+        assert(entered); first_run.Shutdown();
+    }
     Storage store(root.string());
     Put(store,"worker.json",R"({"schema":1,"titleId":"FAKE78001","installId":"local-da50300a-92a4-4c0a-9c60-a2b31cc9f0e3"})");
     bool called=false;
@@ -120,7 +142,7 @@ int main() {
     std::atomic<bool> saw_cancel{false}, allow_drain{false};
     auto native_config = config;
     native_config.handoff = [&](const auto&, const auto&, auto*) { assert(false); return false; };
-    native_config.native_run = [&](const auto& report,const auto& cancelled) {
+    native_config.native_run = [&](const auto& report,const auto& cancelled,const auto&) {
         std::filesystem::create_directories(partial);
         Put(partial_store,".nexus-streaming-v1.jsonl","resume");
         Put(partial_store,"content.bin","partial content");
@@ -148,35 +170,69 @@ int main() {
         assert(!std::filesystem::exists(partial) && !std::filesystem::exists(quarantine));
         assert(native.Snapshot()->partials.empty());
     }
-    // Pause drains IO just like cancel, but retains content and offers recovery.
+    // Pause retains the same live native job and request. Resume must neither
+    // cancel the worker nor recreate/truncate the partial files or byte counters.
     saw_cancel = false; allow_drain = false;
+    std::atomic<int> starts{0};
+    std::atomic<bool> saw_pause{false}, saw_resume{false};
+    native_config.native_run = [&](const auto& report,const auto& cancelled,const auto& paused) {
+        ++starts;
+        std::filesystem::create_directories(partial);
+        Put(partial_store,".nexus-streaming-v1.jsonl","resume");
+        Put(partial_store,"content.bin","partial content");
+        report(stores::xbox::NativeProgress{"downloading","Downloading Xbox game",40,100,9});
+        bool parked = false;
+        while (!cancelled()) {
+            const bool pause = paused();
+            if (pause != parked) {
+                parked = pause;
+                report(stores::xbox::NativeProgress{"downloading","Downloading Xbox game",40,100,pause ? 0u : 9u,pause});
+                if (pause) saw_pause = true; else saw_resume = true;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        saw_cancel = true;
+        const auto bytes = store.Read("job-request.json"); assert(bytes.ok());
+        const auto request = steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));
+        Put(store,"job-result.json","{\"schema\":1,\"requestId\":\"" + request->Find("requestId")->text() + "\",\"productId\":\"9NP1P1WFS0LB\",\"status\":\"cancelled\"}");
+        return stores::xbox::NativeResult::Cancelled;
+    };
     {
         stores::xbox::Jobs native(native_config); Wait(native,"idle");
         const auto game = GameId::Xbox("9NP1P1WFS0LB");
         assert(!native.Install(game,std::string(64,'a'),"GB","bad-content"));
         assert(native.Install(game,std::string(64,'a'),"GB","11111111-1111-4111-8111-111111111111"));
-        Wait(native,"downloading"); assert(native.Pause(game));
-        assert(!native.Cancel(game));
-        for (int i=0;i<2000 && !saw_cancel;++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        assert(saw_cancel && std::filesystem::exists(partial/"content.bin"));
-        const auto pending_request = store.Read("job-request.json"); assert(pending_request.ok());
-        const auto pending_value = steam::json::Parse(std::string(pending_request.value().begin(),pending_request.value().end()));
-        Put(store,"job-result.json","{\"schema\":1,\"requestId\":\"" + pending_value->Find("requestId")->text() + "\",\"productId\":\"9NP1P1WFS0LB\",\"status\":\"cancelled\"}");
-        allow_drain = true; Wait(native,"cancelled");
-        assert(std::filesystem::exists(partial/"content.bin"));
-        assert(native.Snapshot()->partials.size() == 1);
+        Wait(native,"downloading");
         const auto request = store.Read("job-request.json"); assert(request.ok());
+        assert(native.Pause(game)); Wait(native,"paused");
+        assert(native.Snapshot()->active && !native.Snapshot()->cancelling);
+        assert(saw_pause && !saw_cancel && starts == 1);
+        assert(native.Snapshot()->done_bytes == 40 && native.Snapshot()->total_bytes == 100);
+        assert(native.Snapshot()->bytes_per_second == 0);
+        assert(!native.Install(game,std::string(64,'a'),"GB"));
+        assert(!native.Discard(game));
+        assert(native.Resume(game));
+        for (int i=0;i<2000 && !saw_resume;++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(saw_resume && starts == 1 && !saw_cancel);
+        assert(store.Read("job-request.json").value() == request.value());
+        assert(partial_store.Read("content.bin").value() == Bytes({'p','a','r','t','i','a','l',' ','c','o','n','t','e','n','t'}));
+        assert(native.Snapshot()->done_bytes == 40);
+        // Closing the app while paused still cancels/drains safely, preserving
+        // the durable recovery path for the next process.
+        assert(native.Pause(game)); Wait(native,"paused");
+        native.Shutdown();
+        assert(saw_cancel && starts == 1 && std::filesystem::exists(partial/"content.bin"));
+        assert(native.Snapshot()->partials.size() == 1);
         const auto value = steam::json::Parse(std::string(request.value().begin(),request.value().end()));
         assert(value->Find("contentId")->text() == "11111111-1111-4111-8111-111111111111");
     }
     {
         stores::xbox::Jobs recovered(native_config); Wait(recovered,"cancelled");
-        // A reopened app restores the paused byte counters without network IO.
         assert(recovered.Snapshot()->done_bytes == 40 && recovered.Snapshot()->total_bytes == 100);
     }
     // Another operation cannot erase the selected edition used by Resume.
     Put(store,"job-request.json",R"({"schema":1,"requestId":"refresh","operation":"refresh","market":"GB"})");
-    native_config.native_run = [&](const auto&,const auto&) {
+    native_config.native_run = [&](const auto&,const auto&,const auto&) {
         const auto bytes = store.Read("job-request.json"); assert(bytes.ok());
         const auto request = steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));
         assert(request->Find("contentId")->text() == "11111111-1111-4111-8111-111111111111");
@@ -188,7 +244,7 @@ int main() {
     }
     std::filesystem::remove_all(partial);
     // Fresh completion requests preparation, while startup only inventories files.
-    native_config.native_run = [&](const auto&, const auto&) {
+    native_config.native_run = [&](const auto&, const auto&,const auto&) {
         std::filesystem::create_directories(root/"games"/"xbox-9n5pkh0kw2l1");
         Put(store,"prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9N5PKH0KW2L1\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\"xbox-9n5pkh0kw2l1\",\"executable\":\"Game.exe\"}]}");
         return stores::xbox::NativeResult::Complete;
@@ -220,7 +276,7 @@ int main() {
     }
     { stores::xbox::Jobs reload(config); Wait(reload,"idle"); assert(reload.Snapshot()->prepared.size() == 1); }
     // Refresh uses the native service without download identity or cleanup.
-    native_config.native_run = [&](const auto& report,const auto&) {
+    native_config.native_run = [&](const auto& report,const auto&,const auto&) {
         const auto bytes = store.Read("job-request.json"); assert(bytes.ok());
         const auto request = steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));
         assert(request && request->Find("operation")->text() == "refresh");
@@ -236,7 +292,7 @@ int main() {
     }
     // New native installs resolve a plan without creating download content.
     // Only an explicit package selection authorizes the actual install request.
-    native_config.native_run = [&](const auto&,const auto&) {
+    native_config.native_run = [&](const auto&,const auto&,const auto&) {
         const auto bytes = store.Read("job-request.json"); assert(bytes.ok());
         const auto request = steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));
         assert(request);
@@ -261,7 +317,7 @@ int main() {
     // Native sign-out has no download/account identity and leaves prepared games.
     std::filesystem::remove(root/"job-request.json");std::filesystem::remove(root/"job-result.json");
     auto signout_config=config;
-    signout_config.native_run=[&](const auto&,const auto&) {
+    signout_config.native_run=[&](const auto&,const auto&,const auto&) {
         const auto bytes=store.Read("job-request.json");assert(bytes.ok());
         const auto request=steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));assert(request);
         assert(request->Find("operation")->text()=="signout" && !request->Find("accountKey") && !request->Find("productId"));
@@ -280,7 +336,7 @@ int main() {
     std::filesystem::remove(root/"job-request.json");std::filesystem::remove(root/"job-result.json");
     std::atomic<int> phone_stage{0};std::atomic<bool> phone_finish{false};
     auto phone_config=config;
-    phone_config.native_run=[&](const auto& report,const auto&) {
+    phone_config.native_run=[&](const auto& report,const auto&,const auto&) {
         const auto bytes=store.Read("job-request.json");assert(bytes.ok());
         const auto request=steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));assert(request);
         assert(request->Find("operation")->text()=="signin-test" && !request->Find("accountKey"));
@@ -314,7 +370,7 @@ int main() {
     // Cancelling drains the native runner, clears the code immediately, and
     // never calls the partial-download cleanup path.
     std::atomic<bool> phone_cancel_seen{false},phone_drain{false};
-    phone_config.native_run=[&](const auto& report,const auto& cancelled) {
+    phone_config.native_run=[&](const auto& report,const auto& cancelled,const auto&) {
         report(stores::xbox::NativeProgress{"checking-sign-in","Preparing phone"});
         while(!cancelled())std::this_thread::sleep_for(std::chrono::milliseconds(1));
         phone_cancel_seen=true;while(!phone_drain)std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -338,7 +394,7 @@ int main() {
     std::filesystem::create_directories(untouched);Storage retained(untouched.string());
     Put(retained,".nexus-streaming-v1.jsonl","keep-checkpoint");
     std::atomic<bool> account_cancel{false},account_drain{false};
-    phone_config.native_run=[&](const auto& report,const auto& cancelled) {
+    phone_config.native_run=[&](const auto& report,const auto& cancelled,const auto&) {
         report(stores::xbox::NativeProgress{"refreshing","Loading library"});
         while(!cancelled())std::this_thread::sleep_for(std::chrono::milliseconds(1));
         account_cancel=true;while(!account_drain)std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -360,7 +416,7 @@ int main() {
     // Browser authentication remains an account operation. Pairing evidence
     // belongs to the exact request and success needs the native saved result.
     std::atomic<bool> browser_pairing{false},browser_continue{false};
-    phone_config.native_run=[&](const auto& report,const auto&) {
+    phone_config.native_run=[&](const auto& report,const auto&,const auto&) {
         const auto bytes=store.Read("job-request.json");assert(bytes.ok());
         const auto request=steam::json::Parse(std::string(bytes.value().begin(),bytes.value().end()));assert(request);
         assert(request->Find("operation")->text()=="signin-browser");

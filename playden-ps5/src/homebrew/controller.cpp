@@ -1867,17 +1867,35 @@ void Controller::TickXboxJobs() {
   if (state->native && ((state->active && state->active_game.valid()) || (!state->partials.empty() && (state->phase == "cancelled" || state->phase == "failed")))) {
     LiveInstallJob job; job.game_id = state->active || std::find(state->partials.begin(),state->partials.end(),state->active_game) != state->partials.end()
         ? state->active_game : state->partials.front();
-    job.state = !state->active ? (state->phase == "failed" ? JobState::Failed : JobState::Paused) : state->cancelling ? JobState::Pausing : JobState::Downloading;
+    job.state = !state->active ? (state->phase == "failed" ? JobState::Failed : JobState::Paused) : (state->cancelling || state->phase == "pausing") ? JobState::Pausing : state->phase == "paused" ? JobState::Paused : JobState::Downloading;
     job.done_bytes = state->done_bytes; job.total_bytes = state->total_bytes;
-    job.bytes_per_second = state->bytes_per_second; job.volume_id = "internal";
-    if (state->bytes_per_second && state->total_bytes > state->done_bytes)
-      job.eta_seconds = static_cast<int>(std::min<std::uint64_t>((state->total_bytes-state->done_bytes)/state->bytes_per_second,2147483647));
+    job.volume_id = "internal";
+    if (job.state == JobState::Downloading) {
+      // Native samples describe short read/write bursts. Estimate from byte
+      // history, with separate windows and refresh intervals for speed and ETA.
+      // A new phase/request or a resumed job establishes a fresh byte baseline.
+      const auto key = state->request_id + "|" + ToKey(job.game_id) + "|" + state->phase;
+      if (key != xbox_rate_key_) { xbox_download_rate_.Reset(); xbox_rate_key_ = key; }
+      const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now().time_since_epoch()).count();
+      xbox_download_rate_.Record(state->done_bytes,now);
+      const auto estimate = xbox_download_rate_.Shown(now,state->done_bytes,state->total_bytes);
+      job.bytes_per_second = estimate.bytes_per_second;
+      job.eta_seconds = estimate.eta_seconds;
+    } else {
+      xbox_download_rate_.Reset(); xbox_rate_key_.clear();
+    }
     xbox_download = std::move(job);
+  } else {
+    xbox_download_rate_.Reset(); xbox_rate_key_.clear();
   }
   model_.UpdateXboxDownload(std::move(xbox_download),state->message);
   if (!state->message.empty() && (state->phase == "failed" || state->phase == "cleaned" || state->phase == "package-choice")) model_.ShowLayoutNotice(state->message);
-  xbox_locations_.clear(); xbox_programs_.clear();
+  xbox_locations_.clear(); xbox_programs_.clear(); xbox_installed_.clear();
   for (const auto& game : state->prepared) {
+    // Owned downloads occupy storage even when a different account is active.
+    // Launch locations still require the matching account below.
+    xbox_installed_.push_back({game.game,game.installed_bytes,"internal",true});
     if (game.account_key != account) continue;
     xbox_locations_.push_back({game.game,game.root,"internal",true,installs::InstalledLocation::Ownership::kExternal,{}});
     xbox_programs_[game.game] = game.executable;
@@ -1896,13 +1914,21 @@ void Controller::TickXboxJobs() {
 void Controller::TickInstalls() {
   if (!installs_) {
     ProjectLocations({});
+    if (xbox_installed_ != xbox_installed_projected_) {
+      model_.UpdateInstalls({},xbox_installed_,{});
+      xbox_installed_projected_ = xbox_installed_;
+    }
     return;
   }
   for (const auto& request : model_.TakeInstallRequests()) {
     if (request.game_id.store == Store::kXbox) {
       if (request.kind == InstallRequestKind::Uninstall) { BeginUninstall(request.game_id,request.delete_saves); continue; }
       if (request.kind == InstallRequestKind::Pause && xbox_jobs_) {
-        if (!xbox_jobs_->Pause(request.game_id)) model_.ShowLayoutNotice("This Xbox download cannot be paused right now.");
+        if (!xbox_jobs_->Pause(request.game_id)) model_.ShowLayoutNotice("Pause is available while game files are downloading. Package preparation must finish first.");
+        continue;
+      }
+      if (request.kind == InstallRequestKind::Resume && xbox_jobs_ && xbox_jobs_->Resume(request.game_id)) {
+        model_.ShowLayoutNotice("Xbox download resumed. View progress in Downloads.");
         continue;
       }
       if (request.kind == InstallRequestKind::Cancel && xbox_jobs_) {
@@ -1971,9 +1997,10 @@ void Controller::TickInstalls() {
   // Free space changes outside Playden too, so volumes refresh every few seconds as well.
   const auto now = std::chrono::steady_clock::now();
   const bool account_changed = model_.state().account_generation != install_generation_;
+  const bool xbox_installs_changed = xbox_installed_ != xbox_installed_projected_;
   const bool space_due = now - volume_refreshed_at_ >= std::chrono::seconds(10);
   const bool licenses_due = licenses_notice_at_ && now >= *licenses_notice_at_;
-  if (snapshot.revision == install_revision_ && !account_changed && !space_due && !licenses_due) return;
+  if (snapshot.revision == install_revision_ && !account_changed && !xbox_installs_changed && !space_due && !licenses_due) return;
   {
     std::vector<LiveVolume> volumes;
     // Only attached drives are listed; one Playden can't write to is still attached, and its
@@ -1988,7 +2015,7 @@ void Controller::TickInstalls() {
     model_.UpdateVolumes(volumes, snapshot.default_volume_id, snapshot.default_volume_saved);
     volume_refreshed_at_ = now;
   }
-  if (snapshot.revision == install_revision_ && !account_changed && !licenses_due) return;
+  if (snapshot.revision == install_revision_ && !account_changed && !xbox_installs_changed && !licenses_due) return;
   install_revision_ = snapshot.revision;
   install_generation_ = model_.state().account_generation;
   std::vector<LiveInstallJob> jobs;
@@ -2014,6 +2041,9 @@ void Controller::TickInstalls() {
   }
   std::vector<LiveInstalledGame> installed;
   for (const auto& game : snapshot.installed) installed.push_back({game.id, game.install_bytes, game.volume_id, game.available});
+  for (const auto& game : xbox_installed_)
+    if (std::none_of(installed.begin(),installed.end(),[&](const auto& known) { return known.game_id == game.game_id; })) installed.push_back(game);
+  xbox_installed_projected_ = xbox_installed_;
   std::vector<LiveCompletedDownload> completed;
   for (const auto& finished : snapshot.completed)
     completed.push_back({finished.id, finished.install_bytes, finished.volume_id, finished.finished_at});

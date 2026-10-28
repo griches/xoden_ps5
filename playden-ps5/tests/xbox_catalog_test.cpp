@@ -54,6 +54,21 @@ int main(int argc, char** argv) {
     assert(parsed && parsed->games.size() == 1 && parsed->subscription_active);
     ServiceChecks(head + game + "]}");
     assert(playden::ToKey(parsed->games.front().id) == "xbox-9n5pkh0kw2l1");
+    const auto art = ParseCatalog(head + R"({"productId":"9N5PKH0KW2L1","title":"Example","artwork":"https://store-images.s-microsoft.com/poster","heroArtwork":"https://store-images.s-microsoft.com/wide"}]})");
+    assert(art && art->games.front().hero_artwork_source == "https://store-images.s-microsoft.com/wide");
+    assert(!ParseCatalog(head + R"({"productId":"9N5PKH0KW2L1","title":"Example","heroArtwork":"https://store-images.s-microsoft.com.evil/wide"}]})"));
+    const auto hero_game=playden::GameId::Xbox("9N5PKH0KW2L1");
+    const auto hero_response=[](const std::string& id,const std::string& images) {
+        return "{\"Products\":[{\"ProductId\":\""+id+"\",\"LocalizedProperties\":[{\"Images\":["+images+"]}]}]}";
+    };
+    const std::string hero_images=R"({"ImagePurpose":"Poster","Uri":"//store-images.s-microsoft.com/portrait"},{"ImagePurpose":"TitledHeroArt","Uri":"//store-images.s-microsoft.com/titled"},{"ImagePurpose":"SuperHeroArt","Uri":"//store-images.s-microsoft.com/wide"})";
+    assert(playden::stores::xbox::ParseHeroArtwork(hero_response(hero_game.value,hero_images),hero_game)=="https://store-images.s-microsoft.com/wide");
+    assert(!playden::stores::xbox::ParseHeroArtwork(hero_response("9NF6XPSBTTGB",hero_images),hero_game));
+    for (const auto* uri:{"https://store-images.s-microsoft.com.evil/wide","https://secret@store-images.s-microsoft.com/wide","http://store-images.s-microsoft.com/wide"}) {
+        const auto images="{\"ImagePurpose\":\"SuperHeroArt\",\"Uri\":\""+std::string(uri)+"\"}";
+        assert(!playden::stores::xbox::ParseHeroArtwork(hero_response(hero_game.value,images),hero_game));
+    }
+    assert(!playden::stores::xbox::ParseHeroArtwork(hero_response(hero_game.value,R"({"ImagePurpose":"Poster","Uri":"//store-images.s-microsoft.com/portrait"})"),hero_game));
     assert(!ParseCatalog(head + game + "," + game + "]}"));
     assert(!ParseCatalog(head + R"({"productId":"../escape","title":"Oops"})]})"));
     assert(!ParseCatalog(head + R"({"productId":"9N5PKH0KW2L1","title":"Oops","artwork":"https://store-images.s-microsoft.com.evil/a"})]})"));

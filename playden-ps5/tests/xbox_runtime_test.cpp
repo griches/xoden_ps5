@@ -23,6 +23,12 @@ int main() {
     std::copy(marker.begin(),marker.end(),builtin.begin()+64);
     assert(source.WriteAtomicPrivate("windows.web.dll",builtin).ok());
     std::string reason;
+    // An untrusted PE must never replace an existing shader compiler merely
+    // because its architecture/header look right.
+    assert(source.WriteAtomicPrivate("d3dcompiler_43.dll",dll).ok());
+    assert(system32.WriteAtomicPrivate("d3dcompiler_43.dll",{'k','e','e','p'}).ok());
+    assert(!playden::runtime::InstallD3DCompiler43((root/"runtime").string(),(root/"prefix").string(),&reason));
+    assert(system32.Read("d3dcompiler_43.dll").value()==playden::Bytes({'k','e','e','p'}));
     const bool installed = playden::runtime::InstallXboxRuntime((root/"runtime").string(),(root/"prefix").string(),123,&reason);
     if (!installed) std::fprintf(stderr,"%s\n",reason.c_str());
     assert(installed);

@@ -70,6 +70,39 @@ int main() {
     CHECK(*rate.Shown(15100, 11000000, 100000000).bytes_per_second > 0);
   }
   {
+    // Native Game Pass bursts vary every quarter second. The display must
+    // average them instead of dividing remaining bytes by each latest sample.
+    DownloadRate rate;
+    constexpr std::uint64_t total = 12'000'000'000ull;
+    std::uint64_t done = 0;
+    DownloadEstimate previous;
+    std::int64_t speed_changed = 0, eta_changed = 0;
+    for (std::int64_t now = 0; now <= 90000; now += 250) {
+      if (now) done += (now / 250 % 2 ? 7'900'000 : 20'000'000) / 4;
+      rate.Record(done, now);
+      const auto shown = rate.Shown(now, done, total);
+      if (now >= 30000) {
+        CHECK(shown.bytes_per_second && *shown.bytes_per_second >= 13'900'000 && *shown.bytes_per_second <= 14'000'000);
+        CHECK(shown.eta_seconds && *shown.eta_seconds >= 0);
+        const auto expected = static_cast<int>((total - done) / 13'950'000);
+        CHECK(*shown.eta_seconds >= expected - 1 && *shown.eta_seconds <= expected + 6);
+        if (shown.bytes_per_second != previous.bytes_per_second) {
+          CHECK(now - speed_changed >= DownloadRate::kSpeedRefreshMs); speed_changed = now;
+        }
+        if (shown.eta_seconds != previous.eta_seconds) {
+          CHECK(now - eta_changed >= DownloadRate::kEtaRefreshMs); eta_changed = now;
+        }
+      }
+      previous = shown;
+    }
+    // Pause and resume must not count stored bytes or the paused duration as
+    // new traffic. Wait for a fresh measurement instead of showing the old ETA.
+    rate.Reset(); rate.Record(done, 120000);
+    CHECK(!rate.Shown(120000, done, total).eta_seconds);
+    done += 30'000'000; rate.Record(done, 123000);
+    CHECK(rate.Shown(123000, done, total).bytes_per_second == 10'000'000);
+  }
+  {
     DownloadRate rate;
     rate.Record(1000, 0);
     rate.Record(5000000, 4000);

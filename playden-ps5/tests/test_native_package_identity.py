@@ -14,19 +14,19 @@ class NativePackageIdentityTests(unittest.TestCase):
             image = b"signed-title-fixture"
             (app / "eboot.bin").write_bytes(image)
             result = subprocess.run([
-                "cmake", f"-DAPP_DIR={app}", "-DTITLE_ID=FAKE77031", "-P",
+                "cmake", f"-DAPP_DIR={app}", "-DTITLE_ID=PPSA99324", "-P",
                 str(ROOT / "cmake/WriteNativePackageIdentity.cmake")],
                 capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((app / "playden-package.identity").read_text(),
-                             "playden-native/1\nFAKE77031\n" + hashlib.sha256(image).hexdigest() + "\n")
+                             "playden-native/1\nPPSA99324\n" + hashlib.sha256(image).hexdigest() + "\n")
             self.assertTrue((app / "logs").is_dir())
             self.assertTrue((app / "playden-data").is_dir())
 
     def test_missing_binary_or_invalid_title_does_not_publish_identity(self):
         with tempfile.TemporaryDirectory() as name:
             app = pathlib.Path(name)
-            for title in ("FAKE77031", "../FAKE77031"):
+            for title in ("PPSA99324", "../PPSA99324"):
                 if title.startswith("../"):
                     (app / "eboot.bin").write_bytes(b"signed-title-fixture")
                 result = subprocess.run([

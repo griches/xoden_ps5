@@ -598,7 +598,7 @@ void MicrosoftApprovalLoadsMissingLibraryWithoutAnotherAction() {
     put("prepared-games.json","{\"schema\":1,\"games\":[{\"productId\":\"9N5PKH0KW2L1\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\"xbox-9n5pkh0kw2l1\",\"executable\":\"Game.exe\"}]}");
     std::atomic<int> phone{0},refresh{0};
     stores::xbox::JobConfig config;config.root=root.string();config.games_root=(root/"games").string();
-    config.native_run=[&](const auto&,const auto&){
+    config.native_run=[&](const auto&,const auto&,const auto&){
       const auto data=storage.Read("job-request.json");assert(data.ok());
       const auto request=steam::json::Parse(std::string(data.value().begin(),data.value().end()));assert(request);
       const auto operation=request->Find("operation")->text();const auto id=request->Find("requestId")->text();
@@ -620,6 +620,101 @@ void MicrosoftApprovalLoadsMissingLibraryWithoutAnotherAction() {
     for(int i=0;i<8;++i)controller.Tick();
     assert(phone==1 && refresh==1 && !jobs.Snapshot()->active_game.valid());
     assert(backend.calls==0 && backend.restores==0);
+    controller.Shutdown();jobs.Shutdown();source.Shutdown();
+  }
+  std::filesystem::remove_all(root);
+}
+
+void XboxInstalledGamesReachStorageWithoutSteamSignIn() {
+  for (const bool legacy_service : {false,true}) {
+    char temp[]="/tmp/xoden-storage-inventory-XXXXXX";assert(mkdtemp(temp));
+    const auto root=std::filesystem::canonical(temp);
+    {
+      Storage storage(root.string());
+      const auto put=[&](const std::string& name,const std::string& value) {
+        assert(storage.WriteAtomicPrivate(name,Bytes(value.begin(),value.end())).ok());
+      };
+      const std::vector<std::string> products{"9N5PKH0KW2L1","9NP1P1WFS0LB","9NF6XPSBTTGB"};
+      std::string rows;
+      for (std::size_t i=0;i<products.size();++i) {
+        const auto folder=ToInstallId(GameId::Xbox(products[i]));
+        std::filesystem::create_directories(root/"games"/folder/"nested");
+        Storage game((root/"games"/folder).string());
+        assert(game.WriteAtomicPrivate("Game.exe",Bytes(10+i,42)).ok());
+        assert(game.WriteAtomicPrivate("nested/content.bin",Bytes(20+i,43)).ok());
+        if (!rows.empty()) rows+=",";
+        rows+="{\"productId\":\""+products[i]+"\",\"accountKey\":\""+std::string(64,'a')+"\",\"folder\":\""+folder+"\",\"executable\":\"Game.exe\"}";
+      }
+      put("prepared-games.json","{\"schema\":1,\"games\":["+rows+"]}");
+      // Neither partial downloads nor files outside a game through a symlink
+      // belong in the completed-install count or its storage size.
+      std::filesystem::create_directories(root/"games/xbox-9n0000000000");
+      Storage partial((root/"games/xbox-9n0000000000").string());
+      assert(partial.WriteAtomicPrivate(".nexus-streaming-v1.jsonl",Bytes{'x'}).ok());
+      assert(partial.WriteAtomicPrivate("partial.bin",Bytes(500,44)).ok());
+      put("unrelated.bin",std::string(1000,'x'));
+      std::filesystem::create_symlink(root/"unrelated.bin",root/"games"/ToInstallId(GameId::Xbox(products[0]))/"outside");
+      stores::xbox::JobConfig config;config.root=root.string();config.games_root=(root/"games").string();
+      config.native_run=[&](const auto&,const auto&,const auto&) {
+        const auto data=storage.Read("job-request.json");assert(data.ok());
+        const auto request=steam::json::Parse(std::string(data.value().begin(),data.value().end()));assert(request);
+        assert(request->Find("operation")->text()=="refresh");
+        // An inventory reload must update Storage even when the old install
+        // service's revision has not changed.
+        put("prepared-games.json","{\"schema\":1,\"games\":[]}");
+        put("job-result.json","{\"schema\":1,\"requestId\":\""+request->Find("requestId")->text()+"\",\"operation\":\"refresh\",\"status\":\"complete\"}");
+        return stores::xbox::NativeResult::Complete;
+      };
+      stores::xbox::Jobs jobs(config);stores::xbox::XboxLibrarySource source(root.string());
+      Simulation model({}, {},ModelMode::Live);model.SetGamePassOnly(true);
+      Repository repository;Backend backend;LicenseCheckRunner runner(repository);
+      InstallService installs(runner,(root/"steam-games").string());
+      Controller controller(model,backend,repository,nullptr,nullptr,nullptr,legacy_service?&installs:nullptr);
+      controller.SetXboxJobs(&jobs,&source);
+      Wait(controller,[&]{return model.state().installations.size()==3;});
+      assert(source.AccountKey().empty());
+      std::uint64_t bytes=0;
+      for(const auto& game:model.state().installations) { assert(game.game_id.store==Store::kXbox);bytes+=game.installed_bytes; }
+      assert(bytes==96);
+      OpenSettings(model);
+      const auto row=std::find_if(model.view().rows.begin(),model.view().rows.end(),[](const auto& item){return item.key=="settings-installed";});
+      assert(row!=model.view().rows.end() && row->enabled && row->value.find("3 games")!=std::string::npos);
+      assert(model.action("focus:settings-installed"));
+      assert(model.action("cross"));
+      assert(model.state().navigation.modals.back().id=="installed-games");
+      assert(jobs.Refresh("GB"));
+      Wait(controller,[&]{return model.state().installations.empty();});
+      assert(std::filesystem::exists(root/"games"/ToInstallId(GameId::Xbox(products[0]))/"Game.exe"));
+      controller.Shutdown();jobs.Shutdown();source.Shutdown();installs.Shutdown();
+    }
+    std::filesystem::remove_all(root);
+  }
+}
+
+void XboxDownloadDoesNotDisplayInstantaneousRateAsEta() {
+  char temp[]="/tmp/xoden-xbox-rate-XXXXXX";assert(mkdtemp(temp));
+  const auto root=std::filesystem::canonical(temp);
+  {
+    std::atomic<bool> downloading{false};
+    stores::xbox::JobConfig config;config.root=root.string();config.games_root=(root/"games").string();
+    config.native_run=[&](const auto& report,const auto& cancelled,const auto&) {
+      // Saved bytes form a baseline; the native engine's instantaneous speed
+      // must not produce a believable-looking ETA before enough history exists.
+      report(stores::xbox::NativeProgress{"downloading","Downloading Xbox game",10'000'000,1'000'000'000,20'000'000});
+      downloading=true;
+      while(!cancelled()) std::this_thread::sleep_for(1ms);
+      return stores::xbox::NativeResult::Cancelled;
+    };
+    stores::xbox::Jobs jobs(config);stores::xbox::XboxLibrarySource source(root.string());
+    Simulation model({}, {},ModelMode::Live);model.SetGamePassOnly(true);
+    Repository repository;Backend backend;Controller controller(model,backend,repository);controller.SetXboxJobs(&jobs,&source);
+    Wait(controller,[&]{return jobs.Snapshot()->phase=="idle";});
+    const auto game=GameId::Xbox("9N5PKH0KW2L1");
+    assert(jobs.Install(game,std::string(64,'a'),"GB","11111111-1111-4111-8111-111111111111"));
+    Wait(controller,[&]{return downloading && !model.state().jobs.empty();});
+    const auto& job=model.state().jobs.front();
+    assert(job.game_id==game && job.completed_bytes==10'000'000);
+    assert(!job.bytes_per_second && !job.eta_seconds);
     controller.Shutdown();jobs.Shutdown();source.Shutdown();
   }
   std::filesystem::remove_all(root);
@@ -849,4 +944,4 @@ void StaySignedInOffKeepsTheTokenInMemory() {
   }
   std::filesystem::remove_all(root);
 }
-int main() { MicrosoftApprovalLoadsMissingLibraryWithoutAnotherAction(); GamePassStartupDoesNotRestoreSteam(); StaySignedInOffKeepsTheTokenInMemory(); TitleNamesCarryTheirStore(); NoSteamSessionWithOtherGamesOpensHome(); FailedRestoreWithOtherGamesOpensHome(); OtherRestoreFailuresWithOtherGamesOpenHome(); SteamSignOutKeepsOtherGames(); PasswordSignInWithGuardCode(); PasswordFailuresAndCancel(); SlowLicenseCheckShowsAfterAFewSeconds(); CanceledStorageRetryKeepsSavedSessionIntent(); RevokedSessionCleanupRetriesAfterStorageRecovery(); StorageFailureKeepsVisibleAccount(); StorageFailureRetriesSavedSession(); ChallengeAndCancel(); AuthenticationRestoreAndSignOut(); FailedClearDoesNotSwitch(); SignInAgainKeepsTheAccount(); ExitHonorsClearWithoutStartingNewQr(); StorageFailureAndRevocation(); ConnectedLibraryAndOfflineRestart(); LicenseChangesRefreshTheLibrary(); OfflineRefreshFromTheLibraryReconnects(); ShutdownClearsLibraryBeforeSession(); RepeatedClearPreservesFirstIntent(); }
+int main() { XboxInstalledGamesReachStorageWithoutSteamSignIn(); XboxDownloadDoesNotDisplayInstantaneousRateAsEta(); MicrosoftApprovalLoadsMissingLibraryWithoutAnotherAction(); GamePassStartupDoesNotRestoreSteam(); StaySignedInOffKeepsTheTokenInMemory(); TitleNamesCarryTheirStore(); NoSteamSessionWithOtherGamesOpensHome(); FailedRestoreWithOtherGamesOpensHome(); OtherRestoreFailuresWithOtherGamesOpenHome(); SteamSignOutKeepsOtherGames(); PasswordSignInWithGuardCode(); PasswordFailuresAndCancel(); SlowLicenseCheckShowsAfterAFewSeconds(); CanceledStorageRetryKeepsSavedSessionIntent(); RevokedSessionCleanupRetriesAfterStorageRecovery(); StorageFailureKeepsVisibleAccount(); StorageFailureRetriesSavedSession(); ChallengeAndCancel(); AuthenticationRestoreAndSignOut(); FailedClearDoesNotSwitch(); SignInAgainKeepsTheAccount(); ExitHonorsClearWithoutStartingNewQr(); StorageFailureAndRevocation(); ConnectedLibraryAndOfflineRestart(); LicenseChangesRefreshTheLibrary(); OfflineRefreshFromTheLibraryReconnects(); ShutdownClearsLibraryBeforeSession(); RepeatedClearPreservesFirstIntent(); }

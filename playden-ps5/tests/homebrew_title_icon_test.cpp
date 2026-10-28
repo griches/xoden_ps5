@@ -53,13 +53,32 @@ int main() {
     return n;
   };
   CHECK(word(4)==124 && word(12)==1080 && word(16)==1920 && word(84)==0x31545844);
-  // Centre is the intact bright green cover; edges use the same cover darkened.
+  // A portrait is uniformly aspect-filled rather than placed a second time
+  // over a darkened copy. The whole middle row samples the same green band.
   const auto green = [&](unsigned x,unsigned y) {
     const auto block = 128+((y/4)*(1920/4)+x/4)*8;
     const auto color=word(block)&0xffff;
     return ((color>>5)&63)*255/63;
   };
-  CHECK(green(960,540)>=250 && green(0,540)<100);
+  CHECK(green(960,540)>=250 && green(0,540)>=250 && green(1919,540)>=250);
+  // Native 16:9 artwork stays bright and fills the entire background. Distinct
+  // vertical bands keep their positions; there is no central poster boundary.
+  ArtworkImage hero{192,108,std::vector<std::uint8_t>(192*108*4)};
+  for (unsigned y=0;y<hero.height;++y) for (unsigned x=0;x<hero.width;++x) {
+    auto* p=&hero.rgba[(y*hero.width+x)*4];
+    p[0]=x<64?255:0;p[1]=x>=64&&x<128?255:0;p[2]=x>=128?255:0;p[3]=255;
+  }
+  const auto wide=playden::homebrew::MakeTitlePicture(hero);CHECK(wide);
+  const auto block_color=[&](unsigned x,unsigned y) {
+    const auto block=128+((y/4)*(1920/4)+x/4)*8;
+    return std::uint16_t(static_cast<unsigned char>((*wide)[block])) |
+           std::uint16_t(static_cast<unsigned char>((*wide)[block+1]))<<8;
+  };
+  for (const unsigned y:{0u,540u,1079u}) {
+    CHECK((block_color(0,y)>>11)==31);
+    CHECK(((block_color(960,y)>>5)&63)==63);
+    CHECK((block_color(1919,y)&31)==31);
+  }
   CHECK(!playden::homebrew::MakeTitlePicture(ArtworkImage{}));
   CHECK(!playden::homebrew::MakeTitlePicture(ArtworkImage{10,10,std::vector<std::uint8_t>(3)}));
   std::puts("title icon tests passed");

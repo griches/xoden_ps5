@@ -440,6 +440,10 @@ class Render::Impl
         }
         if (hero_ != 0)
             glDeleteTextures(1, &hero_);
+        if (brand_icon_ != 0)
+            glDeleteTextures(1, &brand_icon_);
+        if (brand_background_ != 0)
+            glDeleteTextures(1, &brand_background_);
         if (capture_color_ != 0)
             glDeleteRenderbuffers(1, &capture_color_);
         if (capture_framebuffer_ != 0)
@@ -579,6 +583,8 @@ class Render::Impl
         if (!load_fonts())
             return false;
         if (fixture_artwork) load_art();
+        brand_icon_ = load_texture(asset("branding/xoden-icon.png"));
+        brand_background_ = load_texture(asset("branding/xoden-background.png"));
         stats_.artwork_texture_count = static_cast<std::size_t>(std::count_if(
             art_.begin(), art_.end(), [](std::uint32_t texture) { return texture != 0; })) +
             (hero_ == 0 ? 0U : 1U);
@@ -759,6 +765,14 @@ class Render::Impl
     void draw_background()
     {
         scene_.rounded_rect({0.0F, 0.0F, kWidth, kHeight}, 0.0F, kBackground);
+        if (brand_background_ != 0)
+        {
+            scene_.image(brand_background_, {0.0F, 0.0F, kWidth, kHeight}, gfx::kFullUv,
+                         gfx::Color::rgb(0xFFFFFF, 0.72F));
+            scene_.rounded_rect({0.0F, 0.0F, kWidth, kHeight}, 0.0F, kBackground.with_alpha(0.24F));
+            scene_.rounded_rect({0.0F, 0.0F, kWidth, 142.0F}, 0.0F, kBackground.with_alpha(0.64F));
+            scene_.rounded_rect({0.0F, 946.0F, kWidth, 134.0F}, 0.0F, kBackground.with_alpha(0.64F));
+        }
     }
 
     // Tab icons drawn from primitives, after the SF Symbols the macOS tabs use.
@@ -834,7 +848,12 @@ class Render::Impl
                 ++needs_you;
         const bool saves_busy = current_state_->saves_job.kind != SavesJobKind::None;
         static constexpr std::array<const char *, 5> names = {"Home", "Library", "Queue", "Saves", "Settings"};
-        float x = kSafeX;
+        if (brand_icon_ != 0)
+            scene_.image(brand_icon_, {kSafeX, 54.0F, 58.0F, 58.0F}, gfx::kFullUv,
+                         gfx::Color::rgb(0xFFFFFF), 10.0F);
+        ui::text(scene_, fonts_.semibold, "XoDen", kSafeX + 72.0F, 96.0F, 34.0F, kText);
+        scene_.line(kSafeX + 224.0F, 60.0F, kSafeX + 224.0F, 108.0F, 1.0F, kText.with_alpha(0.18F));
+        float x = kSafeX + 250.0F;
         constexpr float cy = 82.0F;
         for (int tab = 0; tab < 5; ++tab)
         {
@@ -2810,20 +2829,39 @@ class Render::Impl
     {
         const GameId id = state.navigation.detail_id.value_or(state.navigation.selected_game_id);
         const Game *game = game_by_id(state, id);
+        // The game owns this page. Keep the app's wallpaper out of its facts
+        // and description, and let the hero fade into one quiet surface.
+        scene_.rounded_rect({0.0F, 0.0F, kWidth, kHeight}, 0.0F, kBackground);
         const gfx::Rect hero{0.0F, 0.0F, kWidth, 620.0F};
         const bool live_art = !state.simulation_mode && live_artwork_ &&
             (id.store == Store::kXbox || !state.account().id.empty()) && id.valid();
         std::uint32_t hero_width=0, hero_height=0;
         const std::uint32_t hero_texture = state.simulation_mode ? hero_ :
             live_art && game ? store_texture(id, HeroUrl(*game),&hero_width,&hero_height) : 0;
-        if (hero_texture != 0 && id.store == Store::kXbox && hero_width && hero_height) {
-            // A Microsoft catalogue poster keeps its proportions. Present it
-            // on the right over the game's colour, leaving a clear title area.
+        if (id.store == Store::kXbox) {
+            std::uint32_t cover_width=0, cover_height=0;
+            const auto cover=live_art && game ? store_texture(id,CoverUrl(*game),&cover_width,&cover_height) : 0;
             scene_.gradient_rect(hero,0.0F,id_color(id),kBackground);
-            const float height=hero.h-40.0F;
-            const float width=height*static_cast<float>(hero_width)/hero_height;
-            const gfx::Rect poster{kWidth-width-160.0F,20.0F,width,height};
-            scene_.image(hero_texture,poster,gfx::kFullUv,kText,12.0F);
+            const auto backdrop=hero_texture ? hero_texture : cover;
+            const auto image_width=hero_texture ? hero_width : cover_width;
+            const auto image_height=hero_texture ? hero_height : cover_height;
+            if (backdrop && image_width && image_height) {
+                const float image_aspect=static_cast<float>(image_width)/image_height;
+                const float box_aspect=hero.w/hero.h;
+                gfx::Rect uv=gfx::kFullUv;
+                if (image_aspect>box_aspect) { uv.w=box_aspect/image_aspect; uv.x=(1.0F-uv.w)*0.5F; }
+                else { uv.h=image_aspect/box_aspect; uv.y=(1.0F-uv.h)*0.42F; }
+                scene_.image_gradient(backdrop,hero,uv,kText.with_alpha(hero_texture ? 0.70F : 0.30F),
+                                      kText.with_alpha(0.12F));
+                scene_.rounded_rect(hero,0.0F,kBackground.with_alpha(0.25F));
+            }
+            if (cover && cover_width && cover_height) {
+                const float scale=std::min(340.0F/cover_width,420.0F/cover_height);
+                const float width=cover_width*scale, height=cover_height*scale;
+                const gfx::Rect poster{kWidth-kSafeX-width,100.0F,width,height};
+                scene_.shadow(poster,12.0F,30.0F,gfx::Color::rgb(0x000000,0.50F));
+                scene_.image(cover,poster,gfx::kFullUv,kText,12.0F);
+            }
         } else if (hero_texture != 0)
             scene_.image(hero_texture, hero, gfx::kFullUv, kText);
         else
@@ -3510,28 +3548,28 @@ class Render::Impl
     {
         const float x = panel.x + 48.0F;
         const float width = panel.w - 96.0F;
-        ui::text(overlay_, fonts_.semibold, "1  OPEN ON YOUR COMPUTER", x, 278.0F + drop, 18.0F, kSecondary);
+        ui::text(overlay_, fonts_.semibold, "1  ON THE COMPUTER RUNNING THE HELPER", x, 278.0F + drop, 18.0F, kSecondary);
         overlay_.rounded_rect({x, 300.0F + drop, width, 80.0F}, 12.0F, kBackground);
         ui::text(overlay_, fonts_.semibold, view.pairing_url, x + 24.0F, 352.0F + drop, 32.0F, kText);
-        ui::paragraph(overlay_, fonts_.regular, "Chrome is required for the Microsoft sign-in window.", x, 416.0F + drop,
-                      21.0F, width, 30.0F, kSecondary, 2);
-        ui::text(overlay_, fonts_.semibold, "2  ENTER THIS PAIRING CODE", x, 488.0F + drop, 18.0F, kSecondary);
-        ui::text(overlay_, fonts_.regular, "Enter your PS5 address and the code on the page.", x, 526.0F + drop, 22.0F, kSecondary);
+        ui::paragraph(overlay_, fonts_.regular,
+                      "Start XoDen's computer sign-in helper first. Open this URL on that same computer, not your phone. Chrome is required.",
+                      x, 416.0F + drop, 21.0F, width, 30.0F, kSecondary, 3);
+        ui::text(overlay_, fonts_.semibold, "2  ENTER THIS CODE ON THE COMPUTER PAGE", x, 548.0F + drop, 18.0F, kSecondary);
         const float gap = 16.0F;
         const float group_width = (width - gap * 3) / 4;
         for (std::size_t index = 0; index < 4; ++index)
         {
             const float left = x + index * (group_width + gap);
-            overlay_.rounded_rect({left, 554.0F + drop, group_width, 122.0F}, 14.0F, kAccent.with_alpha(0.12F));
+            overlay_.rounded_rect({left, 578.0F + drop, group_width, 122.0F}, 14.0F, kAccent.with_alpha(0.12F));
             const auto group = view.pairing_code.substr(index * 5, 4);
             const float size = 60.0F;
             const float text_width = fonts_.semibold.measure(group, size);
             ui::text(overlay_, fonts_.semibold, group, left + (group_width - text_width) * 0.5F,
-                     635.0F + drop, size, kText);
+                     659.0F + drop, size, kText);
         }
-        ui::paragraph(overlay_, fonts_.regular, "Finish sign-in on your computer. XoDen saves it on your PS5.",
-                      x, 724.0F + drop, 22.0F, width, 32.0F, kSecondary, 2);
-        draw_overlay_rows(view, {panel.x + 40.0F, 830.0F + drop, panel.w - 80.0F, 112.0F - drop});
+        ui::paragraph(overlay_, fonts_.regular, "Finish sign-in in Chrome. Wait for XoDen to confirm it is saved.",
+                      x, 754.0F + drop, 22.0F, width, 32.0F, kSecondary, 2);
+        draw_overlay_rows(view, {panel.x + 40.0F, 864.0F + drop, panel.w - 80.0F, 78.0F - drop});
     }
 
     void draw_sheet_overlay(const ViewData &view)
@@ -4255,6 +4293,8 @@ class Render::Impl
     int keyboard_layouts_ = 0;  // 0 the default layouts, 1 a password's (Show), 2 a revealed password's (Hide)
     std::array<std::uint32_t, 8> art_{};
     std::uint32_t hero_ = 0;
+    std::uint32_t brand_icon_ = 0;
+    std::uint32_t brand_background_ = 0;
     std::string cached_qr_url_;
     QrMatrix cached_qr_;
     std::string cached_qr_error_;

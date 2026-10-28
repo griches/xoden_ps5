@@ -104,7 +104,9 @@ impl State {
                 self.files.insert(id, (0, total));
             }
             ProgressEvent::Advanced { id, delta } => {
-                if self.phase == "downloading" {
+                if self.phase == "initializing" && id == usize::MAX {
+                    self.completed = self.completed.saturating_add(delta);
+                } else if self.phase == "downloading" {
                     if let Some((position, total)) = self.files.get_mut(&id) {
                         let next = position.saturating_add(delta).min(*total);
                         self.completed = self.completed.saturating_add(next - *position);
@@ -160,11 +162,23 @@ pub(super) async fn report(mut events: mpsc::Receiver<ProgressEvent>, observer: 
         phase: "initializing",
         ..Default::default()
     };
+    let mut pause = observer.as_ref().and_then(|sink| sink.pause_control());
+    if let Some(control) = &pause { state.paused = *control.borrow(); }
     let mut sequence = 0;
     let mut last = Instant::now();
     let mut previous = 0;
     emit(&state, sequence, 0, observer.as_deref());
-    while let Some(event) = events.recv().await {
+    loop {
+        let event = if let Some(control) = pause.as_mut() {
+            tokio::select! {
+                event = events.recv() => event,
+                changed = control.changed() => {
+                    if changed.is_err() { pause = None; continue; }
+                    Some(ProgressEvent::Paused { paused: *control.borrow_and_update() })
+                }
+            }
+        } else { events.recv().await };
+        let Some(event) = event else { break; };
         let transition = state.apply(event);
         let elapsed = last.elapsed();
         if transition || elapsed >= Duration::from_millis(200) {
@@ -205,6 +219,20 @@ fn emit(state: &State, sequence: u64, rate: u64, observer: Option<&dyn crate::jo
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn package_initialization_reports_bytes_without_counting_them_as_game_files() {
+        let mut state = State { phase: "initializing", ..Default::default() };
+        state.apply(ProgressEvent::Advanced { id: usize::MAX, delta: 540_000_000 });
+        assert_eq!(state.completed, 540_000_000);
+        assert_eq!(state.total, None);
+        state.apply(ProgressEvent::Advanced { id: 17, delta: 99 });
+        assert_eq!(state.completed, 540_000_000);
+        state.apply(ProgressEvent::UpdateRemaining { name: "Downloading".into(), total: 1000 });
+        assert_eq!(state.completed, 0);
+        state.apply(ProgressEvent::Started { id: 17, name: "private".into(), total: 1000 });
+        state.apply(ProgressEvent::Advanced { id: 17, delta: 250 });
+        assert_eq!(state.completed, 250);
+    }
     #[test]
     fn streaming_progress_counts_files_once_and_reconciles_coalesced_tail() {
         let mut state = State::default();
@@ -276,4 +304,53 @@ async fn embedded_observer_receives_bounded_progress_without_private_names() {
     assert_eq!(records.last().unwrap().total_bytes,Some(100));
     assert!(records.iter().all(|record| !record.phase.contains("private")));
     assert!(records.windows(2).all(|pair| pair[0].sequence < pair[1].sequence));
+}
+
+#[cfg(test)]
+#[tokio::test]
+async fn embedded_pause_reports_while_idle_and_preserves_download_position() {
+    use crate::job_observer::{DownloadProgress, JobObserver};
+    use std::sync::{Arc, Mutex};
+    struct Capture {
+        control: watch::Sender<bool>,
+        records: Mutex<Vec<DownloadProgress>>,
+        events: tokio::sync::Notify,
+    }
+    impl JobObserver for Capture {
+        fn pause_control(&self) -> Option<watch::Receiver<bool>> { Some(self.control.subscribe()) }
+        fn progress(&self, progress: DownloadProgress) {
+            self.records.lock().unwrap().push(progress);
+            self.events.notify_one();
+        }
+    }
+    async fn observe(sink: &Capture, paused: bool) {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let notified = sink.events.notified();
+                if sink.records.lock().unwrap().last().is_some_and(|p|
+                    p.phase == "downloading" && p.paused == paused && p.completed_bytes == 40) { break; }
+                notified.await;
+            }
+        }).await.unwrap();
+    }
+    let (control, _) = watch::channel(false);
+    let sink = Arc::new(Capture { control, records: Mutex::new(Vec::new()), events: Default::default() });
+    let (tx, rx) = mpsc::channel(8);
+    let reporter = tokio::spawn(report(rx, Some(sink.clone())));
+    tx.send(ProgressEvent::UpdateRemaining { name: "private".into(), total: 100 }).await.unwrap();
+    tx.send(ProgressEvent::Started { id: 1, name: "private".into(), total: 100 }).await.unwrap();
+    tx.send(ProgressEvent::Advanced { id: 1, delta: 40 }).await.unwrap();
+    tx.send(ProgressEvent::Paused { paused: false }).await.unwrap();
+    observe(&sink, false).await;
+    sink.control.send_replace(true);
+    // No more transfer events: control alone must produce the paused snapshot.
+    observe(&sink, true).await;
+    assert_eq!(sink.records.lock().unwrap().last().unwrap().bytes_per_second, 0);
+    sink.control.send_replace(false);
+    observe(&sink, false).await;
+    tx.send(ProgressEvent::Completed { success: true }).await.unwrap();
+    reporter.await.unwrap();
+    let records = sink.records.lock().unwrap();
+    assert!(records.windows(2).all(|pair| pair[0].sequence < pair[1].sequence));
+    assert_eq!(records.last().unwrap().completed_bytes, 40);
 }

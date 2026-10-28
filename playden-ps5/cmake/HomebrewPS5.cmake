@@ -3,8 +3,8 @@ function(playden_add_homebrew_ps5_title)
 	if(NOT DEFINED ENV{PS5_PAYLOAD_SDK})
 		message(FATAL_ERROR "PS5_PAYLOAD_SDK is unset; use scripts/build-homebrew-ps5.sh")
 	endif()
-	if(NOT PLAYDEN_PS5_TITLE_ID MATCHES "^FAKE[0-9][0-9][0-9][0-9][0-9]$")
-		message(FATAL_ERROR "PLAYDEN_PS5_TITLE_ID is required and must match FAKE12345")
+	if(NOT PLAYDEN_PS5_TITLE_ID MATCHES "^(FAKE|PPSA)[0-9][0-9][0-9][0-9][0-9]$")
+		message(FATAL_ERROR "PLAYDEN_PS5_TITLE_ID is required and must match PPSA12345 or FAKE12345")
 	endif()
 
 	set(sdk "$ENV{PS5_PAYLOAD_SDK}")
@@ -277,6 +277,41 @@ function(playden_add_homebrew_ps5_title)
 		if(NOT EXISTS "${PLAYDEN_XBOX_WRAPPER_DLL}" OR IS_SYMLINK "${PLAYDEN_XBOX_WRAPPER_DLL}" OR IS_DIRECTORY "${PLAYDEN_XBOX_WRAPPER_DLL}")
 			message(FATAL_ERROR "The Xbox wrapper DLL must be a regular local file")
 		endif()
+		set(PLAYDEN_XBOX_RUNTIME_DIR "" CACHE PATH "Pinned Xbox Wine runtime DLL directory")
+		foreach(module xgameruntime_impl.dll windows.web.dll)
+			set(module_source "${PLAYDEN_XBOX_RUNTIME_DIR}/${module}")
+			if(NOT EXISTS "${module_source}" OR IS_SYMLINK "${module_source}" OR IS_DIRECTORY "${module_source}")
+				message(FATAL_ERROR "Missing Xbox runtime ${module}; run tools/fetch_xbox_runtime.py")
+			endif()
+			string(JSON expected_module_sha GET "${dependency_lock}" xbox_runtime files "${module}")
+			file(SHA256 "${module_source}" actual_module_sha)
+			if(NOT actual_module_sha STREQUAL expected_module_sha)
+				message(FATAL_ERROR "Pinned Xbox runtime hash mismatch for ${module}")
+			endif()
+			list(APPEND package_inputs "${module_source}")
+			set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${module_source}")
+			list(APPEND native_helper_package_commands
+				COMMAND "${CMAKE_COMMAND}" -E make_directory "${app}/xbox-runtime"
+				COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${module_source}" "${app}/xbox-runtime/${module}")
+		endforeach()
+		foreach(module d3dcompiler_43.dll DIRECTX-LICENSE.txt DIRECTX-NOTICE.md)
+			set(module_source "${PLAYDEN_XBOX_RUNTIME_DIR}/${module}")
+			if(NOT EXISTS "${module_source}" OR IS_SYMLINK "${module_source}" OR IS_DIRECTORY "${module_source}")
+				message(FATAL_ERROR "Missing Microsoft shader compiler ${module}; run tools/fetch_xbox_runtime.py")
+			endif()
+			string(JSON expected_module_sha GET "${dependency_lock}" directx_shader_compiler files "${module}" sha256)
+			file(SHA256 "${module_source}" actual_module_sha)
+			if(NOT actual_module_sha STREQUAL expected_module_sha)
+				message(FATAL_ERROR "Pinned Microsoft shader compiler hash mismatch for ${module}")
+			endif()
+			list(APPEND package_inputs "${module_source}")
+			set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${module_source}")
+			list(APPEND native_helper_package_commands
+				COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${module_source}" "${app}/xbox-runtime/${module}")
+		endforeach()
+		list(APPEND native_helper_package_commands
+			COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_SOURCE_DIR}/runtime/xbox/LICENSE" "${app}/xbox-runtime/LICENSE"
+			COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_SOURCE_DIR}/runtime/xbox/SOURCES.txt" "${app}/xbox-runtime/SOURCES.txt")
 		list(APPEND package_inputs "${PLAYDEN_XBOX_WRAPPER_DLL}")
 		set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PLAYDEN_XBOX_WRAPPER_DLL}")
 		list(APPEND native_helper_package_commands
@@ -322,6 +357,7 @@ function(playden_add_homebrew_ps5_title)
 		DEPENDS "${pie}" "${host_tool}" "${libc_prx}" "${CMAKE_SOURCE_DIR}/cmake/PackagePS5.cmake"
 			"${CMAKE_SOURCE_DIR}/cmake/WriteNativePackageIdentity.cmake"
 			"${CMAKE_SOURCE_DIR}/sce_sys/icon0.png" "${CMAKE_SOURCE_DIR}/assets/branding/generic-title-icon.png"
+			"${CMAKE_SOURCE_DIR}/assets/branding/xoden-background-v1.png"
 			"${CMAKE_SOURCE_DIR}/sce_sys/pic0.dds" "${CMAKE_SOURCE_DIR}/sce_sys/pic1.dds"
 			"${PLAYDEN_STEAM_CA_BUNDLE}" "${CMAKE_SOURCE_DIR}/LICENSE" "${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
 			${package_inputs}

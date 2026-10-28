@@ -47,7 +47,7 @@ are retained. This still needs acceptance with fresh generated settings.
 
 Latest Playden changes its launcher title to PPSA97031. Account data and kit
 remain under the shared Playden data root. Deployment must account for the old
-FAKE77031 launcher and keep rollback available. Do not edit pinned kit hashes.
+PPSA99324 launcher and keep rollback available. Do not edit pinned kit hashes.
 
 ## 2026-10-27 catalog checkpoint
 
@@ -56,7 +56,7 @@ FAKE77031 launcher and keep rollback available. Do not edit pinned kit hashes.
   snapshot validates in the native reader.
 - Native reader and asynchronous registry source committed as `ce564da`.
   Full host suite passes 149/149; PS5 package builds successfully.
-- Build scripts explicitly retain FAKE77031; this deployment uses the existing
+- Build scripts explicitly retain PPSA99324; this deployment uses the existing
   launcher identity. Verified raw backup retained in sibling xodus-games.
 - Console FTP transparently decodes SELF on retrieval. Ordinary byte comparison
   fails even for correct uploads. The uidcp get-raw envelope preserves exact
@@ -201,7 +201,7 @@ eboot.bin (SHA prefix `d2891aad89b4`) and playden-package.identity. Exact raw
 read-back passed; backup is in sibling
 `xodus-games/console-backups/20261027-xbox-cleanup-ftp`. No UID backup payload was
 used. The existing ps5vkctl control helper was restored, reported idle, and
-launched FAKE77031 successfully. Native screenshot `/tmp/playden-cleanup-startup.png`
+launched PPSA99324 successfully. Native screenshot `/tmp/playden-cleanup-startup.png`
 shows the home screen and existing Doom 64/Minishoot entries. The capture was
 retrieved and removed from the title's developer capture directory through FTP;
 no Remote Play session or virtual pad was opened. The update boots; actual
@@ -319,7 +319,7 @@ Validation/deployment: ba8bb8c passed all 152 host tests (132.32 seconds)
 and the native PS5 build. Deployed eboot SHA256
 6e610735c9afdc3a8878e165589577e8705855cdf6f28bb54724679d70ba6420
 and identity cd0d40066789 with exact read-back verification; backup is
-xodus-games/console-backups/20261027-uninstall-ui. Launched FAKE77031 and
+xodus-games/console-backups/20261027-uninstall-ui. Launched PPSA99324 and
 captured its Home screen successfully. No virtual pad was opened and no console
 uninstall was confirmed: end-to-end physical content removal remains untested
 on this build, intentionally leaving that action to Gary.

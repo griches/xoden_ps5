@@ -67,7 +67,7 @@ std::string Message(const std::string& phase) {
 NativeRunner NativeEngine(std::string root, std::string games, std::string trust, std::function<void(const std::string&)> log) {
     return [root = std::move(root),games = std::move(games),trust = std::move(trust), log = std::move(log)](
         const std::function<void(const NativeProgress&)>& progress,
-        const std::function<bool()>& cancelled) {
+        const std::function<bool()>& cancelled, const std::function<bool()>& paused) {
         // The native job drains before this scope ends. Its Rust callbacks use
         // this same live UID lease instead of locking the parent worker again.
         CredentialLease credential_identity;
@@ -109,11 +109,28 @@ NativeRunner NativeEngine(std::string root, std::string games, std::string trust
         const int started = xodus_job_start(&config,sizeof(config),XODUS_NATIVE_ABI,&handle);
         if (log) log("native job start code=" + std::to_string(started));
         if (started != 0) return NativeResult::Failed;
-        bool cancel_sent = false;
+        bool cancel_sent = false, pause_sent = false;
+        const auto began = std::chrono::steady_clock::now();
+        auto logged = began - std::chrono::seconds(10);
+        std::uint64_t last_done = 0, last_total = 0;
+        std::string last_phase;
         for (;;) {
             if (!cancel_sent && cancelled()) cancel_sent = xodus_job_cancel(handle) == 0;
+            if (!cancel_sent) {
+                const bool requested = paused();
+                if (requested != pause_sent && xodus_job_set_paused(handle,requested ? 1 : 0) == 0) pause_sent = requested;
+            }
             XodusJobSnapshot state{};
             if (xodus_job_poll(handle,&state,sizeof(state),XODUS_NATIVE_ABI) == 0) {
+                const auto now = std::chrono::steady_clock::now();
+                const std::string phase(state.phase,strnlen(state.phase,sizeof(state.phase)));
+                if (state.total_bytes || !last_total) { last_done = state.completed_bytes; last_total = state.total_bytes; }
+                if (log && (now - logged >= std::chrono::seconds(10) || phase != last_phase || state.state >= 4)) {
+                    log("native download sample elapsed_ms=" + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now-began).count()) +
+                        " phase=" + phase + " done=" + std::to_string(last_done) + " total=" + std::to_string(last_total) +
+                        " rate=" + std::to_string(state.bytes_per_second) + " state=" + std::to_string(state.state));
+                    logged = now; last_phase = phase;
+                }
                 if (state.state >= 4 && state.state <= 6) {
                     // Release succeeds only after the runtime and all file writes
                     // have drained. Never permit cleanup on a polling failure.
@@ -123,8 +140,7 @@ NativeRunner NativeEngine(std::string root, std::string games, std::string trust
                         return state.state == 4 ? NativeResult::Complete : state.state == 6 ? NativeResult::Cancelled : NativeResult::Failed;
                     }
                 }
-                const std::string phase(state.phase,strnlen(state.phase,sizeof(state.phase)));
-                progress({phase,Message(phase),state.completed_bytes,(state.flags & 1) ? state.total_bytes : 0,state.bytes_per_second});
+                progress({phase,Message(phase),state.completed_bytes,(state.flags & 1) ? state.total_bytes : 0,state.bytes_per_second,(state.flags & 2) != 0});
             } else {
                 xodus_job_cancel(handle);
                 progress({"stopping","Waiting for the Xbox downloader to stop safely…"});

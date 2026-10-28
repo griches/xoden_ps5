@@ -50,9 +50,9 @@ std::optional<std::string> MakeTitleIcon(const ArtworkImage& cover) {
   return png;
 }
 
-std::optional<std::string> MakeTitlePicture(const ArtworkImage& cover) {
-  if (!cover.width || !cover.height ||
-      cover.rgba.size() != static_cast<std::size_t>(cover.width) * cover.height * 4) return {};
+std::optional<std::string> MakeTitlePicture(const ArtworkImage& artwork) {
+  if (!artwork.width || !artwork.height ||
+      artwork.rgba.size() != static_cast<std::size_t>(artwork.width) * artwork.height * 4) return {};
   constexpr std::uint32_t width = 1920, height = 1080;
   std::string dds(128 + width * height / 2, '\0');
   const auto word = [&](std::size_t offset, std::uint32_t value) {
@@ -60,18 +60,15 @@ std::optional<std::string> MakeTitlePicture(const ArtworkImage& cover) {
   };
   dds.replace(0,4,"DDS "); word(4,124); word(8,0x81007); word(12,height); word(16,width);
   word(20,width*height/2); word(76,32); word(80,4); word(84,0x31545844); word(108,0x1000);
-  const double fill = std::max(double(width)/cover.width,double(height)/cover.height);
-  const double fit = std::min(960.0/cover.width,972.0/cover.height);
-  const double left = (width-cover.width*fit)/2, top = (height-cover.height*fit)/2;
+  const double fill = std::max(double(width)/artwork.width,double(height)/artwork.height);
   const auto sample = [&](unsigned x,unsigned y) -> std::array<unsigned,3> {
-    const bool poster = x>=left && x<width-left && y>=top && y<height-top;
-    const double sx = poster ? (x-left)/fit : (x-width/2.0)/fill+cover.width/2.0;
-    const double sy = poster ? (y-top)/fit : (y-height/2.0)/fill+cover.height/2.0;
-    const auto ix = std::clamp(static_cast<int>(sx),0,static_cast<int>(cover.width)-1);
-    const auto iy = std::clamp(static_cast<int>(sy),0,static_cast<int>(cover.height)-1);
-    const auto* p = &cover.rgba[(static_cast<std::size_t>(iy)*cover.width+ix)*4];
+    const double sx = (x+0.5-width/2.0)/fill+artwork.width/2.0;
+    const double sy = (y+0.5-height/2.0)/fill+artwork.height/2.0;
+    const auto ix = std::clamp(static_cast<int>(sx),0,static_cast<int>(artwork.width)-1);
+    const auto iy = std::clamp(static_cast<int>(sy),0,static_cast<int>(artwork.height)-1);
+    const auto* p = &artwork.rgba[(static_cast<std::size_t>(iy)*artwork.width+ix)*4];
     std::array<unsigned,3> color{};
-    for (int c=0;c<3;++c) color[c] = unsigned(p[c])*p[3]/255 * (poster ? 100 : 30)/100;
+    for (int c=0;c<3;++c) color[c] = unsigned(p[c])*p[3]/255;
     return color;
   };
   const auto pack = [](const std::array<unsigned,3>& c) -> std::uint16_t {

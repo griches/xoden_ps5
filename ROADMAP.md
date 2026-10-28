@@ -1,6 +1,6 @@
 # Remaining work
 
-Updated 2026-10-27. The [work record](xodus-games/GAMEPASS-PS5-RECORD.md) holds
+Updated 2026-10-28. The [work record](xodus-games/GAMEPASS-PS5-RECORD.md) holds
 test evidence; this page tracks outstanding functionality.
 
 ## Priorities
@@ -30,6 +30,22 @@ test evidence; this page tracks outstanding functionality.
   show a useful reason when the loader is stalled.
 - [ ] Finish multi-job queue scheduling and acceptance for interruption,
   restart, insufficient storage and cleanup.
+- [ ] Show complete notification messages, including long game names and the
+  download-progress destination. Gary saw Halo: Campaign Evolved's download
+  message cut off at "check progress in D". Allow sufficient space or wrapping;
+  investigate later, after the current crash investigation.
+- [ ] Fix Settings → Storage installed-game inventory. Gary reports "Installed
+  games: none" despite at least three games being installed. Include installed
+  Game Pass titles and their storage usage. Local fix now merges completed
+  Xbox installs into Storage, including measured file sizes, without Steam
+  sign-in. Partial downloads and symlink targets are excluded. Installed at
+  Gary's request on 2026-10-28; startup shows all four existing games. Verify
+  Settings → Storage and its totals on the console before closing this item.
+- [ ] Replace generated pic0 poster collages with the game's proper widescreen
+  artwork. Local fix renders one full-frame hero, retains separate icon artwork,
+  retrieves missing public hero metadata, and migrates old generated art on
+  stopped titles. All 153 host tests and PS5 build passed. Real-game previews
+  reviewed; app deployment and console read-back still pending.
 - [ ] Complete standalone app identity, separate title/package assets, settings
   and update ownership. XoDen's visible name, original icon/background and larger
   pairing screen are installed; existing IDs/storage retain compatibility.
@@ -40,6 +56,14 @@ test evidence; this page tracks outstanding functionality.
 - [ ] Verify subscription expiry and account changes end to end, including
   launch-time behavior; do not claim enforcement beyond the checks actually tested.
 - [ ] Expand compatibility tests, including save/reload and longer sessions.
+  Gary confirmed LIMBO works. Its pinned Microsoft shader compiler and
+  product-specific default are now bundled in XoDen; automatic bottle installation
+  and title-screen acceptance passed. Donut County hit Microsoft content-licence
+  device limit (code 501), then completed on a later retry. The native backend
+  now preserves that bounded error and the app shows the device-management
+  action. An online re-test of that UI error is pending because the latest
+  licence request succeeded. Device identity stayed stable across observed
+  attempts; Gary is comparing Microsoft device entries with another download.
 - [ ] Connect app-side compatibility reporting to this repository only if/when
   implemented. Currently ratings are local and GitHub reports are manual.
 

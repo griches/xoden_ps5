@@ -7,11 +7,31 @@
 #include "steam/backend/json.h"
 #include <algorithm>
 #include <set>
+#include <filesystem>
+#include <limits>
 #include <sys/stat.h>
 
 namespace playden::stores::xbox {
 namespace {
 using steam::json::Value;
+// Metadata only, on the Xbox service worker at admission/reload. Never scan
+// game contents from the UI thread or follow links out of the owned game tree.
+std::uint64_t InstalledBytes(const std::string& root) {
+    std::uint64_t total = 0;
+    std::error_code error;
+    std::size_t entries = 0;
+    for (std::filesystem::recursive_directory_iterator it(root, std::filesystem::directory_options::skip_permission_denied, error), end;
+         !error && it != end && ++entries <= 500000; it.increment(error)) {
+        std::error_code entry_error;
+        const auto status = it->symlink_status(entry_error);
+        if (entry_error) continue;
+        if (std::filesystem::is_symlink(status)) { it.disable_recursion_pending(); continue; }
+        if (!std::filesystem::is_regular_file(status)) continue;
+        const auto bytes = it->file_size(entry_error);
+        if (!entry_error) total += std::min<std::uint64_t>(bytes, std::numeric_limits<std::uint64_t>::max() - total);
+    }
+    return total;
+}
 std::string Text(const Value& value, const char* key) {
     const auto* field = value.Find(key); return field && field->is_string() ? field->text() : std::string{};
 }
@@ -197,8 +217,8 @@ bool Jobs::Refresh(std::string market) {
 }
 bool Jobs::Cancel(GameId game) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!config_.native_run || !busy_ || !state_->active || state_->active_game != game || cancel_requested_ || pause_requested_) return false;
-    cancel_requested_ = true;
+    if (!config_.native_run || !busy_ || !state_->active || state_->active_game != game || cancel_requested_) return false;
+    cancel_requested_ = true; pause_requested_ = false;
     auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
     next->cancelling = true; next->phase = "stopping";
     next->sign_in_code.clear(); next->sign_in_url.clear();
@@ -242,10 +262,18 @@ bool Jobs::BrowserSignIn(std::string market) {
 }
 bool Jobs::Pause(GameId game) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!config_.native_run || !busy_ || !state_->active || state_->active_game != game || cancel_requested_ || pause_requested_) return false;
+    if (!config_.native_run || !busy_ || !state_->active || state_->active_game != game || cancel_requested_ || pause_requested_ || state_->phase != "downloading") return false;
     pause_requested_ = true;
     auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
-    next->cancelling = true; next->phase = "stopping"; next->message = "Pausing download; keeping downloaded files…";
+    next->phase = "pausing"; next->message = "Pausing download; keeping downloaded files…";
+    state_ = std::move(next); return true;
+}
+bool Jobs::Resume(GameId game) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopping_ || !busy_ || !state_->active || state_->active_game != game || !pause_requested_ || cancel_requested_) return false;
+    pause_requested_ = false;
+    auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
+    next->phase = "downloading"; next->message = "Resuming Xbox download…";
     state_ = std::move(next); return true;
 }
 bool Jobs::Discard(GameId game) {
@@ -372,7 +400,7 @@ void Jobs::Load() {
                 if (!game.valid() || !Hash(account) || !Program(program) || folder != ToInstallId(game) || !seen.insert(game).second) { valid = false; break; }
                 const auto root = config_.games_root + "/" + folder;
                 struct stat st{};
-                if (lstat(root.c_str(),&st) == 0 && S_ISDIR(st.st_mode)) next->prepared.push_back({game,account,program,root,ContentId(content)?content:std::string{}});
+                if (lstat(root.c_str(),&st) == 0 && S_ISDIR(st.st_mode)) next->prepared.push_back({game,account,program,root,ContentId(content)?content:std::string{},InstalledBytes(root)});
             }
             if (!valid) { next->prepared.clear(); next->message = "Xbox's prepared-game list could not be read."; }
         }
@@ -429,9 +457,16 @@ void Jobs::Load() {
             else if (code == "account-changed") next->message = "The Xbox account changed. Refresh your Xbox library before downloading.";
             else if (code == "active-pc-subscription-required") next->message = "An active PC Game Pass or Game Pass Ultimate subscription is required.";
             else if (code == "game-entitlement-required") next->message = "This Xbox account does not currently have access to this game.";
+            else if (code == "content-device-limit") next->message = "Microsoft Store device limit reached. Unlink an old device at account.microsoft.com/devices/content, then Resume. Your download was kept.";
+            else if (code == "content-license-failed") next->message = "Microsoft could not issue this game's content licence. Try again; downloaded files were kept.";
             else if (code == "metadata-memory") next->message = "The app ran out of working memory while reading this package. Downloaded files were kept.";
             else if (code == "metadata-invalid") next->message = "The game's package data could not be read. Retry the download; existing files were kept.";
             else if (code == "package-resolution") next->message = "The Store could not find this game's PC packages. Try again.";
+            else if (code == "entitlements-http-401") next->message = "Microsoft rejected the refreshed sign-in. Reconnect your Game Pass account before downloading.";
+            else if (code == "entitlements-http-403") next->message = "Microsoft refused the library access check. Refresh your Game Pass account and try again.";
+            else if (code == "entitlements-http-429") next->message = "Microsoft is limiting library requests. Automatic retries were exhausted; wait a minute and retry.";
+            else if (code == "entitlements-http-5xx" || code == "entitlements-http-408" || code == "entitlements-request" || code == "entitlements-http")
+                next->message = "Microsoft's library access check failed before the download started. Retry shortly; installed games were kept.";
         }
         else if (phase == "package-choice") {
             next->phase = "package-choice"; next->choice_game = GameId::Xbox(Text(*request,"productId"));
@@ -468,6 +503,16 @@ void Jobs::Load() {
 }
 void Jobs::Execute(const Request& request) {
     auto identity = config_.hold_effective_uid ? config_.hold_effective_uid() : std::shared_ptr<void>{};
+    // A fresh install has no Xbox state root yet. Create it as the app user
+    // before saving the request that starts the native engine.
+    const std::filesystem::path root(config_.root);
+    auto parent = platform::ManagedDirectory::Open(root.parent_path(), platform::DirectoryPolicy::kApprovedTree);
+    auto state = parent ? parent->OpenChild(root.filename().string(), platform::DirectoryPolicy::kPrivate, true)
+                        : std::nullopt;
+    if (!state) {
+        Publish("failed", "Xbox account storage could not be prepared. Try again.");
+        return;
+    }
     if (request.browser_signin) {
         const auto id=RandomUuid();if(!id){Publish("failed","A computer sign-in request could not be created.");return;}
         const auto text="{\"schema\":1,\"requestId\":\""+*id+"\",\"operation\":\"signin-browser\",\"market\":\""+request.market+"\"}";
@@ -554,11 +599,15 @@ void Jobs::ExecuteNative(GameId game, const std::string& request_id) {
         }
         std::lock_guard<std::mutex> lock(mutex_);
         auto next = std::make_shared<JobSnapshot>(*state_); ++next->revision;
-        if (!next->cancelling) { next->phase = progress.phase; next->message = progress.message; }
+        if (!next->cancelling) {
+            next->phase = pause_requested_ ? (progress.paused ? "paused" : "pausing") : progress.phase;
+            next->message = pause_requested_ ? (progress.paused ? "Xbox download paused. Choose Resume to continue." : "Pausing download; keeping downloaded files…") : progress.message;
+        }
         if (!next->cancelling) { next->sign_in_code=std::move(code);next->sign_in_url=std::move(url); }
         next->done_bytes = progress.done_bytes; next->total_bytes = progress.total_bytes;
-        next->bytes_per_second = progress.bytes_per_second; state_ = std::move(next);
-    },[this] { std::lock_guard<std::mutex> lock(mutex_); return stopping_ || cancel_requested_ || pause_requested_; });
+        next->bytes_per_second = pause_requested_ ? 0 : progress.bytes_per_second; state_ = std::move(next);
+    },[this] { std::lock_guard<std::mutex> lock(mutex_); return stopping_ || cancel_requested_; },
+      [this] { std::lock_guard<std::mutex> lock(mutex_); return pause_requested_; });
     bool discard = false;
     { std::lock_guard<std::mutex> lock(mutex_); discard = cancel_requested_; }
     // The runner's contract guarantees no outstanding file writes here. Reload

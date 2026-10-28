@@ -1086,6 +1086,8 @@ std::string RuntimeHost::ApplyPreparationSteps(Composition& c, const rt::Runtime
     std::string reason;
     if (config_.xbox_runtime_dir.empty() || !rt::InstallXboxRuntime(config_.xbox_runtime_dir,files.prefix,config_.unix_time(),&reason,config_.xbox_wrapper_dir))
       return reason.empty() ? "The Xbox runtime has not been installed on this console." : reason;
+    if (rt::NeedsNativeD3DCompiler43(*files.recipe) &&
+        !rt::InstallD3DCompiler43(config_.xbox_runtime_dir, files.prefix, &reason)) return reason;
   }
   for (const auto& entry : files.recipe->launch_entries) {
     auto program = entry.executable;
@@ -2653,6 +2655,7 @@ void RuntimeHost::LoadGeneratedRecipes(Composition& c) {
           (bytes.ok() ? reason : bytes.message()));
       continue;
     }
+    rt::ApplyXboxCompatibilityDefaults(&recipe);
     c.recipes.push_back(std::move(recipe));
   }
   PublishRecipes(c);
@@ -4006,6 +4009,23 @@ bool RuntimeHost::RunServices() {
           if (published || !refused.empty())
             Log("startup settings app=" + std::to_string(record.runtime_number) + " " + (refused.empty() ? "applied" : refused));
         }
+      // Upgrade generated artwork on existing, stopped titles too. The old
+      // generator marker makes its collage stale even when those bytes match.
+      // RefreshTitle retains the existing title, bottle and game settings.
+      bool artwork_changed = false;
+      if (c.kit && config_.title_picture)
+        for (const auto& record : c.repository.Snapshot()) {
+          if (record.state != rt::PreparationState::kReady ||
+              !MaintenanceRefusal(c, record).empty() ||
+              c.installer->TitleMetadataCurrent(record) || !c.installer->TitleCurrent(record)) continue;
+          artwork_changed = true;
+          const auto written = WriteTitleMetadata(c, record, InstalledTitleName(record).value_or(std::string{}));
+          const auto refreshed = written.state == rt::PackageActionState::kComplete
+              ? c.installer->RefreshTitle(record) : written;
+          Log("startup artwork app=" + std::to_string(record.runtime_number) +
+              " state=" + std::to_string(static_cast<int>(refreshed.state)) + " code=" + refreshed.code);
+        }
+      if (artwork_changed) PublishInstalls(c);
       const auto leftovers = LeftoverRequests(c, false);
       Publish([&](RuntimeSnapshot& s) { s.leftover_requests = leftovers; });
       const bool kit_available = c.kit.has_value();

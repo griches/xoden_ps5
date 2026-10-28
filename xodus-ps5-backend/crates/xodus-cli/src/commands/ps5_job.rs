@@ -95,16 +95,21 @@ fn catalog_rows(body: &Value, requested: &[String]) -> Result<Vec<Value>> {
         if p["ProductType"] != "Game" { continue; }
         let localized = &p["LocalizedProperties"][0];
         let title = text(&localized["ProductTitle"], 512).ok_or("catalog-title")?;
-        let image = localized["Images"].as_array().and_then(|images| images.iter().find_map(|image| {
-            if !["BoxArt","Poster"].contains(&image["ImagePurpose"].as_str()?) { return None; }
-            let raw = image["Uri"].as_str()?;
-            let raw = if raw.starts_with("//") { format!("https:{raw}") } else { raw.into() };
-            let url = reqwest::Url::parse(&raw).ok()?;
-            (url.scheme() == "https" && url.host_str() == Some("store-images.s-microsoft.com") && url.username().is_empty()
-                && url.password().is_none() && url.port().is_none() && raw.len() < 4096).then_some(raw)
-        }));
+        let image_for = |purposes: &[&str]| -> Option<String> {
+            let images = localized["Images"].as_array()?;
+            purposes.iter().find_map(|purpose| images.iter().find_map(|image| {
+                if image["ImagePurpose"].as_str()? != *purpose { return None; }
+                let raw = image["Uri"].as_str()?;
+                let raw = if raw.starts_with("//") { format!("https:{raw}") } else { raw.into() };
+                let url = reqwest::Url::parse(&raw).ok()?;
+                (url.scheme() == "https" && url.host_str() == Some("store-images.s-microsoft.com") && url.username().is_empty()
+                    && url.password().is_none() && url.port().is_none() && raw.len() < 4096).then_some(raw)
+            }))
+        };
+        let image = image_for(&["Poster", "BoxArt"]);
+        let hero = image_for(&["SuperHeroArt", "TitledHeroArt"]);
         rows.push(json!({"productId":id,"title":title,"developer":text(&localized["DeveloperName"],512),
-            "description":localized["ShortDescription"].as_str().filter(|s|s.len()<=8192),"artwork":image}));
+            "description":localized["ShortDescription"].as_str().filter(|s|s.len()<=8192),"artwork":image,"heroArtwork":hero}));
     }
     Ok(rows)
 }
@@ -153,13 +158,31 @@ fn declared_program(bytes: &[u8]) -> Result<String> {
     if !stack.is_empty() || programs.len() != 1 { return Err("program-choice-required"); }
     programs.into_iter().next().ok_or("program-choice-required")
 }
-fn executable(root: &Path) -> Result<String> {
-    let program = declared_program(&read(&root.join("MicrosoftGame.config"), 1024 * 1024)?)?;
-    let mut path = root.to_owned();
-    for part in program.split('/') {
-        path.push(part);
-        if std::fs::symlink_metadata(&path).map_err(|_| "program-missing")?.file_type().is_symlink() { return Err("program-symlink"); }
+// Windows package paths are case insensitive. Resolve to the actual PS5
+// spelling, rejecting ambiguity and symlinks instead of following a different file.
+fn package_file(root: &Path, relative: &str) -> Result<std::path::PathBuf> {
+    let mut path=root.to_path_buf();
+    for part in relative.split('/') {
+        if part.is_empty() || part=="." || part==".." || part.contains(['\\',':']) { return Err("game-file-path"); }
+        let mut found=None;
+        for entry in std::fs::read_dir(&path).map_err(|_| "game-file-directory")? {
+            let entry=entry.map_err(|_| "game-file-directory")?;
+            if entry.file_name().to_str().is_some_and(|name|name.eq_ignore_ascii_case(part)) {
+                if found.is_some() { return Err("game-file-ambiguous"); }
+                if std::fs::symlink_metadata(entry.path()).map_err(|_| "game-file-type")?.file_type().is_symlink() { return Err("program-symlink"); }
+                found=Some(entry.path());
+            }
+        }
+        path=found.ok_or("game-file-missing")?;
     }
+    Ok(path)
+}
+
+fn executable(root: &Path) -> Result<String> {
+    let config=package_file(root,"MicrosoftGame.config")?;
+    let program=declared_program(&read(&config,1024*1024)?)?;
+    let path=package_file(root,&program)?;
+    let relative=path.strip_prefix(root).map_err(|_| "program-path")?.to_str().ok_or("program-path")?.to_owned();
     let mut file = File::open(path).map_err(|_| "program-open")?;
     let mut header = [0u8;64]; file.read_exact(&mut header).map_err(|_| "program-header")?;
     if &header[..2] != b"MZ" { return Err("program-header"); }
@@ -168,7 +191,7 @@ fn executable(root: &Path) -> Result<String> {
     file.seek(SeekFrom::Start(offset.into())).map_err(|_| "program-header")?;
     let mut pe = [0u8;6]; file.read_exact(&mut pe).map_err(|_| "program-header")?;
     if pe != *b"PE\0\0\x64\x86" { return Err("program-x64-required"); }
-    Ok(program)
+    Ok(relative)
 }
 fn remember_prepared(root: &Path, entry: Value) -> Result<()> {
     let path = root.join("prepared-games.json");
@@ -450,11 +473,37 @@ mod tests {
         assert!(catalog_rows(&json!({"Products":[p.clone()]}),&[B.into()]).is_err());
         assert!(catalog_rows(&json!({"Products":[p.clone(),p]}),&[A.into()]).is_err());
     }
+    #[test] fn catalog_keeps_portrait_and_wide_art_separate() {
+        let image=|purpose:&str,path:&str| json!({"ImagePurpose":purpose,"Uri":format!("//store-images.s-microsoft.com/{path}")});
+        let mut p=json!({"ProductId":A,"ProductType":"Game","LocalizedProperties":[{"ProductTitle":"Example","Images":[
+            image("BoxArt","square"),image("TitledHeroArt","titled"),image("Poster","portrait"),image("SuperHeroArt","wide")]}]});
+        let rows=catalog_rows(&json!({"Products":[p.clone()]}),&[A.into()]).unwrap();
+        assert_eq!(rows[0]["artwork"],"https://store-images.s-microsoft.com/portrait");
+        assert_eq!(rows[0]["heroArtwork"],"https://store-images.s-microsoft.com/wide");
+        p["LocalizedProperties"][0]["Images"]=json!([{"ImagePurpose":"SuperHeroArt","Uri":"https://secret@store-images.s-microsoft.com/wide"}]);
+        let rows=catalog_rows(&json!({"Products":[p]}),&[A.into()]).unwrap();
+        assert!(rows[0]["heroArtwork"].is_null());
+    }
     #[test] fn atomic_results_keep_request_identity_and_bounded_reads() {
         let dir = tempfile::tempdir().unwrap(); let req = parse(&serde_json::to_vec(&request()).unwrap()).unwrap();
         state(dir.path(),&req,"checking-account",json!({})).unwrap(); state(dir.path(),&req,"failed",json!({"code":"account-changed"})).unwrap();
         let result: Value = serde_json::from_slice(&read(&dir.path().join("job-result.json"),4096).unwrap()).unwrap();
         assert_eq!(result["requestId"],req.id); assert_eq!(result["status"],"failed"); assert!(read(&dir.path().join("job-result.json"),8).is_err());
+    }
+    #[test]
+    fn prepared_program_uses_the_actual_case_of_the_config_and_executable() {
+        let root=tempfile::tempdir().unwrap();
+        std::fs::create_dir(root.path().join("Win64")).unwrap();
+        std::fs::write(root.path().join("MicrosoftGame.Config"),br#"<Game><ExecutableList><Executable Name="win64/game.exe"/></ExecutableList></Game>"#).unwrap();
+        let mut pe=vec![0u8;70]; pe[..2].copy_from_slice(b"MZ"); pe[60..64].copy_from_slice(&64u32.to_le_bytes()); pe[64..].copy_from_slice(b"PE\0\0\x64\x86");
+        std::fs::write(root.path().join("Win64/Game.EXE"),pe).unwrap();
+        assert_eq!(executable(root.path()).unwrap(),"Win64/Game.EXE");
+        #[cfg(unix)] {
+            std::fs::remove_file(root.path().join("Win64/Game.EXE")).unwrap();
+            let outside=tempfile::NamedTempFile::new().unwrap();
+            std::os::unix::fs::symlink(outside.path(),root.path().join("Win64/Game.EXE")).unwrap();
+            assert_eq!(executable(root.path()).unwrap_err(),"program-symlink");
+        }
     }
     #[test] fn executable_selection_rejects_escape_ambiguity_and_non_pc_entries() {
         assert_eq!(declared_program(br#"<Game><ExecutableList><Executable Name="Game.exe"/></ExecutableList></Game>"#).unwrap(), "Game.exe");

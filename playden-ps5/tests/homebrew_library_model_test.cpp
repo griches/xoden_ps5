@@ -2758,8 +2758,11 @@ void store_art_follows_the_store() {
     xbox.id = playden::GameId::Xbox("9N5PKH0KW2L1");
     xbox.artwork_source = "https://store-images.s-microsoft.com/image/apps/example?w=4000";
     check(CoverUrl(xbox) == "https://store-images.s-microsoft.com/image/apps/example?w=600&h=900&q=85", "Xbox covers fit the bounded decoder");
-    check(HeroUrl(xbox) == CoverUrl(xbox) &&
-              LogoUrl(xbox).empty(), "Xbox details use catalogue artwork without borrowing a Steam logo");
+    check(HeroUrl(xbox).empty() &&
+              LogoUrl(xbox).empty(), "older Xbox catalogues do not pretend their cover is widescreen art");
+    xbox.hero_artwork_source = "https://store-images.s-microsoft.com/image/apps/wide?w=4000";
+    check(HeroUrl(xbox) == "https://store-images.s-microsoft.com/image/apps/wide?w=1440&h=810&q=85" &&
+              LogoUrl(xbox).empty(), "Xbox widescreen artwork fits the decoder budget and stays separate from its cover");
     Game local;
     local.id = playden::GameId::Local("0f8fad5b-d9cb-469f-a165-70867728950e");
     check(CoverUrl(local).empty() && HeroUrl(local).empty() && LogoUrl(local).empty(), "imported games have no store art");
@@ -3201,6 +3204,24 @@ void xbox_search_covers_the_complete_catalog() {
     check(std::find(scopes.begin(), scopes.end(), "xbox") != scopes.end(), "Xbox has its own library rail");
 }
 
+void fresh_gamepass_library_connects_the_microsoft_account() {
+    auto model = make_live();
+    model.SetGamePassOnly(true);
+    auto& state = const_cast<playden::homebrew::State&>(model.state());
+    state.games.clear();
+    state.library.scope = "all";
+    state.navigation.route = playden::homebrew::Route::Library;
+    model.UpdateXboxAccount("", "No account connected.", false);
+    const auto* connect = find_row(model, "library-empty");
+    check(connect && connect->title == "Connect to Game Pass" && connect->action == "xbox-account",
+          "fresh Library offers the Game Pass account flow");
+    activate(model, "library-empty");
+    check(!model.state().navigation.modals.empty() && model.state().navigation.modals.back().id == "xbox-account",
+          "empty Library opens Microsoft account options");
+    activate(model, "xbox-browser-signin");
+    check(model.TakeXboxBrowserSignIn(), "Library can start Microsoft browser sign-in");
+}
+
 void gamepass_mode_migrates_the_old_xbox_category() {
     auto model = make_live();
     model.SetGamePassOnly(true);
@@ -3249,7 +3270,8 @@ void xbox_browser_pairing_is_transient_and_cancellable() {
     check(model.TakeXboxBrowserSignIn() && !model.TakeXboxBrowserSignIn(),"browser sign-in requests one account operation");
     model.UpdateXboxBrowserSignIn("Pairing","0123456789abcdef",true);
     check(model.view().pairing_code=="0123 4567 89AB CDEF","browser fingerprint is grouped separately for pairing");
-    check(model.view().pairing_url=="http://127.0.0.1:47832","sign-in displays the page address without helper jargon");
+    check(model.view().pairing_url=="http://127.0.0.1:47832","computer helper URL remains local to the computer");
+    check(model.view().subtitle.find("helper running on your computer")!=std::string::npos,"computer helper prerequisite is explicit");
     check(model.view().subtitle.find("0123")==std::string::npos,"the large code is separate from the instructions");
     check(model.state().navigation.modals.back().link.empty(),"browser pairing never pretends to be a Microsoft device-code link");
     model.UpdateXboxBrowserSignIn("Invalid code hidden","untrusted-value",true);
@@ -3259,6 +3281,7 @@ void xbox_browser_pairing_is_transient_and_cancellable() {
 }
 
 int main() {
+    fresh_gamepass_library_connects_the_microsoft_account();
     gamepass_mode_migrates_the_old_xbox_category();
     xbox_account_help_is_visible_without_authenticating();
     xbox_signin_offers_only_the_full_authorisation_route();

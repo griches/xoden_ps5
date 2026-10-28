@@ -16,5 +16,8 @@ struct Catalog {
 };
 // The worker publishes a complete snapshot. The account fingerprint is opaque;
 // callers bind it to their selected account before presenting or installing.
+// Public Store metadata fallback for old caches without a widescreen image.
+// Only the exact requested product and Microsoft's image host are accepted.
+std::optional<std::string> ParseHeroArtwork(std::string_view bytes, const GameId& game);
 std::optional<Catalog> ParseCatalog(std::string_view bytes);
 }  // namespace playden::stores::xbox

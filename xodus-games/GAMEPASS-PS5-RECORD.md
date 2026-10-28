@@ -1531,3 +1531,299 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   was used; physical controller remains available. The larger pairing screen
   was checked in the host renderer; no additional live browser login was
   requested for this layout change. No pushes/releases.
+
+#### XoDen identity, first-run copy and separate runtime mirror (2026-10-28)
+
+- Gary requested a new title ID following his other apps. XoDen now builds as
+  PPSA99324 with content ID UP9000-PPSA99324_00-XODEN0000000000. Updated package
+  validation, exact-title Lapy helper artifact/pin, deployment/log tooling,
+  Xbox handoff return target and the Xbox wrapper's CA bundle path. The helper
+  protocol and upstream runtime kit pin are unchanged.
+- Empty Game Pass Library and welcome now say Connect to Game Pass and open
+  Xbox account options. Added a regression covering Library through browser
+  sign-in. Generic Steam UI paths retain their existing behavior.
+- At Gary's request, mirrored the exact Playden v0.7.2 kit 0.13 and discovery
+  manifest into the separate public griches/xoden-runtime repository, release
+  v0.13.0. Kit archive is 429631275 bytes, SHA256
+  6d58e72112c8e5d8ab0a4872f53cdbefb63adc436d366201cd02e704f74482b5.
+  Verified upstream digests, all 4348 manifest file hashes, published digests,
+  anonymous manifest download and anonymous ranged kit access. Original
+  licenses, source list and source provenance were retained. Only public
+  upstream runtime assets/metadata were published; app source remains private.
+- Added a pinned kit-release endpoint independent of the app's version.
+  Tests cover a differently versioned mirror and refusal of a wrong manifest
+  pin. App self-updates remain disabled in Game Pass mode.
+- Gary then requested uninstalling the old-title XoDen for now. Observed idle
+  console; moved /data/homebrew/FAKE77031 to
+  /data/xoden-retired-FAKE77031-20261028, outside discovery, and used the native
+  uninstall API. API accepted; both /data/homebrew/FAKE77031 and
+  /user/app/FAKE77031 confirmed absent. /data/playden and /data/playden-games
+  remain present. New PPSA99324 package was not deployed or launched.
+- Validation: final host suite 153/153 passed (70.70 s), final PS5 build passed,
+  signed package identity and new-title helper digest checked. An earlier
+  installed-locations test timed out; its focused retry and the complete final
+  suite passed. Xbox Windows wrapper rebuilt successfully in Lima. New-title
+  startup, game return and live sign-in remain untested on the console.
+  Logs: /tmp/xoden-final-host-tests.log, /tmp/xoden-final-ps5-build.log,
+  /tmp/xoden-title-wrapper-build.log. Final eboot SHA256:
+  c35833781cfc311a7f4e51a4286e13926e1b97a65a9a5baf7d0543b2bb5bb3f4.
+- Supplied desktop (2144x256) and mobile (2160x256) Reddit banners using a
+  built-in imagegen adaptation of the pic0 source. Artifacts and exact prompt
+  are in output/xoden-reddit at the workspace root. App artwork unchanged.
+- Changes are synchronized into the combined gamepass-ps5 checkout, including
+  the previously local visible-branding update. The runtime mirror was committed
+  and published; no application source push or release was performed.
+
+#### New-title installation and startup accepted (2026-10-28)
+
+- Gary requested installation. Confirmed the console idle, then installed the
+  already verified PPSA99324 package using console_title_deploy.py --install.
+  All 71 package files were transferred with read-back verification. Backup:
+  playden-ps5/console-backups/20261028-091945-xoden-PPSA99324-install.
+- Confirmed source and registered param.json both identify XoDen/PPSA99324.
+  Read-only app.db snapshot contains the matching content ID and metadata path;
+  FAKE77031 is absent. Launched PPSA99324 normally and confirmed it running.
+- Native-startup log confirms the new-title helper granted data access and user
+  service initialization succeeded. launch.log records the 3840x2160 display,
+  settings initialization and first frame presented at 09:21:37Z. Existing shared
+  data was reused. No controller takeover or fresh authentication was performed.
+- Gameplay, return from a game and a fresh kit download were not exercised.
+  Deployment log: /tmp/xoden-PPSA99324-install.log.
+
+#### Clean runtime download and first-run sign-in storage fix (2026-10-28)
+
+- Gary requested a fresh runtime installation to verify our mirror. Closed only
+  PPSA99324, removed /data/playden/kits and the updater downloads cache with a
+  narrowly scoped payload, and relaunched. Reset removed 4349 files (1082545581
+  bytes), zero failures. User/game data remained present. Reset log:
+  /tmp/xoden-kit-reset-result.log.
+- Console update log reported no installed kit and offered 429631275 bytes from
+  mirror release v0.13.0 at 09:35:51Z. Gary started the download. The app unpacked
+  4349 files and installed kit 0.13 at 09:38:03Z. Downloaded manifest SHA256 matches
+  the compiled pin. This build's exact release endpoint is the separate public
+  griches/xoden-runtime mirror; local-release override has no supplied assets.
+- Gary reported Microsoft sign-in: computer sign-in request could not be saved.
+  Captured via the app's frame hook without controller takeover; screenshot at
+  workspace output/xoden-signin-error.png. The Xbox state root did not exist.
+  Jobs saved job-request.json before the native engine had a chance to create
+  that root, so a truly fresh first sign-in failed locally.
+- Jobs now creates/opens the app-owned private Xbox state root on its worker,
+  under the effective-UID lease, before saving account/download requests. Uses
+  ManagedDirectory to reject symlinks and require current-user ownership/0700.
+  A missing-root browser-sign-in regression failed before the fix and passes
+  after it; it verifies the native runner sees a 0600 request inside a 0700 root.
+- Final host suite: 153/153 passed (70.57 s). PS5 build passed. Deployed 3 changed
+  files with read-back verification and relaunched PPSA99324. Backup:
+  playden-ps5/console-backups/20261028-094112-xoden-fresh-signin-fix.
+  Eboot SHA256: 70c3e7805491c3c385190b52da2313184baed38bac6f7c28865fafbd8992708c.
+  Fresh live browser sign-in still needs Gary's retry/approval; no account state
+  was created manually to conceal the missing-root condition. Source/test fix
+  synchronized into combined gamepass-ps5. No source push or release.
+
+#### Second clean app/runtime reinstall with Remote Play (2026-10-28)
+
+- Gary requested deleting the app and kit and reinstalling, then requested Remote
+  Play because TV access was lost. Started the already paired Remote Play server
+  and loopback viewer at http://127.0.0.1:8767/, opened it in the default browser,
+  and verified the live feed (60 incoming frames/s). Input is disabled in the
+  server; no virtual controller was opened. Remote Play is intentionally LEFT
+  RUNNING under Gary's explicit request. Logs: /tmp/xoden-remote-play.log and
+  /tmp/xoden-remote-view.log. Viewer: /tmp/xoden-remote-view.py.
+- Closed only XoDen, then removed /data/playden/kits, updater downloads and
+  /data/homebrew/PPSA99324 with an exact-root payload. Deleted 4421 files,
+  1211676300 bytes, zero failures. Native uninstall accepted; source and registered
+  app paths confirmed absent before reinstall. User/game data retained.
+- Reinstalled the current fixed 70c3e7805491 build, 71 files with read-back
+  verification. Backup: playden-ps5/console-backups/20261028-094531-xoden-clean-reinstall.
+  Confirmed native registration and launched PPSA99324. First frame at 09:46:52Z.
+- Remote Play image confirms the fresh Download the runtime kit? prompt, 430 MB.
+  Update log confirms no installed kit and offer from mirror release v0.13.0.
+  Left the app at the Download button for Gary's fresh-install test. Screenshot:
+  /tmp/xoden-clean-install-remote.png. The sign-in fix is included; this second
+  clean run has not yet performed Microsoft sign-in.
+
+#### Remote Play browser input controls (2026-10-28)
+
+- Gary reported that physical controller input was unavailable during Remote
+  Play and requested buttons on the DevLoop viewer. Added permanent tools
+  ps5rp_view.py / ps5rp_view.html with clickable D-pad, face, shoulder, stick-click,
+  Options, Touchpad and PS buttons plus keyboard shortcuts. Extended the existing
+  ps5rp.py tap command whitelist to these supported button codes and require a
+  ready controller before acknowledging input.
+- Restarted Remote Play with --input and replaced the temporary viewer with the
+  repo-backed viewer at the same loopback URL, http://127.0.0.1:8767/.
+  Verified 60 incoming frames/s, input_enabled=true, a directional tap accepted,
+  missing-token rejection (403), and invalid-button rejection (400). Native
+  Safari accessibility snapshot shows the viewer, live controls-enabled status
+  and every button. No DevLoop virtual pad was opened. Keyboard shortcuts and
+  launch instructions are in PS5_DevLoop/README.md. Continuous stick input and
+  holds are not implemented. Remote Play and viewer remain running.
+- Gary then questioned the localhost address. Asked whether this refers to the
+  PS5 pairing-screen computer URL or the Mac page's PS5-address field. Detected
+  that the local sign-in helper on port 47832 was not listening; started it.
+  Verified the helper responds and its PS5 address default is a private LAN
+  address, not loopback. Pairing-screen URL is intentionally a computer-local
+  helper URL; the confusing label/address presentation still needs clarification.
+
+#### Fresh-install authentication and game-install fixes (2026-10-28)
+
+- Clarified the sign-in panel: start the separate Node.js 24+ helper on the
+  computer and open its localhost URL on that same computer, not a phone.
+  Removed the briefly attempted extra console-address presentation. Gary
+  completed fresh Microsoft sign-in; the Game Pass library populated.
+- Safe bounded package diagnostics exposed `package-xbox-request`. Shared Xbox
+  package authentication now tries the same original/bare/d=/t= RPS ticket
+  representations as the working profile path, retrying only 400/401/403.
+  No entitlement or license checks were relaxed. Auth tests: 2/2; CLI tests: 89/89.
+- DREDGE downloaded its full approximately 777 MB on the PS5, then exposed a
+  Windows/PS5 filename case mismatch: MicrosoftGame.Config vs the literal
+  MicrosoftGame.config. Resolve config/executable components using unique
+  case-insensitive matches, rejecting symlinks, ambiguity and unsafe paths.
+  On retry the native job completed with `prepared`; PS5 setup is in progress.
+- Fresh app packages now include the required Xbox Wine runtime implementation
+  and windows.web DLLs, alongside our wrapper. The pinned upstream archive and
+  both DLL hashes were verified against the actual release archive. Fetching,
+  packaging checks, Wine LGPL license and source provenance are included.
+  Runtime modules now load from the packaged title's xbox-runtime directory.
+- Full host suite: 153/153 passed (72.49 s); native Rust probe and PS5 package
+  built successfully. Deployed/read-back verified eboot SHA256
+  ba442692712b48a99d42ff817cd709e5512e88aafa05c9ec3d42f4174762bdc2.
+  Backup: playden-ps5/console-backups/20261028-103532-xoden-case-and-runtime-install-fix.
+  Source synchronized into gamepass-ps5; no app source push or release yet.
+
+- Live console acceptance: DREDGE native job completed at 10:40:32Z; game
+  setup completed and registration reconciled to Ready at 10:42:33Z as
+  FAKE78001. Blood Dungeon native job completed at 10:43:59Z and reached
+  Ready at 10:45:52Z as FAKE78002. Both tiles are visible on PS5 Home and
+  both are marked Installed in XoDen. Registration requires quitting XoDen
+  for ShadowMount's shell scan; reopening reconciles the durable journal.
+- Blood Dungeon launch/gameplay check passed: signed-in profile visible,
+  opening/menu/gameplay rendered, Remote Play movement/jump/pause/menu taps
+  worked, audio grains became audible, and Quit to desktop ended with
+  PW_WINE64 exit + session_end reason=wine64-exit (no title fault). Initial
+  input delay cleared after the PS5 overlay was opened/dismissed. Screenshots
+  and private session evidence are in output/xoden-install-tests.
+- DREDGE launch currently loops on Vulkan swapchain creation with
+  VK_ERROR_NATIVE_WINDOW_IN_USE_KHR. Installation is complete, but gameplay
+  acceptance is not yet achieved. Continuing diagnosis of its graphics path.
+- Clean pinned-runtime fetch/extraction and cached reuse were exercised from
+  an empty temporary dependency root against the verified upstream archive.
+
+#### Install acceptance and DREDGE launch workaround (2026-10-28)
+
+- DREDGE's DXVK black screen reproduces after a windowed-start-only retry.
+  Switching only Graphics to OpenGL (WineD3D/Zink), retaining
+  `-screen-fullscreen 0`, reaches the signed-in menu, new-game intro and
+  dock conversation. Save and Quit at the dock succeeded, Continue reloaded
+  the progress, and undocking rendered the boat/water scene. Controller
+  dialogue/settings navigation worked. Boat movement, fishing, frame rate
+  and extended play were not tested. The title quit through its main menu.
+- Generated recipes for exact Xbox product 9MSVVM5NS9L6, pe64 DREDGE.exe,
+  now default to that verified graphics/argument combination (recipe v3).
+  Different allocated runtime numbers receive the same workaround; other
+  products and a player's explicit Graphics override remain independent.
+  Current console has the working per-game overrides retained as well.
+- Added a two-second hold option to the existing Remote Play page; both
+  HTTP and socket input validate bounded durations. Verified invalid numeric,
+  string, boolean, NaN and out-of-range requests are refused; a valid hold
+  returned after 2.0 seconds and cleared DREDGE's Begin and Undock prompts.
+  Safari's existing viewer tab was reloaded and the new checkbox is visible.
+  Remote Play remains running with input enabled.
+- Final host suite: 153/153 passed (76.77 s). Final PS5 package built with
+  eboot SHA256 9499bd1d6266e8339a6529f458fb2fac649d068f961c2fa2cb5416035556b098.
+  Compatibility chart now records Blood Dungeon's brief gameplay acceptance
+  and DREDGE's bounded launch/save-reload evidence, without claiming extended
+  gameplay coverage. Changes are local and synchronized to gamepass-ps5.
+
+- Final deployment accepted and read-back verified (2 changed files), backup
+  playden-ps5/console-backups/20261028-110849-xoden-verified-game-install-fixes.
+  XoDen relaunched with final eboot 9499bd1d6266e8339a6529f458fb2fac649d068f961c2fa2cb5416035556b098.
+  DREDGE's final main-menu Quit recorded PW_WINE64 exit and session_end
+  reason=wine64-exit. Blood Dungeon had the same clean end in its gameplay run.
+- Remote Play briefly lost its connection during the final app restart; its
+  reconnect attempt previously exited on a transient refused connection.
+  The server now retries transient startup exceptions and reports input enabled
+  only when the controller is ready. A new session recovered at 60 fps with
+  input enabled. No console reboot was needed.
+- Gary then requested ending Remote Play when finished. Stopped its active
+  session and loopback viewer server; did not disable the PS5's Remote Play
+  setting or close the currently running game. No further input sent.
+
+
+## 2026-10-28 — DREDGE normal launch, runtime 0.13.1 and High on Life 2 download
+
+- Corrected the earlier DREDGE reliability claim: the recorded menu/intro/save/dock test did not establish reliable subsequent launches. Reproduced normal startup failure: native launcher logged `zink provider=not-found`, returned exit value 1 before Wine, followed by PS5 SIGSYS. Remote Play was not the cause.
+- Added a title-specific `/data/homebrew/<kernel title ID>` runtime source fallback after the root grant, based on the exact upstream shell ce289425. Commit `ffd297dbe7249763bff5f1daaa1c9f9074131eec`; launcher SELF SHA256 `8be859d5b86ae1cf285771725085d0c77a572ae8aaef52a1820786c4c96edf3c`. Gary explicitly confirmed DREDGE opened from PS5 Home after this patch. Extended gameplay remains untested.
+- Published own runtime release https://github.com/griches/xoden-runtime/releases/tag/v0.13.1 with unchanged Wine/Mesa/helper/template and changed launcher/build marker/manifest only. Every one of 4348 manifest files checked; production admission passed locally and on PS5. Manifest SHA256 `1d49095369dc3f76e1465b3ddec3bec1433810d623c7c30bf4bd1680f4d69e59`. Source archive, exact Git bundle, patch, provenance and checksums included. Console kit changed files backed up and read back exactly.
+- Details screen redesign uses the Xbox widescreen hero separately from portrait cover, darkens/fades the header and paints a clean lower background. Host visual preview `output/xoden-ui/details-preview.png`; deployed with the downloader update, but visual console acceptance pending.
+- Blood Dungeon has its correct generated icon0 and pic0 in both title source and PS5 cache. Its separate `/user/appmeta/FAKE78002/logo.png` is MIO. ID FAKE78002 was previously MIO and subsequently reallocated; Art Swap retains its logo by title ID and restores it. This is a separate retained-logo identity bug; game files were not overwritten. Fix pending.
+- Gary reported High on Life 2 immediate failure. Current mailbox error was `entitlements-http`, before file transfer. Added bounded retries for transport failures, HTTP408/429/5xx (honour numeric Retry-After up to60s), one fresh Store-session retry on401, and clearer permanent failure codes/messages. No entitlement bypass or cached-permission fallback.
+- Added ten-second native byte/rate/elapsed samples and Xbox support to the existing development install-request file, using the catalog-bound normal Jobs service. After authorized reinstall, High on Life 2 `9NF6XPSBTTGB` passed entitlement check and package resolution. Attempt1 began12:14:19Z and failed12:16:34Z with `metadata-memory`, not entitlement failure. XVD header drive size 91,153,215,488 bytes (84.89GiB), needing about509.36MiB for page hashes/data units alone, above the previous512MiB combined UI/downloader budget. Prefix metadata download observed at540,657,576 bytes12:16:08Z; initial progress incorrectly showed zero.
+- Prepared supported1GiB direct-memory heap override and metadata-progress reporting. Retrying High on Life2 with regular speed logs; no successful full download or launch claimed yet. Remote Play remains off; no virtual input controller used.
+
+- Large-download correction built and deployed after failed attempt1: supported direct-memory heap now1GiB, metadata-prefix bytes/rates reported during initialization. Latest app SELF SHA256 `2d63c13b98660e66bc80c071e09a2282ea1f30be54d52e0c696cd716b7f2e4a0`; console deployment backed up/read back. Full153/153 host tests and92/92 CLI tests passed. Fixed a macOS mock HTTP server inheriting nonblocking mode, which caused immediate EAGAIN test flakiness; no production network behavior changed by that test fix.
+- High on Life2 attempt2 began12:22:49Z, passed entitlement/package checks and reports initial metadata transfer near6MB/s. Download monitoring is ongoing under `output/xoden-install-tests/high-on-life-2/attempt-2/`; no completion claim yet.
+
+- High on Life2 attempt2 COMPLETED: game files 91,111,436,122 bytes, transfer ended13:38:06Z after4517.321s (75m17s). Average effective game payload throughput20.169MB/s (161.35Mbps), including account checks/initial metadata and stalls. Bulk transfer sustained roughly32–34MB/s, later declined to~11–13MB/s. Native preparation completed13:39:33Z (another86.803s); whole native job4604.124s,19.789MB/s. First monitored failed attempt plus repair time5114s,17.816MB/s. Samples every10s saved in `output/xoden-install-tests/high-on-life-2/`.
+- PS5 runtime setup selected `HighOnLife2/Binaries/WinGDK/HighOnLife2-WinGDK-Shipping.exe`, recipe2. TitleFAKE78003 registered after closing XoDen and returning Home. Reopened XoDen; actual repository stateReady, no last failure or pending journal, and runtime log `prepare result app=4026531842 ready` at13:42:21Z. No High on Life2 launch or gameplay test performed. Remote Play off throughout.
+
+- Blood Dungeon stale MIO logo cleared through Art Swap's normal `APPS rescan` + `RESTORE FAKE78002 logo` protocol, without a Home restart or changing game files. Both cached `/user/appmeta/FAKE78002/logo.png` and Art Swap's retained FAKE78002.png removed; original220,167-byte MIO logo (SHA2561483af56e125e402...) and original empty `.orig` backed up under `output/xoden-ui/blood-logo-backup`. Reused native IDs remain allocator behavior; this corrects the retained custom logo for the current Blood Dungeon title.
+- Enriched the existing private catalog's artwork fields for installed DREDGE, Blood Dungeon and High on Life2 using their public Microsoft catalog metadata: Poster cover and SuperHeroArt widescreen hero. Preserved every account/entitlement field and all other games. Catalog backed up privately, atomically replaced asUID1/mode0600, read-back verified. Reopened XoDen so redesigned Details can use actual hero images.
+
+- Final verification after artwork refresh/reopen: High on Life2 stateReady, no journal or last_failure; XoDen running. All3 title admissions passed and runtime log reports3 installs. Blood Dungeon logo absence independently confirmed via directory listings (FTP SIZE was not a reliable existence test). Current native app has not been overwritten during the successful download.
+
+
+### 2026-10-28 — Halo Campaign Evolved GPU compatibility test
+
+- Correct title/product: Halo: Campaign Evolved, `9N683TDT5M7R`, PS5 title `FAKE78004`; this is separate from Halo Infinite. Installed executable `Meteorite/Binaries/WinGDK/HaloCampaignEvolved.exe`.
+- Existing launch log showed native D3D12 providers and vkd3d-proton 3.0.1 initialization. It did not identify the exact failing GPU/driver check.
+- At Gary’s request, backed up the private saved settings, set only `reported_gpu=nvidia` at revision 1, and restarted XoDen. Its normal startup publisher committed the profile; independently read back revision 1 and `dxgi.customVendorId = 10de`. No manual edits to publication receipts or game binaries.
+- Launched Halo once. A one-shot Remote Play screenshot confirmed “Your GPU or driver isn’t supported.” No menu or gameplay reached. First screenshot attempt failed; the second succeeded and disconnected automatically. No virtual controller or Remote Play input used.
+- Closed the failed test, restored the original DXVK default GPU identity at revision 2, reopened XoDen, and verified committed publication revision 2 with `dxvk.present=0` and no saved `reported_gpu` override.
+- Classification: Broken / incompatible with the current 0.13.1 runtime. This does not establish permanent incompatibility or the exact missing feature. Local evidence: `output/xoden-install-tests/halo-campaign-evolved/gpu-test/`. Raw logs/settings remain private.
+
+
+### 2026-10-28 — Balatro and BLiNX startup investigation
+
+- Balatro PC package `9PK087LNGJC5` correctly lists `love.exe`. Existing launches exit during runtime initialization, before game frames. Core Xbox runtime and wrapper match bundled files; windows.web matches the documented native-marker patch. No exact fatal cause established from normal logs.
+- BLiNX PC package `BRG51C5MWFSG` launches `EmuMenu/EmuMenu.exe`, which fails Windows App Runtime 1.8 bootstrap with `0x80004001` (not implemented). Package explicitly offers direct `Emu.exe`. A normal managed-settings test at revision 1 bypassed WinUI, then failed with “Failed to allocate guest address space” and unhandled `c0000409`; preceding Wine error identifies an unaligned placeholder partial free. No frames rendered.
+- Direct-test settings were restored in the private saved settings at revision 2. Full live-profile republish remains pending XoDen reopen: launcher service stopped answering; FTP stayed responsive. No virtual input or console reboot. Evidence under `output/xoden-install-tests/blinx/direct-emu-test/`.
+
+
+## 2026-10-28 — Small-game tests, automatic LIMBO compiler and licence diagnostics
+
+- Direct native download of LIMBO (`9PNG83MDD6SH`, `Limbo.exe`, Home
+  `FAKE78002`) completed. Default startup displayed a pixel-shader compiler
+  E5000 error. The log loaded Wine builtin d3dcompiler_43 with native DXVK D3D9.
+  Installing Microsoft's x64 compiler and selecting it removed the error. Gary
+  subsequently reported the game works; no extended-play/save acceptance claimed.
+- XoDen now bundles unmodified Microsoft.DXSDK.D3DX 9.29.952.8's x64 compiler
+  with its own licence. Builder verifies package and extracted-file SHA-256;
+  bottle installation verifies the pinned compiler and uses atomic file copying.
+  The exact Game Pass product, x64 architecture and Limbo.exe select the rule.
+  Fresh generated recipes and loaded older recipes gain the default; user
+  overrides remain separate. Preparation refuses a missing/corrupt dependency.
+- Removed the manual compiler/user override before updating the app. Normal
+  startup installed the bundled compiler; read-back hash matched the package.
+  New compiler .text matches the original gameplay-tested redistributable. A
+  later launch reached the title screen again. Native DLL/override/profile
+  evidence and screenshots are kept locally under small-games.
+- Donut County (`9N6V2181GHLM`) twice failed after ~1.95 MB of metadata and
+  before payload files. Private local reproduction with the existing device
+  credentials returned HTTP 200 with licensing satisfaction failure 501
+  (`content-device-limit`). No new device or sign-in was provisioned for that
+  reproduction. The stored device identity matched the console afterwards.
+  A subsequent native retry acquired the licence and completed installation
+  as FAKE78004. Gary launched it; gameplay outcome still awaits his report.
+- Native download diagnostics now retain the fixed device-limit code instead
+  of generic download-failed. The UI directs the user to Microsoft's content
+  devices page to unlink an unused device, keeping partial files. No devices
+  were unlinked by the agent. The new online error path could not be re-triggered
+  because the most recent request succeeded.
+- Final functional SELF e2a3fd91f62a6877e07a0afa19b2bfef34ca28b190fe76842ea51c1c8fba3efb
+  deployed with backup. Full 153 host tests, 94 Rust library tests, native
+  cross-build and PS5 package build passed. Earlier full-frame pic0 correction
+  was also included in this working-tree build. No public release/commit/push.
+- Microsoft device-identity baseline retained privately for Gary's next install
+  comparison. Remote Play was disconnected after each screenshot. User's
+  running Donut County was left alone. Brotato package selected but not downloaded.

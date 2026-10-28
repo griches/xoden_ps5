@@ -17,3 +17,9 @@
 **/__pycache__/
 *.pyc
 .DS_Store
+
+# Local release staging and console diagnostics
+/output/
+/release-dist/
+/playden-ps5/output/
+/playden-ps5/console-backups/

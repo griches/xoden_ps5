@@ -13,6 +13,8 @@ static void job_test(void) {
     XodusJobSnapshot state = {0};
     assert(xodus_job_start(NULL,0,XODUS_NATIVE_ABI,&handle) == -1 && handle == 99);
     assert(xodus_job_poll(0,&state,sizeof(state),XODUS_NATIVE_ABI) == -2);
+    assert(xodus_job_set_paused(0,2) == -1);
+    assert(xodus_job_set_paused(0,1) == -2);
     char root[] = "/tmp/xodus-job-test-XXXXXX";
     assert(mkdtemp(root));
     char request[256], lock[256];
@@ -32,7 +34,9 @@ static void job_test(void) {
         usleep(10000);
     }
     assert(state.state == 5 && strcmp(state.error,"trust-open") == 0);
+    assert(xodus_job_set_paused(handle,1) == -3);
     assert(xodus_job_release(handle) == 0);
+    assert(xodus_job_set_paused(handle,0) == -2);
     assert(xodus_job_cancel(handle) == -2);
     assert(xodus_job_poll(handle,&state,sizeof(state),XODUS_NATIVE_ABI) == -2);
     assert(unlink(request) == 0); assert(unlink(lock) == 0); assert(rmdir(root) == 0);

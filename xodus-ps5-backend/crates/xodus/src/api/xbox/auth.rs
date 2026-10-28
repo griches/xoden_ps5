@@ -2,6 +2,17 @@ use crate::models::xbox::{
     UserAuthProperties, UserAuthRequest, XstsPropertyBag, XstsRequest, XstsResponse,
 };
 
+/// Try the original broker ticket first, then the explicit RPS representations.
+/// Each representation is validated by Xbox; never change credentials or claims.
+pub fn rps_representations(ticket: &str) -> Vec<String> {
+    let bare=ticket.strip_prefix("d=").or_else(||ticket.strip_prefix("t=")).unwrap_or(ticket);
+    let mut output=vec![ticket.to_owned()];
+    for value in [bare.to_owned(),format!("d={bare}"),format!("t={bare}")] {
+        if !output.contains(&value) { output.push(value); }
+    }
+    output
+}
+
 pub async fn authenticate_xbox_user(
     client: &reqwest::Client,
     rps_ticket: String,
@@ -71,6 +82,18 @@ pub async fn authenticate_xbox_user_with_diagnostics(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn browser_ticket_representations_are_bounded_and_keep_the_original_first() {
+        for original in ["synthetic", "d=synthetic", "t=synthetic"] {
+            let values=rps_representations(original);
+            assert_eq!(values[0],original);
+            assert_eq!(values.len(),3);
+            assert!(values.iter().any(|value|value=="synthetic"));
+            assert!(values.iter().any(|value|value=="d=synthetic"));
+            assert!(values.iter().any(|value|value=="t=synthetic"));
+            assert!(values.iter().all(|value|!value.contains("=d=")&&!value.contains("=t=")));
+        }
+    }
     #[test]
     fn xbox_rejection_diagnostics_accept_only_numeric_codes() {
         assert_eq!(rejection_code(br#"{"XErr":2148916233,"Message":"private"}"#),Some(2148916233));

@@ -1,4 +1,19 @@
-# Native PS5 downloader boundary — in development
+# Native PS5 downloader boundary
+
+## XoDen 0.1.0 status
+
+The `job-engine` build is embedded in the released PS5 app. Direct console
+sign-in/library refresh, downloads, cancellation/recovery and game preparation
+have console acceptance recorded in the repository's work record. Pause/resume
+and bounded diagnostics are included. The default feature set remains a
+header-inspection boundary, not the complete downloader.
+
+For user setup and current limitations, read the top-level XoDen README and
+COMPATIBILITY.md. The early bring-up checkpoints below are retained as history;
+statements there that native execution is not wired/accepted describe those
+older checkpoints, not this release. The probe builder still never deploys.
+
+## Historical bring-up and API reference
 
 This crate is the C interface being built for Playden's native Xbox downloader.
 Its default build inspects a single 4096-byte XVD package header. The optional

@@ -1198,6 +1198,23 @@ void RepairsBottleRegistryModes() {
   CHECK(Read(title_param).find(R"(Half-Life \"2\" (Steam))") != std::string::npos);
   CHECK(fixture.registry_mutations == 2);
   upgraded.Shutdown();
+  // An already-owned collage refreshes automatically at startup. New versions
+  // must change both the private source and installed pic0, without recreating
+  // the bottle or needing a download/registration cycle.
+  const auto metadata=fixture.root / "data/playden/games/steam-220/title-metadata";
+  Write(metadata / ".generated","2\n",0600);
+  Write(metadata / "sce_sys/pic0.dds","old poster collage",0600);
+  Write(fixture.root / "data/homebrew/FAKE78001/sce_sys/pic0.dds","old poster collage",0644);
+  const auto registry_before=Read(user_reg);
+  named.title_picture=[](const playden::GameId&) -> std::optional<std::string> { return "new full-frame hero"; };
+  RuntimeHost refreshed_art(named);CHECK(refreshed_art.Start());
+  const auto art=WaitFor(refreshed_art,Started);
+  CHECK(art.installs[0].title_current);
+  CHECK(Read(metadata / ".generated")=="3\n");
+  CHECK(Read(metadata / "sce_sys/pic0.dds")=="new full-frame hero");
+  CHECK(Read(fixture.root / "data/homebrew/FAKE78001/sce_sys/pic0.dds")=="new full-frame hero");
+  CHECK(Read(user_reg)==registry_before);
+  refreshed_art.Shutdown();
 }
 
 // Play from Playden: the worker checks the Ready title and prepares a session;

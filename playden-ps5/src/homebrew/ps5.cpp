@@ -30,6 +30,7 @@
 #include "runtime/kit_admission.h"
 #include "runtime/kit_trust.h"
 #include "update/update_service.h"
+#include "update/app_swap.h"
 #include "homebrew/input_adapter.hpp"
 #include "homebrew/usb_keyboard.hpp"
 #include "core/input.hpp"
@@ -61,11 +62,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// A 22 GB MSIXVC package needs about 124 MiB of page tables before the
-// renderer/network allocations. The driver's 128 MiB default forces large
-// tables into the small libc fallback heap. Use its supported direct-memory
-// heap override for the combined UI and single native download worker.
-extern "C" const size_t ps5_opengl_heap_size = 512u * 1024u * 1024u;
+// High on Life 2's 84.89 GiB package needs about 509 MiB of page tables,
+// in addition to the UI and bounded transfer buffers. Reserve the driver's
+// supported direct-memory heap for the combined UI and single downloader.
+extern "C" const size_t ps5_opengl_heap_size = 1024u * 1024u * 1024u;
 
 extern "C" void playden_release_splash(void);
 // The native signer requires every referenced export to resolve, including
@@ -433,6 +433,7 @@ int main() {
         playden::update::UpdateConfig update_config;
         update_config.latest_release_url = "https://api.github.com/repos/leolobato/playden-ps5/releases/latest";
         update_config.releases_page = "https://github.com/leolobato/playden-ps5/releases";
+        update_config.kit_release_url = "https://api.github.com/repos/griches/xoden-runtime/releases/tags/v0.13.1";
         update_config.title_id = PLAYDEN_PS5_TITLE_ID;
         update_config.installed_root = std::string("/data/homebrew/") + PLAYDEN_PS5_TITLE_ID;
         update_config.work_root = "/data/playden/self-update";
@@ -474,6 +475,23 @@ int main() {
         };
         update_config.log = [](const std::string& line) { playden::app::AppendLogLine(log_root, "update.log", line); };
         update_config.local_release_dir = paths.title_root + "/dev/update-local";
+        // Folder deployments also need to refresh the presentation copies made
+        // at registration. Skip unchanged files; account/game data is elsewhere.
+        const bool presentation = playden::ps5::WithRoot([&] {
+            bool changed = false;
+            for (const auto& destination : {update_config.appmeta_root, update_config.registered_app_root + "/sce_sys"}) {
+                struct stat folder{};
+                if (lstat(destination.c_str(), &folder) != 0 || !S_ISDIR(folder.st_mode)) continue;
+                for (const auto* name : {"param.json", "icon0.png", "pic0.dds", "pic1.dds"}) {
+                    const auto source = playden::runtime::HashArtifactFile(paths.title_root + "/sce_sys/" + name);
+                    if (source && source != playden::runtime::HashArtifactFile(destination + "/" + name)) changed = true;
+                }
+            }
+            if (!changed) return true;
+            return playden::update::RefreshRegisteredCopies(paths.title_root + "/sce_sys", update_config.appmeta_root,
+                update_config.registered_app_root, update_config.log);
+        });
+        playden::app::AppendLogLine(log_root, "update.log", std::string("registered presentation synchronized=") + (presentation ? "1" : "0"));
         playden::update::UpdateService self_update(std::move(update_config));
         playden::app::AppendLogLine(log_root, "update.log",
                                     "self-update: XoDen " + playden::update::CurrentVersion().ToString() + " started");
@@ -578,7 +596,7 @@ int main() {
                 std::fclose(file);
                 if (!bytes.empty()) generic_icon = std::move(bytes);
             }
-            const auto title_cover = [trust = paths.trust_store](const playden::GameId& id)
+            const auto title_artwork = [trust = paths.trust_store](const playden::GameId& id, bool hero)
                 -> std::optional<playden::homebrew::ArtworkImage> {
                 playden::homebrew::Game game; game.id = id;
                 if (id.store == playden::Store::kXbox) {
@@ -587,22 +605,40 @@ int main() {
                     const auto catalog = bytes.ok() ? playden::stores::xbox::ParseCatalog(
                         std::string_view(reinterpret_cast<const char*>(bytes.value().data()),bytes.value().size())) : std::nullopt;
                     if (catalog) for (const auto& item : catalog->games)
-                        if (item.id == id) { game.artwork_source = item.artwork_source; break; }
+                        if (item.id == id) { game.artwork_source = item.artwork_source; game.hero_artwork_source = item.hero_artwork_source; break; }
                 }
-                const auto source = playden::homebrew::CoverUrl(game);
+                auto source = hero ? playden::homebrew::HeroUrl(game) : playden::homebrew::CoverUrl(game);
+                if (hero && id.store == playden::Store::kXbox && source.empty()) {
+                    // Older library caches only contain the poster. Retrieve
+                    // public widescreen artwork without changing account data.
+                    playden::steam::HttpClient client(trust);
+                    playden::steam::HttpRequest request;
+                    request.url = "https://displaycatalog.mp.microsoft.com/v7.0/products?bigIds=" + id.value + "&market=GB&languages=en-gb";
+                    request.timeout_ms = 10000; request.max_response_bytes = 2*1024*1024;
+                    const std::atomic<bool> cancel{false};
+                    const auto response=client.Perform(request,cancel);
+                    if (response.status_code==200)
+                        source=playden::stores::xbox::ParseHeroArtwork(
+                            std::string_view(reinterpret_cast<const char*>(response.body.data()),response.body.size()),id).value_or(std::string{});
+                }
+                if (hero && id.store == playden::Store::kXbox && !source.empty())
+                    source = source.substr(0,source.find('?')) + "?w=1920&h=1080&q=90";
                 if (source.empty()) return std::nullopt;
                 playden::homebrew::HttpArtworkBackend backend(trust,"/data/playden/user/artwork-cache");
                 const std::atomic<bool> cancel{false};
                 return backend.Load({1,id,source},cancel);
             };
-            config.title_icon = [title_cover,generic_icon](const playden::GameId& game) -> std::optional<std::string> {
-                const auto cover = title_cover(game);
+            config.title_icon = [title_artwork,generic_icon](const playden::GameId& game) -> std::optional<std::string> {
+                const auto cover = title_artwork(game,false);
                 if (auto icon = cover ? playden::homebrew::MakeTitleIcon(*cover) : std::nullopt) return icon;
                 return generic_icon;
             };
-            config.title_picture = [title_cover](const playden::GameId& game) -> std::optional<std::string> {
-                const auto cover = title_cover(game);
-                return cover ? playden::homebrew::MakeTitlePicture(*cover) : std::nullopt;
+            config.title_picture = [title_artwork](const playden::GameId& game) -> std::optional<std::string> {
+                const auto hero = title_artwork(game,true);
+                // Missing widescreen art gets a clean neutral background. Never
+                // enlarge a portrait or retain a previously generated collage.
+                const playden::homebrew::ArtworkImage neutral{1,1,{10,14,11,255}};
+                return playden::homebrew::MakeTitlePicture(hero ? *hero : neutral);
             };
             // What Playden downloads for a game's bottle (Microsoft's Visual C++ redistributable, for games that need
             // MFC): ranged HTTPS GETs on the worker, with its own client made on first use. Redirects are followed by
@@ -647,7 +683,7 @@ int main() {
             // An any-title kit's helper serves the game titles listed here (root-owned).
             config.write_title_allow_list = playden::ps5::WriteTitleAllowList;
             config.hold_effective_uid = playden::ps5::HoldEffectiveUid;
-            config.xbox_runtime_dir = "/data/playden/xbox/runtime";
+            config.xbox_runtime_dir = (std::filesystem::path(paths.title_root)/"xbox-runtime").string();
             const auto wrapper_dir=(std::filesystem::path(paths.title_root)/"xbox-runtime").string();
             struct stat wrapper_info{};
             if (lstat((wrapper_dir+"/xgameruntime.dll").c_str(),&wrapper_info)==0 && S_ISREG(wrapper_info.st_mode))
@@ -871,6 +907,7 @@ int main() {
         bool presented = false;
         bool was_connected = true;
         std::vector<playden::GameId> dev_prepares;  // imported games the request file asked to prepare
+        std::vector<playden::steam::InstallRequest> dev_xbox;
         std::uint64_t dev_prepares_until = 0;
         std::uint64_t last_render_us = 0;
         std::uint64_t reconnect_pad_at = hui::sys::monotonic_us() + 2'000'000;
@@ -976,7 +1013,10 @@ int main() {
                     using playden::homebrew::ImportRequestKind;
                     const char* action = "queued";
                     const auto& game = request.game;
-                    if (request.action == Action::kCopy) {
+                    if (game.store == playden::Store::kXbox) {
+                        action = "xbox-pending";
+                        dev_xbox.push_back(request);
+                    } else if (request.action == Action::kCopy) {
                         action = "copy";
                         simulation.RequestImport({ImportRequestKind::CopyIntoPlayden, game, request.volume, {}, {}});
                     } else if (request.action == Action::kMove) {
@@ -1008,6 +1048,26 @@ int main() {
 #endif
             }
 #if !PLAYDEN_UI_SIMULATION
+            if (!dev_xbox.empty()) {
+                const auto catalog = xbox_library->Snapshot();
+                if (catalog && xbox_jobs.Snapshot()->phase != "loading") {
+                    for (auto it = dev_xbox.begin(); it != dev_xbox.end();) {
+                        const auto& request = *it;
+                        const bool listed = std::any_of(catalog->games.begin(),catalog->games.end(),[&](const auto& game) {
+                            return game.id == request.game;
+                        });
+                        using Action = playden::steam::InstallRequest::Action;
+                        bool accepted = false;
+                        if (listed && request.action == Action::kInstall)
+                            accepted = xbox_jobs.Install(request.game,catalog->account_key,catalog->market);
+                        else if (request.action == Action::kCancel) accepted = xbox_jobs.Cancel(request.game);
+                        playden::app::AppendLogLine(log_root,"install.log","install-request xbox game=" +
+                            playden::ToKey(request.game) + " accepted=" + std::to_string(accepted));
+                        it = dev_xbox.erase(it);
+                    }
+                }
+                if (now > dev_prepares_until) dev_xbox.clear();
+            }
             // dev/install-request.txt's imported games to prepare, once their folder is known (a minute at most).
             if (!dev_prepares.empty()) {
                 for (auto it = dev_prepares.begin(); it != dev_prepares.end();) {
