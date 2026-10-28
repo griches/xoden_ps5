@@ -1,5 +1,9 @@
 # XoDen 0.1.0
 
+[![stars](https://img.shields.io/github/stars/griches/xoden_ps5?style=flat)](https://github.com/griches/xoden_ps5/stargazers)
+[![release](https://img.shields.io/github/v/release/griches/xoden_ps5?include_prereleases)](https://github.com/griches/xoden_ps5/releases)
+[![licence](https://img.shields.io/badge/licence-GPL--3.0-blue)](playden-ps5/LICENSE)
+
 <img src="playden-ps5/sce_sys/icon0.png" alt="XoDen" width="128">
 
 Browse your PC Game Pass library, download Windows games directly to a jailbroken
@@ -29,7 +33,7 @@ XoDen is an independent project, **not affiliated with or supported by Xodus,
 Xodus Nexus, Playden, Microsoft or Xbox**. Please report XoDen problems in
 [this repository's Issues](https://github.com/griches/xoden_ps5/issues),
 not to those projects' support channels. Their contributions are credited below.
-This repository and its release downloads currently require repository access.
+The source, release downloads and compatibility reports are hosted here on GitHub.
 
 **[Download 0.1.0](https://github.com/griches/xoden_ps5/releases/tag/0.1)** ·
 **[Compatibility](COMPATIBILITY.md)** · **[Known issues / roadmap](ROADMAP.md)** ·

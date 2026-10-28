@@ -8,7 +8,7 @@ send this fork's issues to the Xodus, Nexus or Playden teams.
 [Open the compatibility report form](https://github.com/griches/xoden_ps5/issues/new?template=compatibility-report.yml),
 enter the game and what worked or failed, and submit it. A maintainer reviews
 the report and updates the chart. You do not need to edit files, install Git,
-or know Markdown. A GitHub account and access to this repository are required.
+or know Markdown. A GitHub account is required to submit a report.
 Reports do not automatically change a verdict.
 
 ## Propose a compatibility-list change
@@ -32,9 +32,10 @@ If you prefer not to edit Markdown, use the
 A maintainer can update the chart from that report. Reports include successful
 games as well as failures. In-app ratings remain local and do not submit to GitHub.
 
-The repository is currently private. Invited collaborators can view and
-contribute; people without access cannot download this release, open its Issues
-or propose changes here. Making the repository public is a separate owner decision.
+The repository is public. Reading the documentation and downloading releases
+do not require an invitation. Sign in to GitHub to open an issue or propose
+a change. If you do not have write access, fork the repository, edit your fork
+and open a pull request back to this repository.
 
 ## Code and documentation
 

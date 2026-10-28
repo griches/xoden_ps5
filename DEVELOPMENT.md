@@ -1,7 +1,7 @@
 # Development and provenance
 
 This repository brings the existing app, backend and integration-tool repositories
-under one private GitHub remote. Their original commit histories are retained as
+under one GitHub remote, originally private and now public. Their original commit histories are retained as
 Git subtrees. Component heads at import are recorded in
 [SOURCE-PROVENANCE.json](SOURCE-PROVENANCE.json). Original working repositories
 and their upstream remotes were left unchanged.
@@ -57,8 +57,7 @@ git push origin main
 Alternatively develop directly in the component directories here. Do not push
 this combined `main` branch to any upstream project. Imported upstream release
 workflows remain inside component directories; no release workflow is installed
-at this repository's root. GitHub Actions is disabled on the private repository
-at initial publication.
+at this repository's root. GitHub Actions was disabled at initial publication.
 
 ## Compatibility reports
 

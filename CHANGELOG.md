@@ -1,5 +1,11 @@
 # Changelog
 
+## Public repository and README badges — 2026-10-28
+
+- Opened the repository and release downloads to the public.
+- Added stars, release and licence badges matching the other PS5 project READMEs.
+- Added GitHub topics and updated the public compatibility-reporting workflow.
+
 ## Documentation and compatibility update — 2026-10-28
 
 - Added explicit Windows PC setup and PowerShell commands to both sign-in READMEs.
@@ -31,5 +37,5 @@ reports and edition/settings/test details.
 
 Registration can need a return to PS5 Home, long-term sign-in renewal needs more
 testing, some notifications truncate text, and other issues remain in ROADMAP.md.
-App updates are manual in this beta. The repository retains its current private
-visibility; this release does not change access permissions.
+App updates are manual in this beta. The first release was initially private;
+the repository and release downloads are now public.

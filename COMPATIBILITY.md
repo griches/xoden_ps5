@@ -13,7 +13,8 @@ The easiest route is the report form: enter the game and what worked or failed;
 a maintainer reviews the report and updates the table. The edit link opens
 GitHub's file editor; submit your change as a pull request for review.
 Neither route changes the list automatically. Successful reports are welcome.
-This repository is currently private, so contributors need repository access.
+Anyone with a GitHub account can submit a report or propose an edit;
+maintainers review changes before updating the list.
 
 ## Status
 
