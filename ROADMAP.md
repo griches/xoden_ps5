@@ -14,7 +14,8 @@ test evidence; this page tracks outstanding functionality.
   approval cache avoids repeating browser login after failed verification.
   Gary also confirmed Call of the Elder Gods is signed in and its existing saves
   are visible. Verify MIO and expiry/account-change behavior before considering
-  this complete across games.
+  this complete across games. Bounded automatic verification retries are now
+  installed to avoid a second menu attempt; fresh first-pass acceptance is pending.
 - [ ] Verify sign-in persistence, expiry, account changes and game runtime end
   to end. Earlier device-code login proved library, subscription and PC licence
   access but not MIO's game grant. It is not the user-facing sign-in route.
