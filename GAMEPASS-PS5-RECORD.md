@@ -1476,3 +1476,58 @@ branch xbox-store at 93cd249. Fetch found upstream 9aae269 and v0.7.2 tag.
   Sign in with Microsoft action and approve once. A fresh first-pass browser
   login with this build is still pending; last night's cached-retry and Elder
   Gods game sign-in acceptance remain the last live success. No pushes/releases.
+
+#### Fresh first-attempt sign-in accepted
+
+- Gary reported "it worked!". Native log: fresh sign-in began 07:36:01Z and
+  completed successfully at 07:36:54Z; automatic library refresh immediately
+  followed and completed at 07:37:19Z. Both terminal states were 4, no error.
+  The paired computer reported `stage:signed-in` and an explicit saved result.
+  This was a fresh browser approval completing within one menu invocation,
+  not last night's separate cached retry. Internal retry usage is not logged,
+  so do not claim that Microsoft actually rejected this attempt first.
+
+#### XoDen branding, artwork and larger PS5 pairing screen
+
+- Gary requested the name XoDen to reflect Xodus, Nexus and Playden, an original
+  green gaming icon/background without copied game artwork, and a larger,
+  separately displayed pairing code. Implemented XoDen in app-facing labels,
+  window/title metadata, status text and preset display names. Existing title
+  FAKE77031, storage paths, account credentials, package identity and settings
+  ownership headers remain compatible. Attribution was retained.
+- Pairing now has a separate URL panel, numbered instructions, four large
+  60px code groups, and an explicit Chrome requirement. URL/code are separate
+  validated transient model fields and clear when pairing finishes or becomes
+  invalid. Native renderer preview: playden-ps5/docs/images/xoden-signin-preview.png.
+- Created original icon and abstract portal background with the built-in image
+  generator and no reference images. Sources and complete prompts are stored
+  in playden-ps5/assets/branding/xoden-{icon,background}-v1.png and
+  xoden-prompts.md. The package has a 512px RGB icon and 3840×2160 DXT1 backgrounds.
+  No Xbox/Microsoft marks or existing game art were used as inputs.
+- The local sign-in page now says XoDen and puts the Chrome prerequisite before
+  the instructions. Chrome is still REQUIRED for the Microsoft auth window.
+  Safari can remain the default browser for the local page. Missing Chrome
+  produces an install message; the PS5 waits for pairing/cancel/timeout.
+  No automatic browser installation or Safari auth fallback was added.
+- Validation: full host run completed with 150/153 passing initially; fixed
+  the leftover preset label, retained the legacy settings comment, and updated
+  the old inline-code expectations. All affected model/settings/account/
+  graphical/publication checks passed on focused reruns. Thus all 153 checks
+  are covered by the full run and final reruns. Helper TLS tests 5/5 passed.
+  Final PS5 build passed. No further full suite rerun is needed without changes.
+  Logs: /tmp/xoden-branding-final-host-tests.log,
+  /tmp/xoden-final-focused-tests.log, /tmp/xoden-final-model-tests.log,
+  /tmp/xoden-branding-final-ps5-build.log.
+- Deployed eboot SHA256:
+  99e671397b4f25032c48c9a249123839f46739d7064c5bd29b3012bf90ea9cfd.
+  Backup: playden-ps5/console-backups/20261028-xoden-branding-pairing.
+  Read-back verified seven changed files. Closed observed PPSA99318 under
+  Gary's standing authorization to terminate games for this work, then opened
+  FAKE77031. Remote param reports XoDen; remote icon hash matches the new icon.
+  Captured the app's Home screen and confirmed the existing installed library
+  loaded. Removed the transient capture. No account reset or save operation.
+- UI source commit ea88a09, with a follow-up preview-only commit. The local
+  helper was restarted with XoDen copy. No DevLoop/virtual pad or Remote Play
+  was used; physical controller remains available. The larger pairing screen
+  was checked in the host renderer; no additional live browser login was
+  requested for this layout change. No pushes/releases.

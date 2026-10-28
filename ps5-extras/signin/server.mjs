@@ -37,7 +37,7 @@ const server=createServer(async(req,res)=>{
   }catch(error){send(res,400,{error:error instanceof SyntaxError?'Invalid request.':error.message});}
 });
 server.listen(port,'127.0.0.1',()=>{
-  console.log(`Game Pass sign-in: ${origin}`);
+  console.log(`XoDen sign-in: ${origin}`);
   if(process.argv.includes('--open') && process.platform==='darwin')spawn('open',[origin],{stdio:'ignore'}).on('error',()=>{});
 });
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{controller?.abort();server.close();});
