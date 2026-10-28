@@ -67,15 +67,43 @@ async fn verify_candidate(tokens:&TokenManager,memory:&TokenManager,expected:Opt
     user:secrets::User,issued:std::collections::HashMap<String,secrets::Token>,
     diagnostics:&mut Vec<xodus::api::xbox::auth::UserAuthRejection>) -> Result<()> {
     memory.save_user_session(secrets::User { puid:user.puid.clone(),username:user.username.clone() },issued.clone()).map_err(|_| "browser-session-verify")?;
-    let signed_in_xuid=super::super::profile::xbox_user_id_with_diagnostics(memory,diagnostics).await.map_err(|_| {
-        match diagnostics.last().map(|value|(value.http,value.kind)) {
-            Some((400,_))=>"browser-verify-http-400",Some((401,_))=>"browser-verify-http-401",Some((403,_))=>"browser-verify-http-403",
-            Some((_,"connect"))=>"browser-verify-connect",Some((_,"timeout"))=>"browser-verify-timeout",Some((_,"response"))=>"browser-verify-response",
-            _=>"browser-verification-pending",
-        }
-    })?;
+    let signed_in_xuid=tokio::time::timeout(Duration::from_secs(60),verify_identity(|| async {
+        let mut rejected=Vec::new();
+        let result=super::super::profile::xbox_user_id_with_diagnostics(memory,&mut rejected).await;
+        (result,rejected)
+    },diagnostics)).await.map_err(|_|"browser-verify-timeout")??;
     if expected_xuid.is_some_and(|previous|previous!=signed_in_xuid) { return Err("browser-account-mismatch"); }
     tokens.save_primary_browser_session(expected,user,issued).map_err(|_| "browser-session-save")
+}
+
+/// Keep a newly approved login in this operation while a recoverable Xbox
+/// rejection settles. Identity comparison and the active-account commit happen
+/// only after this succeeds. Each attempt has its own diagnostic history.
+async fn verify_identity<F,Fut>(mut verify:F,diagnostics:&mut Vec<xodus::api::xbox::auth::UserAuthRejection>) -> Result<String>
+where F:FnMut()->Fut,Fut:std::future::Future<Output=(Result<String>,Vec<xodus::api::xbox::auth::UserAuthRejection>)> {
+    for attempt in 0..3 {
+        let (result,rejected)=verify().await;
+        let rejection=rejected.last();
+        let code=match (result.as_ref().err().copied(),rejection.map(|value|(value.http,value.kind))) {
+            (Some("xbox-user"),Some((400,_)))=>"browser-verify-http-400",
+            (Some("xbox-user"),Some((401,_)))=>"browser-verify-http-401",
+            (Some("xbox-user"),Some((403,_)))=>"browser-verify-http-403",
+            (Some("xbox-user"),Some((429,_)))=>"browser-verify-rate-limit",
+            (Some("xbox-user"),Some((500..=599,_)))=>"browser-verify-service",
+            (Some("xbox-user"),Some((_,"connect")))=>"browser-verify-connect",
+            (Some("xbox-user"),Some((_,"timeout")))=>"browser-verify-timeout",
+            (Some("xbox-user"),Some((_,"request")))=>"browser-verify-request",
+            (Some("xbox-user"),Some((_,"response")))=>"browser-verify-response",
+            _=>"browser-verification-pending",
+        };
+        let retry=result==Err("xbox-user") && rejection.is_some_and(|value|
+            matches!(value.http,401|500..=599) || matches!(value.kind,"connect"|"timeout"|"request"));
+        diagnostics.extend(rejected);
+        if let Ok(identity)=result {return Ok(identity);}
+        if !retry || attempt==2 {return Err(code);}
+        tokio::time::sleep(Duration::from_secs(attempt+1)).await;
+    }
+    unreachable!()
 }
 
 async fn execute(client: &reqwest::Client,tokens: &TokenManager,root: &Path,req: &Request) -> Result<()> {
@@ -176,6 +204,69 @@ async fn execute(client: &reqwest::Client,tokens: &TokenManager,root: &Path,req:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use xodus::api::xbox::auth::UserAuthRejection;
+
+    #[tokio::test(start_paused = true)]
+    async fn browser_verification_first_success_has_no_delay_or_second_attempt() {
+        let mut calls=0;
+        let started=tokio::time::Instant::now();
+        let identity=verify_identity(|| {
+            calls+=1;
+            std::future::ready((Ok("verified-xuid".into()),Vec::new()))
+        },&mut Vec::new()).await.unwrap();
+        assert_eq!(identity,"verified-xuid");assert_eq!(calls,1);
+        assert_eq!(started.elapsed(),Duration::ZERO);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn browser_verification_recovers_in_the_same_operation_and_bounds_rejections() {
+        for recover in [true,false] {
+            let mut calls=0;
+            let mut diagnostics=Vec::new();
+            let started=tokio::time::Instant::now();
+            let result=verify_identity(|| {
+                calls+=1;
+                std::future::ready(if recover && calls==3 {(Ok("verified-xuid".into()),Vec::new())}
+                    else {(Err("xbox-user"),vec![UserAuthRejection {http:401,xerr:None,kind:"http"}])})
+            },&mut diagnostics).await;
+            if recover {assert_eq!(result.unwrap(),"verified-xuid");}else{assert_eq!(result.unwrap_err(),"browser-verify-http-401");}
+            assert_eq!(calls,3);assert_eq!(started.elapsed(),Duration::from_secs(3));
+            assert_eq!(diagnostics.len(),if recover {2}else{3});
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn browser_verification_does_not_retry_permanent_or_later_stage_failures() {
+        for (stage,http,expected) in [("xbox-user",400,"browser-verify-http-400"),("xbox-user",403,"browser-verify-http-403"),
+            ("xbox-user",429,"browser-verify-rate-limit"),("identity-json",401,"browser-verification-pending")] {
+            let mut calls=0;
+            let started=tokio::time::Instant::now();
+            let result=verify_identity(|| {
+                calls+=1;
+                std::future::ready((Err(stage),vec![UserAuthRejection{http,xerr:None,kind:"http"}]))
+            },&mut Vec::new()).await;
+            assert_eq!(result.unwrap_err(),expected);assert_eq!(calls,1);
+            assert_eq!(started.elapsed(),Duration::ZERO);
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn browser_verification_cancellation_stops_before_another_attempt() {
+        let calls=std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let captured=calls.clone();
+        let task=tokio::spawn(async move {
+            verify_identity(|| {
+                captured.fetch_add(1,std::sync::atomic::Ordering::SeqCst);
+                std::future::ready((Err("xbox-user"),vec![UserAuthRejection{http:401,xerr:None,kind:"http"}]))
+            },&mut Vec::new()).await
+        });
+        tokio::task::yield_now().await;
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst),1);
+        task.abort();assert!(task.await.unwrap_err().is_cancelled());
+        tokio::time::advance(Duration::from_secs(10)).await;
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst),1);
+    }
+
     #[test]
     fn browser_duplicate_callbacks_cannot_abort_the_next_login_leg() {
         assert!(!current_event(&json!({"type":"ipc","session":1}),2).unwrap());

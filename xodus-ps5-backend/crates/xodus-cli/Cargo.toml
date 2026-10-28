@@ -47,3 +47,6 @@ default = ["native-webview", "eappx-extraction"]
 eappx-extraction = ["dep:eappx"]
 native-webview = ["dep:tao", "dep:wry"]
 tokio_console = ["dep:console-subscriber"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
